@@ -1,0 +1,17 @@
+# JavaScript files
+/assets/*.js
+  Content-Type: text/javascript; charset=utf-8
+  X-Content-Type-Options: nosniff
+
+/*.js
+  Content-Type: text/javascript; charset=utf-8
+  X-Content-Type-Options: nosniff
+
+# ES Module files
+/assets/*.mjs
+  Content-Type: text/javascript; charset=utf-8
+  X-Content-Type-Options: nosniff
+
+/*.mjs
+  Content-Type: text/javascript; charset=utf-8
+  X-Content-Type-Options: nosniff
