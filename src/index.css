@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-border: hsl(0, 0%, 80%);
+  --color-input: hsl(0, 0%, 96%);
+  --color-ring: hsl(355, 70%, 45%);
+  --color-background: hsl(0, 0%, 97%);
+  --color-foreground: hsl(0, 0%, 15%);
+  --color-primary: hsl(355, 70%, 45%);
+  --color-primary-foreground: hsl(0, 0%, 100%);
+  --color-secondary: hsl(0, 0%, 85%);
+  --color-secondary-foreground: hsl(0, 0%, 25%);
+  --color-tertiary: hsl(0, 0%, 65%);
+  --color-tertiary-foreground: hsl(0, 0%, 20%);
+  --color-neutral: hsl(0, 0%, 96%);
+  --color-neutral-foreground: hsl(0, 0%, 20%);
+  --color-destructive: hsl(0, 70%, 50%);
+  --color-destructive-foreground: hsl(0, 0%, 100%);
+  --color-success: hsl(120, 40%, 45%);
+  --color-success-foreground: hsl(0, 0%, 100%);
+  --color-warning: hsl(40, 80%, 55%);
+  --color-warning-foreground: hsl(0, 0%, 20%);
+  --color-muted: hsl(0, 0%, 92%);
+  --color-muted-foreground: hsl(0, 0%, 50%);
+  --color-accent: hsl(0, 0%, 90%);
+  --color-accent-foreground: hsl(0, 0%, 25%);
+  --color-popover: hsl(0, 0%, 100%);
+  --color-popover-foreground: hsl(0, 0%, 15%);
+  --color-card: hsl(0, 0%, 100%);
+  --color-card-foreground: hsl(0, 0%, 15%);
+  
+  --font-sans: "Inter", sans-serif;
+  --font-headline: "Poppins", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --radius: 12px;
+}
+
+/* Al Watania Steel gradient backgrounds */
+.bg-gradient-watania {
+  background: linear-gradient(135deg, hsl(340, 80%, 30%), hsl(340, 70%, 25%));
+}
+
+.bg-gradient-steel {
+  background: linear-gradient(135deg, hsl(0, 0%, 65%), hsl(0, 0%, 55%));
+}
+
+/* Ensure proper color application */
+html, body {
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+
+html, body {
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
