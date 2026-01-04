@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { orderService, activityService, historyService, supabase, type Order as DBOrder, type Activity as DBActivity, type HistoryOrder } from '../lib/supabase';
+import { roundTo3Decimals } from '../lib/utils';
 
 // Transform database types to frontend types
 interface Order {
@@ -567,9 +568,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       });
       
       metrics[date] = {
-        straightBar: Math.round(straightBar * 100) / 100,
-        cutAndBend: Math.round(cutAndBend * 100) / 100,
-        total: Math.round((straightBar + cutAndBend) * 100) / 100
+        straightBar: roundTo3Decimals(straightBar),
+        cutAndBend: roundTo3Decimals(cutAndBend),
+        total: roundTo3Decimals(straightBar + cutAndBend)
       };
     });
     

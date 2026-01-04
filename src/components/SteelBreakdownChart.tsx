@@ -1,6 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card } from '@/components/ui/card';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { roundTo3Decimals, formatNumber } from '../lib/utils';
 
 export function SteelBreakdownChart() {
   const { orders, historyOrders } = useDashboardStore();
@@ -41,7 +42,7 @@ export function SteelBreakdownChart() {
   const chartData = Object.entries(steelBreakdown)
     .map(([size, tons]) => ({
       size,
-      tons: Math.round(tons * 100) / 100,
+      tons: roundTo3Decimals(tons),
       name: size
     }))
     .filter(item => item.tons > 0)
@@ -64,14 +65,14 @@ export function SteelBreakdownChart() {
               fontSize={12}
               label={{ value: 'Tons', angle: -90, position: 'insideLeft' }}
             />
-            <Tooltip 
+            <Tooltip
               contentStyle={{
                 backgroundColor: 'hsl(0, 0%, 100%)',
                 border: '1px solid hsl(240, 4%, 80%)',
                 borderRadius: '8px',
                 color: 'hsl(0, 0%, 12%)'
               }}
-              formatter={(value) => [`${value} tons`, 'Total Delivered']}
+              formatter={(value: number) => [`${formatNumber(value)} tons`, 'Total Delivered']}
               labelFormatter={(label) => `Steel Size: ${label}`}
             />
             <Bar 

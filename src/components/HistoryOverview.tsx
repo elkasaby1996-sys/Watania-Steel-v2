@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { BarChart3, Weight, Wrench, Package, TrendingUp } from 'lucide-react';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { roundTo3Decimals, formatNumber } from '../lib/utils';
 
 export function HistoryOverview() {
   const dashboardStore = useDashboardStore();
@@ -39,9 +40,9 @@ export function HistoryOverview() {
     
     // Round all values
     Object.keys(metrics).forEach(date => {
-      metrics[date].straightBar = Math.round(metrics[date].straightBar * 100) / 100;
-      metrics[date].cutAndBend = Math.round(metrics[date].cutAndBend * 100) / 100;
-      metrics[date].total = Math.round(metrics[date].total * 100) / 100;
+      metrics[date].straightBar = roundTo3Decimals(metrics[date].straightBar);
+      metrics[date].cutAndBend = roundTo3Decimals(metrics[date].cutAndBend);
+      metrics[date].total = roundTo3Decimals(metrics[date].total);
     });
     
     return metrics;
@@ -52,12 +53,12 @@ export function HistoryOverview() {
   const totalCutAndBend = Object.values(dailyMetrics).reduce((sum, day) => sum + day.cutAndBend, 0);
   const grandTotal = totalStraightBar + totalCutAndBend;
   const totalDays = Object.keys(dailyMetrics).length;
-  const averagePerDay = totalDays > 0 ? Math.round((grandTotal / totalDays) * 100) / 100 : 0;
+  const averagePerDay = totalDays > 0 ? roundTo3Decimals(grandTotal / totalDays) : 0;
 
   const overviewCards = [
     {
       title: "Total Delivered",
-      value: `${Math.round(grandTotal * 100) / 100}`,
+      value: `${formatNumber(grandTotal)}`,
       subtitle: "tons",
       icon: Weight,
       color: 'text-primary',
@@ -65,23 +66,23 @@ export function HistoryOverview() {
     },
     {
       title: "Straight Bar",
-      value: `${Math.round(totalStraightBar * 100) / 100}`,
-      subtitle: `${grandTotal > 0 ? Math.round((totalStraightBar / grandTotal) * 100) : 0}% of total`,
+      value: `${formatNumber(totalStraightBar)}`,
+      subtitle: `${grandTotal > 0 ? roundTo3Decimals((totalStraightBar / grandTotal) * 100) : 0}% of total`,
       icon: Package,
       color: 'text-success',
       bgColor: 'bg-success/10'
     },
     {
       title: "Cut & Bend",
-      value: `${Math.round(totalCutAndBend * 100) / 100}`,
-      subtitle: `${grandTotal > 0 ? Math.round((totalCutAndBend / grandTotal) * 100) : 0}% of total`,
+      value: `${formatNumber(totalCutAndBend)}`,
+      subtitle: `${grandTotal > 0 ? roundTo3Decimals((totalCutAndBend / grandTotal) * 100) : 0}% of total`,
       icon: Wrench,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100'
     },
     {
       title: "Daily Average",
-      value: `${averagePerDay}`,
+      value: `${formatNumber(averagePerDay)}`,
       subtitle: "tons per day",
       icon: TrendingUp,
       color: 'text-tertiary',
@@ -118,30 +119,30 @@ export function HistoryOverview() {
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Order Type Distribution</span>
-              <span>{Math.round(grandTotal * 100) / 100} tons total</span>
+              <span>{formatNumber(grandTotal)} tons total</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
               <div className="h-full flex">
-                <div 
+                <div
                   className="bg-green-500 transition-all duration-500"
-                  style={{ width: `${Math.round((totalStraightBar / grandTotal) * 100)}%` }}
-                  title={`Straight Bar: ${totalStraightBar} tons`}
+                  style={{ width: `${roundTo3Decimals((totalStraightBar / grandTotal) * 100)}%` }}
+                  title={`Straight Bar: ${formatNumber(totalStraightBar)} tons`}
                 ></div>
-                <div 
+                <div
                   className="bg-purple-500 transition-all duration-500"
-                  style={{ width: `${Math.round((totalCutAndBend / grandTotal) * 100)}%` }}
-                  title={`Cut & Bend: ${totalCutAndBend} tons`}
+                  style={{ width: `${roundTo3Decimals((totalCutAndBend / grandTotal) * 100)}%` }}
+                  title={`Cut & Bend: ${formatNumber(totalCutAndBend)} tons`}
                 ></div>
               </div>
             </div>
             <div className="flex justify-between text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                Straight Bar ({Math.round((totalStraightBar / grandTotal) * 100)}%)
+                Straight Bar ({roundTo3Decimals((totalStraightBar / grandTotal) * 100)}%)
               </span>
               <span className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                Cut & Bend ({Math.round((totalCutAndBend / grandTotal) * 100)}%)
+                Cut & Bend ({roundTo3Decimals((totalCutAndBend / grandTotal) * 100)}%)
               </span>
             </div>
           </div>

@@ -8,7 +8,8 @@ import {
   ChevronRight,
   History,
   Truck,
-  Building2
+  Building2,
+  Warehouse
 } from 'lucide-react';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
@@ -27,6 +28,7 @@ export function Sidebar() {
     { icon: Users, label: 'Users', path: '/users', active: location.pathname === '/users', adminOnly: true },
     { icon: Truck, label: 'Drivers', path: '/drivers', active: location.pathname === '/drivers' || location.pathname.startsWith('/drivers/') },
     { icon: Building2, label: 'Clients', path: '/clients', active: location.pathname === '/clients' || location.pathname.startsWith('/clients/') },
+    { icon: Warehouse, label: 'Inventory', path: '/inventory', active: location.pathname === '/inventory' },
     { icon: BarChart3, label: 'Steel Analytics', path: '/steel-analytics', active: location.pathname === '/steel-analytics' },
   ];
 

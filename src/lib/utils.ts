@@ -35,3 +35,23 @@ export function findCompanyBySlug(slug: string, companies: string[]): string | n
 
   return companies.find(company => slugifyCompany(company) === slug) || null;
 }
+
+/**
+ * Formats a number to 3 decimal places.
+ * Returns '-' for null, undefined, or empty values.
+ * Returns the original string for non-numeric values.
+ */
+export function formatNumber(value: any): string {
+  if (value === null || value === undefined || value === '') return '-';
+  const num = Number(value);
+  if (isNaN(num)) return String(value);
+  return num.toFixed(3);
+}
+
+/**
+ * Rounds a number to 3 decimal places for calculations.
+ * Use this when storing/computing values that need 3 decimal precision.
+ */
+export function roundTo3Decimals(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
