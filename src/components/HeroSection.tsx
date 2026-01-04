@@ -13,16 +13,16 @@ export function HeroSection() {
 
   return (
     <div className="mb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="page-header">
         <div>
-          <h1 className="text-3xl font-headline font-bold text-foreground mb-2">
+          <h1 className="page-header-title">
             Al Watania Steel - Daily Orders
           </h1>
-          <p className="text-muted-foreground">
+          <p className="page-header-subtitle">
             {today} - Track and manage steel deliveries
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="page-header-actions">
           <RoleBasedComponent action="create">
             <AddOrderDialog />
           </RoleBasedComponent>

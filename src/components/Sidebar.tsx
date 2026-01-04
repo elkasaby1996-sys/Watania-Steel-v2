@@ -39,47 +39,53 @@ export function Sidebar() {
   };
 
   return (
-    <div className={`fixed left-0 top-0 h-full bg-card border-r border-border transition-all duration-300 ease-in-out z-50 ${
+    <div className={`fixed left-0 top-0 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out z-50 ${
       sidebarCollapsed ? 'w-16' : 'w-64'
     }`}>
-      <div className="flex items-center justify-between px-6 h-16 border-b border-border">
+      {/* Logo Section */}
+      <div className="flex items-center justify-between px-4 h-16 border-b border-sidebar-border">
         <div className="flex items-center justify-center">
-          <img 
-            src="https://c.animaapp.com/mfuv9ro3jvVXIT/img/chatgpt-image-sep-25-2025-10_05_13-am.png" 
+          <img
+            src="https://c.animaapp.com/mfuv9ro3jvVXIT/img/chatgpt-image-sep-25-2025-10_05_13-am.png"
             alt="Al Watania Steel Qatar"
-            className="w-14 h-14 object-contain"
+            className="w-12 h-12 object-contain"
           />
         </div>
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"
+          className="text-sidebar-foreground hover:bg-sidebar-hover hover:text-gray-100 h-8 w-8"
         >
-          {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+          {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </Button>
       </div>
-      
-      <nav className="p-4 space-y-2">
+
+      {/* Navigation */}
+      <nav className="p-3 space-y-1">
         {menuItems.map((item, index) => {
           // Hide admin-only items for non-admins
           if (item.adminOnly && !hasPermission(user?.profile?.role, 'delete')) {
             return null;
           }
-          
+
           return (
             <Button
               key={index}
-              variant={item.active ? "default" : "ghost"}
+              variant="ghost"
               onClick={() => handleNavigation(item.path)}
-              className={`w-full justify-start gap-3 h-11 transition-all duration-200 ${
-                item.active 
-                  ? 'bg-primary text-primary-foreground shadow-md' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-              } ${sidebarCollapsed ? 'px-3' : 'px-4'}`}
+              className={`w-full justify-start gap-3 h-11 transition-all duration-200 relative ${
+                item.active
+                  ? 'bg-sidebar-active text-gray-50 font-medium'
+                  : 'text-sidebar-foreground hover:text-gray-100 hover:bg-sidebar-hover'
+              } ${sidebarCollapsed ? 'px-3 justify-center' : 'px-4'}`}
             >
-              <item.icon size={20} />
-              {!sidebarCollapsed && <span className="font-medium">{item.label}</span>}
+              {/* Maroon accent indicator for active item */}
+              {item.active && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
+              )}
+              <item.icon size={20} className={item.active ? 'text-primary' : ''} />
+              {!sidebarCollapsed && <span>{item.label}</span>}
             </Button>
           );
         })}

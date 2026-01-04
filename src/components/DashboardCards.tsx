@@ -11,28 +11,28 @@ export function DashboardCards() {
       value: stats.todayOrders,
       icon: Package,
       color: 'text-primary',
-      bgColor: 'bg-primary/10'
+      bgColor: 'bg-primary/20'
     },
     {
       title: 'In Progress',
       value: stats.inProgress,
       icon: Clock,
-      color: 'text-tertiary',
-      bgColor: 'bg-tertiary/10'
+      color: 'text-tertiary-foreground',
+      bgColor: 'bg-tertiary/30'
     },
     {
       title: 'Completed',
       value: stats.completed,
       icon: CheckCircle,
       color: 'text-success',
-      bgColor: 'bg-success/10'
+      bgColor: 'bg-success/20'
     },
     {
       title: 'Delayed',
       value: stats.delayed,
       icon: AlertTriangle,
       color: 'text-warning',
-      bgColor: 'bg-warning/10'
+      bgColor: 'bg-warning/20'
     }
   ];
 
@@ -43,7 +43,7 @@ export function DashboardCards() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-2">{card.title}</p>
-              <p className="text-3xl font-bold text-foreground">{card.value}</p>
+              <p className="text-3xl font-bold text-gray-50">{card.value}</p>
             </div>
             <div className={`p-3 rounded-lg ${card.bgColor}`}>
               <card.icon className={`h-6 w-6 ${card.color}`} />

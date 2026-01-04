@@ -6,61 +6,91 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Industrial Pro Design System - Dark Navy Theme */
 :root {
-  --color-border: hsl(0, 0%, 80%);
-  --color-input: hsl(0, 0%, 96%);
-  --color-ring: hsl(355, 70%, 45%);
-  --color-background: hsl(0, 0%, 97%);
-  --color-foreground: hsl(0, 0%, 15%);
-  --color-primary: hsl(355, 70%, 45%);
+  /* Core colors - Dark Navy Theme */
+  --color-border: hsl(215, 25%, 27%);
+  --color-input: hsl(215, 28%, 17%);
+  --color-ring: hsl(345, 65%, 35%);
+  --color-background: hsl(218, 35%, 12%);
+  --color-foreground: hsl(210, 20%, 85%);
+
+  /* Primary - Dark Maroon (Brand Color) */
+  --color-primary: hsl(345, 65%, 30%);
   --color-primary-foreground: hsl(0, 0%, 100%);
-  --color-secondary: hsl(0, 0%, 85%);
-  --color-secondary-foreground: hsl(0, 0%, 25%);
-  --color-tertiary: hsl(0, 0%, 65%);
-  --color-tertiary-foreground: hsl(0, 0%, 20%);
-  --color-neutral: hsl(0, 0%, 96%);
-  --color-neutral-foreground: hsl(0, 0%, 20%);
-  --color-destructive: hsl(0, 70%, 50%);
+
+  /* Secondary - Muted Blue-Gray */
+  --color-secondary: hsl(215, 25%, 23%);
+  --color-secondary-foreground: hsl(210, 20%, 85%);
+
+  /* Tertiary */
+  --color-tertiary: hsl(215, 20%, 35%);
+  --color-tertiary-foreground: hsl(210, 20%, 90%);
+
+  /* Neutral */
+  --color-neutral: hsl(215, 28%, 17%);
+  --color-neutral-foreground: hsl(210, 20%, 85%);
+
+  /* Semantic colors */
+  --color-destructive: hsl(0, 65%, 50%);
   --color-destructive-foreground: hsl(0, 0%, 100%);
-  --color-success: hsl(120, 40%, 45%);
+  --color-success: hsl(142, 50%, 40%);
   --color-success-foreground: hsl(0, 0%, 100%);
-  --color-warning: hsl(40, 80%, 55%);
-  --color-warning-foreground: hsl(0, 0%, 20%);
-  --color-muted: hsl(0, 0%, 92%);
-  --color-muted-foreground: hsl(0, 0%, 50%);
-  --color-accent: hsl(0, 0%, 90%);
-  --color-accent-foreground: hsl(0, 0%, 25%);
-  --color-popover: hsl(0, 0%, 100%);
-  --color-popover-foreground: hsl(0, 0%, 15%);
-  --color-card: hsl(0, 0%, 100%);
-  --color-card-foreground: hsl(0, 0%, 15%);
-  
+  --color-warning: hsl(38, 80%, 50%);
+  --color-warning-foreground: hsl(0, 0%, 10%);
+
+  /* Muted & Accent */
+  --color-muted: hsl(215, 25%, 20%);
+  --color-muted-foreground: hsl(215, 15%, 55%);
+  --color-accent: hsl(215, 25%, 25%);
+  --color-accent-foreground: hsl(210, 20%, 90%);
+
+  /* Surfaces */
+  --color-popover: hsl(218, 32%, 15%);
+  --color-popover-foreground: hsl(210, 20%, 85%);
+  --color-card: hsl(217, 30%, 16%);
+  --color-card-foreground: hsl(210, 20%, 85%);
+
+  /* Sidebar */
+  --color-sidebar: hsl(218, 35%, 10%);
+  --color-sidebar-foreground: hsl(210, 20%, 70%);
+  --color-sidebar-border: hsl(215, 25%, 20%);
+  --color-sidebar-accent: hsl(345, 65%, 30%);
+  --color-sidebar-hover: hsl(217, 30%, 18%);
+  --color-sidebar-active: hsl(217, 30%, 20%);
+
+  /* Typography */
   --font-sans: "Inter", sans-serif;
   --font-headline: "Poppins", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
-  
-  --radius: 12px;
+
+  /* Radius */
+  --radius: 10px;
+
+  /* Shadows for dark theme */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-industrial: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Al Watania Steel gradient backgrounds */
+/* Industrial Pro gradient backgrounds */
 .bg-gradient-watania {
-  background: linear-gradient(135deg, hsl(340, 80%, 30%), hsl(340, 70%, 25%));
+  background: linear-gradient(135deg, hsl(345, 65%, 30%), hsl(345, 55%, 25%));
 }
 
 .bg-gradient-steel {
-  background: linear-gradient(135deg, hsl(0, 0%, 65%), hsl(0, 0%, 55%));
+  background: linear-gradient(135deg, hsl(215, 25%, 25%), hsl(215, 28%, 20%));
+}
+
+.bg-gradient-industrial {
+  background: linear-gradient(135deg, hsl(218, 35%, 12%), hsl(217, 30%, 16%));
 }
 
 /* Ensure proper color application */
 html, body {
   color: var(--color-foreground);
   background-color: var(--color-background);
-}
-
-
-html, body {
-  color: var(--color-foreground);
-  background-color: var(--color-background);
+  font-family: var(--font-sans);
 }
 
 @layer base {
@@ -68,6 +98,81 @@ html, body {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Typography enhancements */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline text-gray-50 tracking-tight;
+  }
+
+  /* Improved focus states */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  /* Industrial Pro Table Styles */
+  .table-industrial {
+    @apply w-full;
+  }
+
+  .table-industrial thead {
+    @apply sticky top-0 z-10 bg-card;
+  }
+
+  .table-industrial thead th {
+    @apply bg-muted/50 text-gray-300 font-semibold text-xs uppercase tracking-wider;
+  }
+
+  .table-industrial tbody tr:nth-child(even) {
+    @apply bg-muted/20;
+  }
+
+  .table-industrial tbody tr:hover {
+    @apply bg-accent/50;
+  }
+
+  /* Diameter chip/badge styling for tables */
+  .diameter-chip {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground;
+  }
+
+  /* Page header consistent styling */
+  .page-header {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6;
+  }
+
+  .page-header-title {
+    @apply font-headline text-2xl font-bold text-gray-50;
+  }
+
+  .page-header-subtitle {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+
+  .page-header-actions {
+    @apply flex items-center gap-3;
+  }
+}
+
+@layer utilities {
+  /* Text color utilities for Industrial Pro */
+  .text-heading {
+    @apply text-gray-50;
+  }
+
+  .text-body {
+    @apply text-gray-200;
+  }
+
+  .text-subtle {
+    @apply text-muted-foreground;
+  }
+
+  /* Numeric column alignment */
+  .numeric-column {
+    @apply text-right font-mono tabular-nums;
   }
 }
