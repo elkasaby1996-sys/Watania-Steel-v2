@@ -1,13 +1,14 @@
 import { Button } from '@/components/ui/button';
-import { 
-  Home, 
-  Package, 
-  Users, 
-  BarChart3, 
+import {
+  Home,
+  Package,
+  Users,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
   History,
-  Truck
+  Truck,
+  Building2
 } from 'lucide-react';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
@@ -25,6 +26,7 @@ export function Sidebar() {
     { icon: History, label: 'History', path: '/history', active: location.pathname === '/history' },
     { icon: Users, label: 'Users', path: '/users', active: location.pathname === '/users', adminOnly: true },
     { icon: Truck, label: 'Drivers', path: '/drivers', active: location.pathname === '/drivers' || location.pathname.startsWith('/drivers/') },
+    { icon: Building2, label: 'Clients', path: '/clients', active: location.pathname === '/clients' || location.pathname.startsWith('/clients/') },
     { icon: BarChart3, label: 'Steel Analytics', path: '/steel-analytics', active: location.pathname === '/steel-analytics' },
   ];
 

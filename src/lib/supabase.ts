@@ -710,6 +710,272 @@ export const historyService = {
   }
 };
 
+// Columns to select from orders and history_orders for clients module
+const CLIENT_ORDER_COLUMNS = 'id,date,status,amount,tons,company,site,order_type,shift,delivered_at,signed_delivery_note,created_at,updated_at,delivery_number,driver_name,phone_number,customer_name,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm';
+
+// Interface for unified order with source field
+export interface UnifiedOrder {
+  id: string;
+  date: string;
+  status: string;
+  amount: number;
+  tons: number;
+  company: string;
+  site: string;
+  order_type: string;
+  shift: string;
+  delivered_at: string | null;
+  signed_delivery_note: boolean;
+  created_at: string;
+  updated_at: string;
+  delivery_number: string;
+  driver_name: string;
+  phone_number: string;
+  customer_name: string;
+  source: 'orders' | 'history_orders';
+  breakdown_8mm?: number;
+  breakdown_10mm?: number;
+  breakdown_12mm?: number;
+  breakdown_14mm?: number;
+  breakdown_16mm?: number;
+  breakdown_18mm?: number;
+  breakdown_20mm?: number;
+  breakdown_25mm?: number;
+  breakdown_32mm?: number;
+}
+
+// Interface for aggregated client data
+export interface ClientData {
+  company: string;
+  totalOrders: number;
+  totalTons: number;
+  totalAmount: number;
+  uniqueSitesCount: number;
+  lastOrderDate: string;
+}
+
+export const clientService = {
+  /**
+   * Fetch orders from both tables with date range filtering
+   * Default: last 180 days, limit 2000 per table
+   */
+  async getUnifiedOrders(options: {
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    company?: string;
+    offset?: number;
+  } = {}): Promise<{ orders: UnifiedOrder[]; historyOrders: UnifiedOrder[] }> {
+    try {
+      const {
+        startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        endDate = new Date().toISOString().split('T')[0],
+        limit = 2000,
+        company,
+        offset = 0,
+      } = options;
+
+      // Build query for orders table
+      let ordersQuery = supabase
+        .from('orders')
+        .select(CLIENT_ORDER_COLUMNS)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (company) {
+        ordersQuery = ordersQuery.eq('company', company);
+      }
+
+      // Build query for history_orders table
+      let historyQuery = supabase
+        .from('history_orders')
+        .select(CLIENT_ORDER_COLUMNS)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (company) {
+        historyQuery = historyQuery.eq('company', company);
+      }
+
+      // Execute both queries in parallel
+      const [ordersResult, historyResult] = await Promise.all([
+        ordersQuery,
+        historyQuery,
+      ]);
+
+      if (ordersResult.error) {
+        console.error('Error fetching orders:', ordersResult.error);
+      }
+      if (historyResult.error) {
+        console.error('Error fetching history orders:', historyResult.error);
+      }
+
+      // Add source field to each order
+      const orders: UnifiedOrder[] = (ordersResult.data || []).map((order: any) => ({
+        ...order,
+        company: order.company?.trim() || '',
+        source: 'orders' as const,
+      }));
+
+      const historyOrders: UnifiedOrder[] = (historyResult.data || []).map((order: any) => ({
+        ...order,
+        company: order.company?.trim() || '',
+        source: 'history_orders' as const,
+      }));
+
+      return { orders, historyOrders };
+    } catch (error) {
+      console.error('Failed to fetch unified orders:', error);
+      return { orders: [], historyOrders: [] };
+    }
+  },
+
+  /**
+   * Merge orders from both tables and compute client aggregations
+   */
+  mergeAndGroupByClient(
+    orders: UnifiedOrder[],
+    historyOrders: UnifiedOrder[]
+  ): ClientData[] {
+    // Combine all orders
+    const allOrders = [...orders, ...historyOrders];
+
+    // Group by normalized company name
+    const clientMap = new Map<string, {
+      orders: UnifiedOrder[];
+      company: string;
+    }>();
+
+    for (const order of allOrders) {
+      const normalizedCompany = (order.company || '').trim();
+      if (!normalizedCompany) continue;
+
+      if (!clientMap.has(normalizedCompany)) {
+        clientMap.set(normalizedCompany, {
+          orders: [],
+          company: normalizedCompany,
+        });
+      }
+      clientMap.get(normalizedCompany)!.orders.push(order);
+    }
+
+    // Compute aggregations for each client
+    const clients: ClientData[] = [];
+
+    for (const [company, data] of clientMap) {
+      const clientOrders = data.orders;
+      const totalOrders = clientOrders.length;
+      const totalTons = clientOrders.reduce((sum, o) => sum + (Number(o.tons) || 0), 0);
+      const totalAmount = clientOrders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
+
+      // Unique sites
+      const uniqueSites = new Set(clientOrders.map(o => o.site).filter(Boolean));
+
+      // Last order date
+      const dates = clientOrders.map(o => o.date).filter(Boolean).sort();
+      const lastOrderDate = dates.length > 0 ? dates[dates.length - 1] : '';
+
+      clients.push({
+        company,
+        totalOrders,
+        totalTons: Math.round(totalTons * 100) / 100,
+        totalAmount: Math.round(totalAmount * 100) / 100,
+        uniqueSitesCount: uniqueSites.size,
+        lastOrderDate,
+      });
+    }
+
+    // Sort by total tons descending
+    clients.sort((a, b) => b.totalTons - a.totalTons);
+
+    return clients;
+  },
+
+  /**
+   * Get unified orders for a specific client with pagination
+   * Used for ClientDetail page - Orders tab
+   */
+  async getClientOrders(options: {
+    company: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ orders: UnifiedOrder[]; total: number }> {
+    try {
+      const {
+        company,
+        startDate,
+        endDate,
+        limit = 200,
+        offset = 0,
+      } = options;
+
+      // Build queries for both tables
+      let ordersQuery = supabase
+        .from('orders')
+        .select(CLIENT_ORDER_COLUMNS, { count: 'exact' })
+        .eq('company', company)
+        .order('date', { ascending: false });
+
+      let historyQuery = supabase
+        .from('history_orders')
+        .select(CLIENT_ORDER_COLUMNS, { count: 'exact' })
+        .eq('company', company)
+        .order('date', { ascending: false });
+
+      // Apply date filters if provided
+      if (startDate) {
+        ordersQuery = ordersQuery.gte('date', startDate);
+        historyQuery = historyQuery.gte('date', startDate);
+      }
+      if (endDate) {
+        ordersQuery = ordersQuery.lte('date', endDate);
+        historyQuery = historyQuery.lte('date', endDate);
+      }
+
+      // Execute both queries
+      const [ordersResult, historyResult] = await Promise.all([
+        ordersQuery,
+        historyQuery,
+      ]);
+
+      // Add source field and combine
+      const ordersWithSource: UnifiedOrder[] = (ordersResult.data || []).map((order: any) => ({
+        ...order,
+        source: 'orders' as const,
+      }));
+
+      const historyWithSource: UnifiedOrder[] = (historyResult.data || []).map((order: any) => ({
+        ...order,
+        source: 'history_orders' as const,
+      }));
+
+      // Combine and sort by date descending
+      const allOrders = [...ordersWithSource, ...historyWithSource];
+      allOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // Calculate total count
+      const totalCount = (ordersResult.count || 0) + (historyResult.count || 0);
+
+      // Apply pagination on combined results
+      const paginatedOrders = allOrders.slice(offset, offset + limit);
+
+      return {
+        orders: paginatedOrders,
+        total: totalCount,
+      };
+    } catch (error) {
+      console.error('Failed to fetch client orders:', error);
+      return { orders: [], total: 0 };
+    }
+  },
+};
+
 export const activityService = {
   async getRecent(limit: number = 10): Promise<Activity[]> {
     try {
