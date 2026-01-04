@@ -136,7 +136,7 @@ export function AddOrderDialog() {
     } else if (isNaN(Number(formData.tons)) || Number(formData.tons) <= 0) {
       newErrors.tons = 'Please enter a valid number of tons';
     } else if (totalBreakdown > 0 && Math.abs(totalBreakdown - enteredTons) > 0.1) {
-      newErrors.tons = `Total tons (${enteredTons}) doesn't match breakdown total (${totalBreakdown.toFixed(2)})`;
+      newErrors.tons = `Total tons (${enteredTons}) doesn't match breakdown total (${totalBreakdown.toFixed(3)})`;
     }
 
     // Check for duplicate delivery numbers (exact match including special characters)
@@ -275,7 +275,7 @@ export function AddOrderDialog() {
     }, 0);
     
     if (total > 0) {
-      setFormData(prev => ({ ...prev, tons: total.toFixed(2) }));
+      setFormData(prev => ({ ...prev, tons: total.toFixed(3) }));
     }
   };
 
@@ -604,7 +604,7 @@ export function AddOrderDialog() {
             <div className="flex items-center justify-between">
               <h4 className="font-semibold text-foreground">Steel Breakdown (Tons)</h4>
               <div className="text-sm text-muted-foreground">
-                Total: {calculateTotalTons().toFixed(2)} tons
+                Total: {calculateTotalTons().toFixed(3)} tons
               </div>
             </div>
             

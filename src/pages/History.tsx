@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { type HistoryOrder, historyService } from '../lib/supabase';
 import { useToast } from '../hooks/use-toast';
 import { RoleBasedComponent } from '../components/RoleBasedComponent';
+import { roundTo3Decimals, formatNumber } from '../lib/utils';
 
 export function History() {
   const dashboardStore = useDashboardStore();
@@ -83,9 +84,9 @@ export function History() {
         }
         
         metrics[date] = {
-          straightBar: Math.round(straightBar * 100) / 100,
-          cutAndBend: Math.round(cutAndBend * 100) / 100,
-          total: Math.round((straightBar + cutAndBend) * 100) / 100
+          straightBar: roundTo3Decimals(straightBar),
+          cutAndBend: roundTo3Decimals(cutAndBend),
+          total: roundTo3Decimals(straightBar + cutAndBend)
         };
       });
     } catch (error) {
@@ -254,13 +255,13 @@ export function History() {
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                               <span className="text-sm text-foreground">
-                                Straight Bar: <strong>{dailyMetrics[date]?.straightBar || 0} tons</strong>
+                                Straight Bar: <strong>{formatNumber(dailyMetrics[date]?.straightBar || 0)} tons</strong>
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
                               <span className="text-sm text-foreground">
-                                Cut & Bend: <strong>{dailyMetrics[date]?.cutAndBend || 0} tons</strong>
+                                Cut & Bend: <strong>{formatNumber(dailyMetrics[date]?.cutAndBend || 0)} tons</strong>
                               </span>
                             </div>
                           </div>
@@ -304,7 +305,7 @@ export function History() {
                                 <TableCell className="text-foreground">{order.site || 'N/A'}</TableCell>
                                 <TableCell className="text-foreground">{order.date}</TableCell>
                                 <TableCell>{getStatusBadge(order.status)}</TableCell>
-                                <TableCell className="text-foreground">{order.tons} tons</TableCell>
+                                <TableCell className="text-foreground">{formatNumber(order.tons)} tons</TableCell>
                                 <TableCell>
                                   <Badge className={order.shift === 'morning' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
                                     {order.shift === 'morning' ? 'Morning' : 'Night'}

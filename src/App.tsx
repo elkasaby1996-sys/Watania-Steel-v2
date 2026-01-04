@@ -10,6 +10,7 @@ import { DriverDetail } from './pages/DriverDetail';
 import { SteelAnalytics } from './pages/SteelAnalytics';
 import { Clients } from './pages/Clients';
 import { ClientDetail } from './pages/ClientDetail';
+import { Inventory } from './pages/Inventory';
 import { ImageAssets } from './components/ImageAssets';
 import { Toaster } from './components/ui/toaster';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -59,6 +60,7 @@ function App() {
                     <Route path="/drivers/:driverId" element={<DriverDetail />} />
                     <Route path="/clients" element={<Clients />} />
                     <Route path="/clients/:clientSlug" element={<ClientDetail />} />
+                    <Route path="/inventory" element={<Inventory />} />
                     <Route path="/steel-analytics" element={<SteelAnalytics />} />
                     {/* Catch all route - redirect to dashboard */}
                     <Route path="*" element={<Navigate to="/" replace />} />

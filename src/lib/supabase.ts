@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { getEnvVar } from './env'
+import { roundTo3Decimals } from './utils'
 
 // Get Supabase credentials from environment variables
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL')
@@ -417,7 +418,7 @@ export const driverService = {
         total_orders: totalOrders,
         completed_orders: completedOrders,
         pending_orders: pendingOrders,
-        total_tons: Math.round(totalTons * 100) / 100
+        total_tons: roundTo3Decimals(totalTons)
       };
     } catch (error) {
       console.error('Failed to get driver metrics for date range:', error);
@@ -509,7 +510,7 @@ export const driverService = {
             total_orders: totalOrders,
             completed_orders: completedOrders,
             pending_orders: pendingOrders,
-            total_tons: Math.round(totalTons * 100) / 100,
+            total_tons: roundTo3Decimals(totalTons),
             cycle_start: cycleStartStr,
             cycle_end: cycleEndStr
           };
@@ -882,8 +883,8 @@ export const clientService = {
       clients.push({
         company,
         totalOrders,
-        totalTons: Math.round(totalTons * 100) / 100,
-        totalAmount: Math.round(totalAmount * 100) / 100,
+        totalTons: roundTo3Decimals(totalTons),
+        totalAmount: roundTo3Decimals(totalAmount),
         uniqueSitesCount: uniqueSites.size,
         lastOrderDate,
       });
@@ -972,6 +973,122 @@ export const clientService = {
     } catch (error) {
       console.error('Failed to fetch client orders:', error);
       return { orders: [], total: 0 };
+    }
+  },
+};
+
+// Inventory service for managing steel inventory tables
+export const inventoryService = {
+  // Fetch all data from a specific inventory table
+  async getTableData(tableName: string): Promise<Record<string, any>[]> {
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*');
+
+      if (error) {
+        console.error(`Error fetching ${tableName}:`, error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error(`Failed to fetch ${tableName}:`, error);
+      return [];
+    }
+  },
+
+  // Fetch all inventory data from all 6 tables
+  async getAllInventory(): Promise<{
+    qatar_steel: Record<string, any>[];
+    al_watania_steel: Record<string, any>[];
+    special_length: Record<string, any>[];
+    coils: Record<string, any>[];
+    wire: Record<string, any>[];
+    coupler: Record<string, any>[];
+  }> {
+    try {
+      const [qatar_steel, al_watania_steel, special_length, coils, wire, coupler] = await Promise.all([
+        this.getTableData('qatar_steel'),
+        this.getTableData('al_watania_steel'),
+        this.getTableData('special_length'),
+        this.getTableData('coils'),
+        this.getTableData('wire'),
+        this.getTableData('coupler'),
+      ]);
+
+      return {
+        qatar_steel,
+        al_watania_steel,
+        special_length,
+        coils,
+        wire,
+        coupler,
+      };
+    } catch (error) {
+      console.error('Failed to fetch all inventory:', error);
+      return {
+        qatar_steel: [],
+        al_watania_steel: [],
+        special_length: [],
+        coils: [],
+        wire: [],
+        coupler: [],
+      };
+    }
+  },
+
+  // Update a single row in an inventory table
+  async updateRow(
+    tableName: string,
+    rowId: string | number,
+    updates: Record<string, any>,
+    idColumn: string = 'id'
+  ): Promise<Record<string, any> | null> {
+    try {
+      // Remove non-editable fields from updates
+      const editableUpdates = { ...updates };
+      delete editableUpdates.id;
+      delete editableUpdates.created_at;
+      delete editableUpdates.updated_at;
+      delete editableUpdates.user_id;
+
+      // Add updated_at timestamp if the table has it
+      editableUpdates.updated_at = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from(tableName)
+        .update(editableUpdates)
+        .eq(idColumn, rowId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error(`Error updating ${tableName}:`, error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`Failed to update ${tableName}:`, error);
+      throw error;
+    }
+  },
+
+  // Update multiple rows in an inventory table
+  async updateMultipleRows(
+    tableName: string,
+    updates: Array<{ id: string | number; data: Record<string, any>; idColumn?: string }>
+  ): Promise<void> {
+    try {
+      await Promise.all(
+        updates.map(({ id, data, idColumn }) =>
+          this.updateRow(tableName, id, data, idColumn || 'id')
+        )
+      );
+    } catch (error) {
+      console.error(`Failed to update multiple rows in ${tableName}:`, error);
+      throw error;
     }
   },
 };

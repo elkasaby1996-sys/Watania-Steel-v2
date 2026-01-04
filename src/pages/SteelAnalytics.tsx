@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { roundTo3Decimals, formatNumber } from '../lib/utils';
 
 export function SteelAnalytics() {
   const navigate = useNavigate();
@@ -105,7 +106,7 @@ export function SteelAnalytics() {
   const lineChartData = Object.entries(tonsVsTimeData)
     .map(([date, tons]) => ({
       date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      tons: Math.round(tons * 100) / 100,
+      tons: roundTo3Decimals(tons),
       fullDate: date
     }))
     .sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime());
@@ -126,19 +127,19 @@ export function SteelAnalytics() {
   const pieChartData = Object.entries(steelBreakdown)
     .map(([size, tons]) => ({
       name: size,
-      value: Math.round(tons * 100) / 100,
-      tons: Math.round(tons * 100) / 100
+      value: roundTo3Decimals(tons),
+      tons: roundTo3Decimals(tons)
     }))
     .filter(item => item.value > 0)
     .sort((a, b) => parseInt(a.name) - parseInt(b.name));
 
   // Calculate total for percentages
   const totalSteelTons = pieChartData.reduce((sum, item) => sum + item.value, 0);
-  
+
   // Add percentages to pie chart data
   const pieChartDataWithPercentages = pieChartData.map(item => ({
     ...item,
-    percentage: totalSteelTons > 0 ? Math.round((item.value / totalSteelTons) * 100) : 0
+    percentage: totalSteelTons > 0 ? roundTo3Decimals((item.value / totalSteelTons) * 100) : 0
   }));
 
   // Colors for pie chart
@@ -278,13 +279,13 @@ export function SteelAnalytics() {
               <Calculator className="h-12 w-12 text-primary" />
             </div>
             <p className="text-4xl font-bold text-foreground mb-2">
-              {Math.round(monthlyAverage * 100) / 100}
+              {formatNumber(monthlyAverage)}
             </p>
             <p className="text-lg text-muted-foreground mb-4">tons per month</p>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Daily Average</p>
-                <p className="font-semibold text-foreground">{Math.round(dailyAverage * 100) / 100} tons</p>
+                <p className="font-semibold text-foreground">{formatNumber(dailyAverage)} tons</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Active Days</p>

@@ -234,7 +234,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, readOnly = false
     }, 0);
     
     if (total > 0) {
-      setFormData(prev => ({ ...prev, tons: total.toFixed(2) }));
+      setFormData(prev => ({ ...prev, tons: total.toFixed(3) }));
     }
   };
 
@@ -674,7 +674,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, readOnly = false
                   Total: {Object.values(formData.breakdown).reduce((sum, val) => {
                     const num = parseFloat(val) || 0;
                     return sum + num;
-                  }, 0).toFixed(2)} tons
+                  }, 0).toFixed(3)} tons
                 </div>
               </div>
               

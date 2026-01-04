@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Weight, BarChart3, Wrench } from 'lucide-react';
+import { roundTo3Decimals } from '../lib/utils';
 
 interface DailyMetricsCardProps {
   date: string;
@@ -25,7 +26,7 @@ export function DailyMetricsCard({ date, metrics, orderCount }: DailyMetricsCard
 
   const getPercentage = (value: number, total: number) => {
     if (total === 0) return 0;
-    return Math.round((value / total) * 100);
+    return roundTo3Decimals((value / total) * 100);
   };
 
   return (

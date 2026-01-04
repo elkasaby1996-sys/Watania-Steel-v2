@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useClientsStore } from '@/stores/clientsStore';
+import { formatNumber, roundTo3Decimals } from '@/lib/utils';
 
 const PAGE_SIZE = 200;
 
@@ -125,12 +126,12 @@ export function ClientDetail() {
     const monthlyTons = sortedMonths.map((m) => {
       const [year, month] = m.split('-');
       const label = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-      return { month: label, tons: Math.round(monthMap[m].tons * 100) / 100 };
+      return { month: label, tons: roundTo3Decimals(monthMap[m].tons) };
     });
     const monthlyAmount = sortedMonths.map((m) => {
       const [year, month] = m.split('-');
       const label = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-      return { month: label, amount: Math.round(monthMap[m].amount * 100) / 100 };
+      return { month: label, amount: roundTo3Decimals(monthMap[m].amount) };
     });
 
     return { monthlyTons, monthlyAmount };
@@ -154,7 +155,7 @@ export function ClientDetail() {
       .map(([status, count]) => ({
         status,
         count,
-        percentage: totalOrders > 0 ? Math.round((count / totalOrders) * 10000) / 100 : 0,
+        percentage: totalOrders > 0 ? roundTo3Decimals((count / totalOrders) * 100) : 0,
       }))
       .sort((a, b) => b.count - a.count);
   }, [clientOrders]);
@@ -181,8 +182,8 @@ export function ClientDetail() {
       .map(([orderType, data]) => ({
         orderType,
         count: data.count,
-        tons: Math.round(data.tons * 100) / 100,
-        amount: Math.round(data.amount * 100) / 100,
+        tons: roundTo3Decimals(data.tons),
+        amount: roundTo3Decimals(data.amount),
       }))
       .sort((a, b) => b.count - a.count);
   }, [clientOrders]);
@@ -209,8 +210,8 @@ export function ClientDetail() {
       .map(([shift, data]) => ({
         shift,
         count: data.count,
-        tons: Math.round(data.tons * 100) / 100,
-        amount: Math.round(data.amount * 100) / 100,
+        tons: roundTo3Decimals(data.tons),
+        amount: roundTo3Decimals(data.amount),
       }))
       .sort((a, b) => b.count - a.count);
   }, [clientOrders]);
@@ -245,11 +246,11 @@ export function ClientDetail() {
 
     const data = diameters.map((diameter) => ({
       diameter,
-      tons: Math.round(breakdownSums[diameter] * 100) / 100,
-      percentage: totalBreakdownTons > 0 ? Math.round((breakdownSums[diameter] / totalBreakdownTons) * 10000) / 100 : 0,
+      tons: roundTo3Decimals(breakdownSums[diameter]),
+      percentage: totalBreakdownTons > 0 ? roundTo3Decimals((breakdownSums[diameter] / totalBreakdownTons) * 100) : 0,
     }));
 
-    return { data, totalBreakdownTons: Math.round(totalBreakdownTons * 100) / 100, totalOrderTons: Math.round(totalOrderTons * 100) / 100, hasMismatch };
+    return { data, totalBreakdownTons: roundTo3Decimals(totalBreakdownTons), totalOrderTons: roundTo3Decimals(totalOrderTons), hasMismatch };
   }, [clientOrders]);
 
   // Compute Sites Performance data from clientOrders
@@ -274,8 +275,8 @@ export function ClientDetail() {
       .map(([site, data]) => ({
         site,
         count: data.count,
-        tons: Math.round(data.tons * 100) / 100,
-        amount: Math.round(data.amount * 100) / 100,
+        tons: roundTo3Decimals(data.tons),
+        amount: roundTo3Decimals(data.amount),
       }))
       .sort((a, b) => b.tons - a.tons);
   }, [clientOrders]);
@@ -393,7 +394,7 @@ export function ClientDetail() {
           <CardContent className="pt-4">
             <div className="text-center">
               <Weight className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{kpis.totalTons.toLocaleString(undefined, { maximumFractionDigits: 1 })}</p>
+              <p className="text-2xl font-bold text-foreground">{formatNumber(kpis.totalTons)}</p>
               <p className="text-xs text-muted-foreground">Total Tons</p>
             </div>
           </CardContent>
@@ -496,7 +497,7 @@ export function ClientDetail() {
                                 {order.site || 'N/A'}
                               </TableCell>
                               <TableCell className="text-right">
-                                {(order.tons || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatNumber(order.tons || 0)}
                               </TableCell>
                               <TableCell className="max-w-[120px] truncate" title={order.driver_name}>
                                 {order.driver_name || 'N/A'}
@@ -584,7 +585,7 @@ export function ClientDetail() {
                 </div>
                 <div className="flex justify-between items-center py-2">
                   <span className="text-muted-foreground">Total Tons</span>
-                  <span className="font-medium text-foreground">{client.totalTons.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="font-medium text-foreground">{formatNumber(client.totalTons)}</span>
                 </div>
               </CardContent>
             </Card>
@@ -670,7 +671,7 @@ export function ClientDetail() {
                               borderRadius: '8px',
                               color: 'hsl(0, 0%, 12%)'
                             }}
-                            formatter={(value: number) => [`${value.toLocaleString()} tons`, 'Tons']}
+                            formatter={(value: number) => [`${formatNumber(value)} tons`, 'Tons']}
                           />
                           <Bar dataKey="tons" fill="hsl(232, 90%, 62%)" radius={[4, 4, 0, 0]} />
                         </BarChart>
@@ -713,7 +714,7 @@ export function ClientDetail() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">{row.count.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{row.percentage.toFixed(1)}%</TableCell>
+                          <TableCell className="text-right">{row.percentage.toFixed(3)}%</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -747,7 +748,7 @@ export function ClientDetail() {
                         <TableRow key={row.orderType} className="border-border">
                           <TableCell className="capitalize">{row.orderType.replace('-', ' ')}</TableCell>
                           <TableCell className="text-right">{row.count.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{row.tons.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right">{formatNumber(row.tons)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -781,7 +782,7 @@ export function ClientDetail() {
                         <TableRow key={row.shift} className="border-border">
                           <TableCell className="capitalize">{row.shift}</TableCell>
                           <TableCell className="text-right">{row.count.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{row.tons.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right">{formatNumber(row.tons)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -820,7 +821,7 @@ export function ClientDetail() {
                               color: 'hsl(0, 0%, 12%)'
                             }}
                             formatter={(value: number, name: string) => [
-                              `${value.toLocaleString()} tons`,
+                              `${formatNumber(value)} tons`,
                               'Tons'
                             ]}
                           />
@@ -864,8 +865,8 @@ export function ClientDetail() {
                         {diameterBreakdown.data.map((row) => (
                           <TableRow key={row.diameter} className="border-border">
                             <TableCell className="font-medium">{row.diameter}</TableCell>
-                            <TableCell className="text-right">{row.tons.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                            <TableCell className="text-right">{row.percentage.toFixed(1)}%</TableCell>
+                            <TableCell className="text-right">{formatNumber(row.tons)}</TableCell>
+                            <TableCell className="text-right">{row.percentage.toFixed(3)}%</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -913,8 +914,8 @@ export function ClientDetail() {
                           <span className="text-xs text-muted-foreground font-mono">{index + 1}.</span>
                           <span className="font-medium max-w-[300px] truncate" title={row.site}>{row.site}</span>
                         </TableCell>
-                        <TableCell className="text-right">{row.tons.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                        <TableCell className="text-right">{row.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="text-right">{formatNumber(row.tons)}</TableCell>
+                        <TableCell className="text-right">{formatNumber(row.amount)}</TableCell>
                         <TableCell className="text-right">{row.count.toLocaleString()}</TableCell>
                       </TableRow>
                     ))}

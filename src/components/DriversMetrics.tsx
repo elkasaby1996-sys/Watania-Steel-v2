@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Users, Truck, Package, Weight, Calendar, TrendingUp } from 'lucide-react';
 import { useDriversStore } from '../stores/driversStore';
+import { roundTo3Decimals, formatNumber } from '../lib/utils';
 
 export function DriversMetrics() {
   const driversStore = useDriversStore();
@@ -26,7 +27,7 @@ export function DriversMetrics() {
   const totalOrders = safeMetrics.reduce((sum, m) => sum + (m?.total_orders || 0), 0);
   const totalCompletedOrders = safeMetrics.reduce((sum, m) => sum + (m?.completed_orders || 0), 0);
   const totalTons = safeMetrics.reduce((sum, m) => sum + (m?.total_tons || 0), 0);
-  const averageOrdersPerDriver = totalDrivers > 0 ? Math.round(totalOrders / totalDrivers * 10) / 10 : 0;
+  const averageOrdersPerDriver = totalDrivers > 0 ? roundTo3Decimals(totalOrders / totalDrivers) : 0;
 
   const metricsCards = [
     {
@@ -47,7 +48,7 @@ export function DriversMetrics() {
     },
     {
       title: "Total Tons Delivered",
-      value: `${Math.round(totalTons * 10) / 10}`,
+      value: `${formatNumber(totalTons)}`,
       subtitle: "tons",
       icon: Weight,
       color: 'text-success',
@@ -55,7 +56,7 @@ export function DriversMetrics() {
     },
     {
       title: "Avg Orders/Driver",
-      value: averageOrdersPerDriver,
+      value: formatNumber(averageOrdersPerDriver),
       subtitle: "per cycle",
       icon: TrendingUp,
       color: 'text-warning',
@@ -141,7 +142,7 @@ export function DriversMetrics() {
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-foreground">{driver.completed_orders} orders</p>
-                    <p className="text-sm text-muted-foreground">{driver.total_tons} tons</p>
+                    <p className="text-sm text-muted-foreground">{formatNumber(driver.total_tons)} tons</p>
                   </div>
                 </div>
               ))}
