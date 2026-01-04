@@ -9,7 +9,8 @@ import {
   History,
   Truck,
   Building2,
-  Warehouse
+  Warehouse,
+  Scissors
 } from 'lucide-react';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
@@ -29,6 +30,7 @@ export function Sidebar() {
     { icon: Truck, label: 'Drivers', path: '/drivers', active: location.pathname === '/drivers' || location.pathname.startsWith('/drivers/') },
     { icon: Building2, label: 'Clients', path: '/clients', active: location.pathname === '/clients' || location.pathname.startsWith('/clients/') },
     { icon: Warehouse, label: 'Inventory', path: '/inventory', active: location.pathname === '/inventory' },
+    { icon: Scissors, label: 'Offcut Usage', path: '/offcut-usage', active: location.pathname === '/offcut-usage' },
     { icon: BarChart3, label: 'Steel Analytics', path: '/steel-analytics', active: location.pathname === '/steel-analytics' },
   ];
 
