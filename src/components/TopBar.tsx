@@ -20,16 +20,16 @@ export function TopBar() {
     await refreshProfile();
   };
 
-  const getRoleBadgeColor = (role: string) => {
+  const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'admin':
-        return 'bg-purple-100 text-purple-800';
+        return 'default';
       case 'editor':
-        return 'bg-green-100 text-green-800';
+        return 'success';
       case 'viewer':
-        return 'bg-blue-100 text-blue-800';
+        return 'secondary';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'outline';
     }
   };
 
@@ -39,53 +39,53 @@ export function TopBar() {
     }`}>
       <div className="flex items-center justify-between h-full px-6">
         <div className="flex-1 flex items-center">
-          <h1 className="font-headline font-bold text-xl text-foreground">Order Management System</h1>
+          <h1 className="font-headline font-bold text-xl text-gray-50">Factory Management System</h1>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             {user?.profile?.role && (
-              <Badge className={getRoleDisplayName(user.profile.role)}>
+              <Badge variant={getRoleBadgeVariant(user.profile.role) as any}>
                 <Shield size={12} className="mr-1" />
                 {getRoleDisplayName(user.profile.role)}
               </Badge>
             )}
           </div>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground p-2"
+              <Button
+                variant="ghost"
+                className="text-foreground hover:bg-accent hover:text-accent-foreground p-2"
               >
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-secondary text-secondary-foreground">
+                  <AvatarFallback className="bg-secondary text-secondary-foreground text-sm font-medium">
                     {user?.email?.charAt(0).toUpperCase() || <User size={16} />}
                   </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover text-popover-foreground w-56">
-              <div className="px-2 py-1.5">
-                <p className="text-sm font-medium">{user?.email}</p>
+            <DropdownMenuContent align="end" className="bg-popover text-popover-foreground w-56 border border-border">
+              <div className="px-3 py-2">
+                <p className="text-sm font-medium text-gray-100">{user?.email}</p>
                 <p className="text-xs text-muted-foreground">
                   {user?.profile?.role && getRoleDisplayName(user.profile.role)}
                 </p>
               </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem
                 onClick={handleRefreshProfile}
-                className="text-popover-foreground hover:bg-accent hover:text-accent-foreground"
+                className="text-popover-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer"
               >
                 Refresh Profile
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-popover-foreground hover:bg-accent hover:text-accent-foreground">
+              <DropdownMenuItem className="text-popover-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer">
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem
                 onClick={handleSignOut}
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
               >
                 <LogOut size={16} className="mr-2" />
                 Sign Out

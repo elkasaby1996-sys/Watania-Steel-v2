@@ -17,75 +17,87 @@ module.exports = {
     },
     extend: {
       colors: {
-        border: "hsl(240, 4%, 80%)",
-        input: "hsl(240, 5%, 96%)",
-        ring: "hsl(232, 90%, 62%)",
-        background: "hsl(0, 0%, 97%)", // Clean light grey background
-        foreground: "hsl(0, 0%, 15%)", // Dark grey text
+        // Industrial Pro Design System - Dark Navy Theme
+        border: "hsl(215, 25%, 27%)", // Subtle border on dark backgrounds
+        input: "hsl(215, 28%, 17%)", // Input background
+        ring: "hsl(345, 65%, 35%)", // Focus ring - maroon accent
+        background: "hsl(218, 35%, 12%)", // Dark navy primary background
+        foreground: "hsl(210, 20%, 85%)", // Light gray body text
         primary: {
-          DEFAULT: "hsl(340, 80%, 30%)", // Rich burgundy/maroon matching logo
+          DEFAULT: "hsl(345, 65%, 30%)", // Dark maroon - company brand
           foreground: "hsl(0, 0%, 100%)",
         },
         secondary: {
-          DEFAULT: "hsl(0, 0%, 85%)", // Light grey
-          foreground: "hsl(0, 0%, 25%)",
+          DEFAULT: "hsl(215, 25%, 23%)", // Muted blue-gray for secondary actions
+          foreground: "hsl(210, 20%, 85%)",
         },
         tertiary: {
-          DEFAULT: "hsl(0, 0%, 65%)", // Medium grey
-          foreground: "hsl(0, 0%, 20%)",
+          DEFAULT: "hsl(215, 20%, 35%)", // Lighter slate for tertiary elements
+          foreground: "hsl(210, 20%, 90%)",
         },
         neutral: {
-          DEFAULT: "hsl(0, 0%, 96%)", // Off-white
-          foreground: "hsl(0, 0%, 20%)",
+          DEFAULT: "hsl(215, 28%, 17%)", // Dark slate neutral
+          foreground: "hsl(210, 20%, 85%)",
         },
         destructive: {
-          DEFAULT: "hsl(0, 70%, 50%)", // Bright red
+          DEFAULT: "hsl(0, 65%, 50%)", // Red for danger/error - NOT maroon
           foreground: "hsl(0, 0%, 100%)",
         },
         success: {
-          DEFAULT: "hsl(120, 40%, 45%)", // Green
+          DEFAULT: "hsl(142, 50%, 40%)", // Professional green
           foreground: "hsl(0, 0%, 100%)",
         },
         warning: {
-          DEFAULT: "hsl(40, 80%, 55%)", // Amber
-          foreground: "hsl(0, 0%, 20%)",
+          DEFAULT: "hsl(38, 80%, 50%)", // Amber warning
+          foreground: "hsl(0, 0%, 10%)",
         },
         muted: {
-          DEFAULT: "hsl(0, 0%, 92%)", // Light grey
-          foreground: "hsl(0, 0%, 50%)", // Medium grey
+          DEFAULT: "hsl(215, 25%, 20%)", // Muted dark slate
+          foreground: "hsl(215, 15%, 55%)", // Muted text
         },
         accent: {
-          DEFAULT: "hsl(0, 0%, 90%)", // Very light grey
-          foreground: "hsl(0, 0%, 25%)",
+          DEFAULT: "hsl(215, 25%, 25%)", // Accent background for hover states
+          foreground: "hsl(210, 20%, 90%)",
         },
         popover: {
-          DEFAULT: "hsl(0, 0%, 100%)",
-          foreground: "hsl(0, 0%, 15%)",
+          DEFAULT: "hsl(218, 32%, 15%)", // Popover/dropdown background
+          foreground: "hsl(210, 20%, 85%)",
         },
         card: {
-          DEFAULT: "hsl(0, 0%, 100%)",
-          foreground: "hsl(0, 0%, 15%)",
+          DEFAULT: "hsl(217, 30%, 16%)", // Card/surface - slightly lighter slate-blue
+          foreground: "hsl(210, 20%, 85%)",
         },
+        // Sidebar specific colors
+        sidebar: {
+          DEFAULT: "hsl(218, 35%, 10%)", // Dark navy sidebar background
+          foreground: "hsl(210, 20%, 70%)", // Light gray sidebar text
+          border: "hsl(215, 25%, 20%)",
+          accent: "hsl(345, 65%, 30%)", // Maroon accent
+          "accent-foreground": "hsl(0, 0%, 100%)",
+          hover: "hsl(217, 30%, 18%)", // Hover state
+          active: "hsl(217, 30%, 20%)", // Active item background
+        },
+        // Gray scale for Industrial Pro
         gray: {
-          50: "hsl(0, 0%, 98%)",
-          100: "hsl(240, 5%, 96%)",
-          200: "hsl(240, 5%, 90%)",
-          300: "hsl(240, 4%, 80%)",
-          400: "hsl(240, 4%, 65%)",
-          500: "hsl(240, 4%, 52%)",
-          600: "hsl(240, 4%, 40%)",
-          700: "hsl(240, 4%, 28%)",
-          800: "hsl(240, 4%, 18%)",
-          900: "hsl(240, 4%, 10%)",
+          50: "hsl(210, 20%, 95%)",
+          100: "hsl(210, 18%, 90%)",
+          200: "hsl(210, 16%, 80%)",
+          300: "hsl(210, 14%, 65%)",
+          400: "hsl(210, 12%, 50%)",
+          500: "hsl(215, 15%, 40%)",
+          600: "hsl(215, 18%, 30%)",
+          700: "hsl(215, 22%, 22%)",
+          800: "hsl(217, 28%, 15%)",
+          900: "hsl(218, 35%, 10%)",
         },
       },
       backgroundImage: {
-        'gradient-1': 'linear-gradient(135deg, hsl(232, 90%, 62%), hsl(268, 75%, 58%))',
-        'gradient-2': 'linear-gradient(135deg, hsl(205, 72%, 72%), hsl(210, 80%, 54%))',
-        'button-border-gradient': 'linear-gradient(135deg, hsl(232, 90%, 62%), hsl(205, 64%, 72%))',
+        'gradient-industrial': 'linear-gradient(135deg, hsl(218, 35%, 12%), hsl(217, 30%, 16%))',
+        'gradient-maroon': 'linear-gradient(135deg, hsl(345, 65%, 30%), hsl(345, 55%, 25%))',
+        'gradient-card': 'linear-gradient(180deg, hsl(217, 30%, 17%), hsl(217, 30%, 15%))',
       },
       borderRadius: {
-        lg: "12px",
+        lg: "10px",
         md: "8px",
         sm: "4px",
       },
@@ -103,6 +115,13 @@ module.exports = {
         '32': '8rem',
         '48': '12rem',
         '64': '16rem',
+      },
+      boxShadow: {
+        'industrial': '0 2px 8px rgba(0, 0, 0, 0.3)',
+        'industrial-md': '0 4px 12px rgba(0, 0, 0, 0.35)',
+        'industrial-lg': '0 8px 24px rgba(0, 0, 0, 0.4)',
+        'card': '0 1px 3px rgba(0, 0, 0, 0.25)',
+        'card-hover': '0 4px 12px rgba(0, 0, 0, 0.3)',
       },
       keyframes: {
         "accordion-down": {
