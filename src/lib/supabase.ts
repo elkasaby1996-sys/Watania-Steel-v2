@@ -1093,6 +1093,219 @@ export const inventoryService = {
   },
 };
 
+// Interface for offcut usage entries
+export interface OffcutUsageEntry {
+  id: string;
+  date: string;
+  company: string;
+  bar_diameter: string;
+  pieces_used: number;
+  weight_kg: number;
+  weight_tons: number;
+  notes: string | null;
+  created_at?: string;
+}
+
+// Interface for diameter totals
+export interface DiameterTotal {
+  bar_diameter: string;
+  total_pieces: number;
+  total_tons: number;
+}
+
+// Offcut Usage service for tracking offcut steel usage
+export const offcutUsageService = {
+  // Get entries by a specific date
+  async getByDate(date: string): Promise<OffcutUsageEntry[]> {
+    try {
+      const { data, error } = await supabase
+        .from('offcut_usage')
+        .select('*')
+        .eq('date', date)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching offcut usage by date:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch offcut usage by date:', error);
+      return [];
+    }
+  },
+
+  // Get entries for a specific month/year
+  async getByMonth(year: number, month: number): Promise<OffcutUsageEntry[]> {
+    try {
+      // Create date range for the month
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+
+      const { data, error } = await supabase
+        .from('offcut_usage')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching offcut usage by month:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch offcut usage by month:', error);
+      return [];
+    }
+  },
+
+  // Get entries within a date range (inclusive)
+  async getByDateRange(startDate: string, endDate: string): Promise<OffcutUsageEntry[]> {
+    try {
+      const { data, error } = await supabase
+        .from('offcut_usage')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching offcut usage by date range:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch offcut usage by date range:', error);
+      return [];
+    }
+  },
+
+  // Create a new offcut usage entry
+  async create(entry: Omit<OffcutUsageEntry, 'id' | 'created_at'>): Promise<OffcutUsageEntry> {
+    try {
+      const entryData = {
+        ...entry,
+        created_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('offcut_usage')
+        .insert([entryData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating offcut usage entry:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Failed to create offcut usage entry:', error);
+      throw error;
+    }
+  },
+
+  // Update an offcut usage entry
+  async update(id: string, updates: Partial<OffcutUsageEntry>): Promise<OffcutUsageEntry> {
+    try {
+      const { data, error } = await supabase
+        .from('offcut_usage')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating offcut usage entry:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Failed to update offcut usage entry:', error);
+      throw error;
+    }
+  },
+
+  // Delete an offcut usage entry
+  async delete(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('offcut_usage')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting offcut usage entry:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Failed to delete offcut usage entry:', error);
+      throw error;
+    }
+  },
+
+  // Create multiple offcut usage entries in bulk
+  async createBulk(entries: Omit<OffcutUsageEntry, 'id' | 'created_at'>[]): Promise<OffcutUsageEntry[]> {
+    try {
+      const entriesData = entries.map(entry => ({
+        ...entry,
+        created_at: new Date().toISOString()
+      }));
+
+      const { data, error } = await supabase
+        .from('offcut_usage')
+        .insert(entriesData)
+        .select();
+
+      if (error) {
+        console.error('Error creating bulk offcut usage entries:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to create bulk offcut usage entries:', error);
+      throw error;
+    }
+  },
+
+  // Calculate diameter totals from entries
+  calculateDiameterTotals(entries: OffcutUsageEntry[]): DiameterTotal[] {
+    const totalsMap = new Map<string, { pieces: number; tons: number }>();
+
+    for (const entry of entries) {
+      const existing = totalsMap.get(entry.bar_diameter) || { pieces: 0, tons: 0 };
+      totalsMap.set(entry.bar_diameter, {
+        pieces: existing.pieces + entry.pieces_used,
+        tons: existing.tons + entry.weight_tons
+      });
+    }
+
+    return Array.from(totalsMap.entries())
+      .map(([bar_diameter, totals]) => ({
+        bar_diameter,
+        total_pieces: totals.pieces,
+        total_tons: roundTo3Decimals(totals.tons)
+      }))
+      .sort((a, b) => {
+        // Sort by diameter size (numeric)
+        const aNum = parseInt(a.bar_diameter.replace(/\D/g, ''), 10) || 0;
+        const bNum = parseInt(b.bar_diameter.replace(/\D/g, ''), 10) || 0;
+        return aNum - bNum;
+      });
+  }
+};
+
 export const activityService = {
   async getRecent(limit: number = 10): Promise<Activity[]> {
     try {
