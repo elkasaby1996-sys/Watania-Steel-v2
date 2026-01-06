@@ -14,8 +14,7 @@ export const useCachedQuery = <T>(
 ) => {
   const { staleTime = 30000, refetchIntervalMs, refetchOnWindowFocus = true } = options;
 
-  const keyString = useMemo(() => JSON.stringify(key), [key]);
-  const keyMemo = useMemo(() => key, [keyString]);
+  const keyMemo = useMemo(() => key, [JSON.stringify(key)]);
 
   const snapshot = useSyncExternalStore(
     (callback) => subscribe(keyMemo, callback),
@@ -30,7 +29,7 @@ export const useCachedQuery = <T>(
     }
 
     return () => controller.abort();
-  }, [keyMemo, fetcher, staleTime]);
+  }, [keyMemo, fetcher, snapshot.data, snapshot.updatedAt, staleTime]);
 
   useEffect(() => {
     if (!refetchIntervalMs) return;
