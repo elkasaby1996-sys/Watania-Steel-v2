@@ -14,7 +14,7 @@ import { hasPermission } from '@/lib/auth';
 import { orderService } from '@/lib/supabase';
 
 export function OrderTable() {
-  const { getFilteredTodayOrders, deleteOrder } = useDashboardStore();
+  const { getFilteredTodayOrders, deleteOrder, loading } = useDashboardStore();
   const { user } = useAuthStore();
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -111,7 +111,13 @@ export function OrderTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {todayOrders.length > 0 ? (
+              {loading ? (
+                <TableRow className="border-border">
+                  <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
+                    Loading orders...
+                  </TableCell>
+                </TableRow>
+              ) : todayOrders.length > 0 ? (
                 todayOrders.map((order) => (
                   <TableRow key={order.id} className="border-border hover:bg-muted/50">
                     <TableCell className="font-mono text-foreground">{order.id}</TableCell>

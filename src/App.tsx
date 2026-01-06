@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { Profiler, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { Dashboard } from './pages/Dashboard';
@@ -18,27 +18,32 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useDashboardStore } from './stores/dashboardStore';
 import { useAuthStore } from './stores/authStore';
+import { useDashboardDataSync } from './hooks/useDashboardDataSync';
+import { useRealtimeOrders } from './hooks/useRealtimeOrders';
+import { logReactRender } from './lib/performance';
 
 function App() {
-  const { sidebarCollapsed, loadOrders, loadActivities } = useDashboardStore();
+  const { sidebarCollapsed } = useDashboardStore();
   const { initialize } = useAuthStore();
+  useDashboardDataSync();
+  useRealtimeOrders();
 
   useEffect(() => {
     // Initialize auth first
     initialize();
   }, [initialize]);
 
-  useEffect(() => {
-    // Load initial data after auth is initialized
-    loadOrders();
-    loadActivities();
-    
-    // Load history orders for the history page
-    const dashboardStore = useDashboardStore.getState();
-    if (dashboardStore.loadHistoryOrders) {
-      dashboardStore.loadHistoryOrders();
-    }
-  }, [loadOrders, loadActivities]);
+  const handleRender: React.ProfilerOnRenderCallback = (
+    id,
+    phase,
+    actualDuration,
+    baseDuration
+  ) => {
+    logReactRender(
+      `${id}:${phase}`,
+      Math.round(actualDuration + baseDuration)
+    );
+  };
 
   return (
     <ErrorBoundary>
@@ -52,22 +57,24 @@ function App() {
             }`}>
               <TopBar />
               <div className="pt-16 p-6">
-                <div className="max-w-7xl mx-auto">
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/history" element={<History />} />
-                    <Route path="/users" element={<Users />} />
-                    <Route path="/drivers" element={<Drivers />} />
-                    <Route path="/drivers/:driverId" element={<DriverDetail />} />
-                    <Route path="/clients" element={<Clients />} />
-                    <Route path="/clients/:clientSlug" element={<ClientDetail />} />
-                    <Route path="/inventory" element={<Inventory />} />
-                    <Route path="/offcut-usage" element={<OffcutUsage />} />
-                    <Route path="/steel-analytics" element={<SteelAnalytics />} />
-                    {/* Catch all route - redirect to dashboard */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </div>
+                <Profiler id="AppRoutes" onRender={handleRender}>
+                  <div className="max-w-7xl mx-auto">
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/history" element={<History />} />
+                      <Route path="/users" element={<Users />} />
+                      <Route path="/drivers" element={<Drivers />} />
+                      <Route path="/drivers/:driverId" element={<DriverDetail />} />
+                      <Route path="/clients" element={<Clients />} />
+                      <Route path="/clients/:clientSlug" element={<ClientDetail />} />
+                      <Route path="/inventory" element={<Inventory />} />
+                      <Route path="/offcut-usage" element={<OffcutUsage />} />
+                      <Route path="/steel-analytics" element={<SteelAnalytics />} />
+                      {/* Catch all route - redirect to dashboard */}
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </div>
+                </Profiler>
               </div>
             </main>
             <Toaster />
