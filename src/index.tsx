@@ -3,11 +3,19 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// Make environment variables available globally
+// Make environment variables available globally without overriding runtime injection
 if (typeof window !== 'undefined') {
+  const existingEnv = (window as any).__VITE_ENV__ ?? {};
+  const buildEnv = (import.meta as any).env ?? {};
+
   (window as any).__VITE_ENV__ = {
-    VITE_SUPABASE_URL: 'https://lzjzdogiuxenlojeudjt.supabase.co',
-    VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6anpkb2dpdXhlbmxvamV1ZGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg2MTMyMjksImV4cCI6MjA3NDE4OTIyOX0.q3kAu-fEJbcYel_H8vxcc0RP3QxAWgCkTF6aqpSCZH4'
+    ...existingEnv,
+    ...(buildEnv.VITE_SUPABASE_URL
+      ? { VITE_SUPABASE_URL: buildEnv.VITE_SUPABASE_URL }
+      : {}),
+    ...(buildEnv.VITE_SUPABASE_ANON_KEY
+      ? { VITE_SUPABASE_ANON_KEY: buildEnv.VITE_SUPABASE_ANON_KEY }
+      : {}),
   };
 }
 

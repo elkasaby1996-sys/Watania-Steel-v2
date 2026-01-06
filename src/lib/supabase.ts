@@ -9,14 +9,21 @@ const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY')
 
 // Create Supabase client with the actual credentials
 export const supabase = createClient(
-  supabaseUrl || 'https://lzjzdogiuxenlojeudjt.supabase.co',
-  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6anpkb2dpdXhlbmxvamV1ZGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg2MTMyMjksImV4cCI6MjA3NDE4OTIyOX0.q3kAu-fEJbcYel_H8vxcc0RP3QxAWgCkTF6aqpSCZH4',
+  supabaseUrl ?? '',
+  supabaseAnonKey ?? '',
   {
     global: {
       fetch: instrumentedFetch,
     },
   }
 );
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn(
+    '[supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. ' +
+      'Set them in your environment to load dashboard and history data.'
+  );
+}
 
 // Database types
 export interface Order {
