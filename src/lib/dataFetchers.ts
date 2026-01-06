@@ -2,6 +2,16 @@ import { activityService, historyService, orderService, dbToFrontend } from '@/l
 import { timeAsync } from '@/lib/performance';
 
 const DEFAULT_PAGE_SIZE = 500;
+const ACTIVE_STATUSES = new Set(['pending', 'in-progress', 'completed', 'delayed']);
+
+const normalizeStatus = (status?: string) => {
+  if (!status) return '';
+  return status
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-');
+};
 
 const fetchAllPages = async <T>(
   fetchPage: (limit: number, offset: number) => Promise<T[]>,
@@ -27,7 +37,6 @@ export const fetchActiveOrders = async (signal?: AbortSignal) => {
     const orders = await fetchAllPages(
       (limit, offset) =>
         orderService.list({
-          status: ['pending', 'in-progress', 'completed', 'delayed'],
           limit,
           offset,
           sortBy: 'created_at',
@@ -36,13 +45,19 @@ export const fetchActiveOrders = async (signal?: AbortSignal) => {
         }),
       DEFAULT_PAGE_SIZE
     );
-    return orders.map(dbToFrontend);
+    return orders
+      .map(dbToFrontend)
+      .map((order) => ({
+        ...order,
+        status: (normalizeStatus(order.status) || 'pending') as typeof order.status,
+      }))
+      .filter((order) => ACTIVE_STATUSES.has(order.status));
   });
 };
 
 export const fetchHistoryOrders = async (signal?: AbortSignal) => {
-  return timeAsync('query:history:all', () =>
-    fetchAllPages(
+  return timeAsync('query:history:all', async () => {
+    const historyOrders = await fetchAllPages(
       (limit, offset) =>
         historyService.list({
           limit,
@@ -52,8 +67,31 @@ export const fetchHistoryOrders = async (signal?: AbortSignal) => {
           signal,
         }),
       DEFAULT_PAGE_SIZE
-    )
-  );
+    );
+
+    if (historyOrders.length > 0) {
+      return historyOrders;
+    }
+
+    const deliveredOrders = await fetchAllPages(
+      (limit, offset) =>
+        orderService.list({
+          limit,
+          offset,
+          sortBy: 'delivered_at',
+          sortDirection: 'desc',
+          signal,
+        }),
+      DEFAULT_PAGE_SIZE
+    );
+
+    return deliveredOrders
+      .filter((order) => normalizeStatus(order.status) === 'delivered')
+      .map((order) => ({
+        ...order,
+        status: 'delivered',
+      }));
+  });
 };
 
 export const fetchActivities = async (signal?: AbortSignal) => {

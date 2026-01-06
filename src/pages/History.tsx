@@ -202,23 +202,27 @@ export function History() {
 
   const renderHistoryRow = (order: HistoryOrder) => (
     <TableRow key={order.id} className="border-border hover:bg-muted/50 table w-full table-fixed">
-      <TableCell className="font-mono text-foreground">
+      <TableCell className="font-mono text-foreground whitespace-nowrap truncate max-w-[160px]">
         {order.delivery_number || order.id}
       </TableCell>
-      <TableCell className="text-foreground">
+      <TableCell className="text-foreground whitespace-nowrap truncate max-w-[220px]">
         {order.customer_name}
       </TableCell>
-      <TableCell className="text-foreground">{order.company || 'N/A'}</TableCell>
-      <TableCell className="text-foreground">{order.site || 'N/A'}</TableCell>
-      <TableCell className="text-foreground">{order.date}</TableCell>
+      <TableCell className="text-foreground whitespace-nowrap truncate max-w-[180px]">
+        {order.company || 'N/A'}
+      </TableCell>
+      <TableCell className="text-foreground whitespace-nowrap truncate max-w-[160px]">
+        {order.site || 'N/A'}
+      </TableCell>
+      <TableCell className="text-foreground whitespace-nowrap">{order.date}</TableCell>
       <TableCell>{getStatusBadge(order.status)}</TableCell>
-      <TableCell className="text-foreground">{formatNumber(order.tons)} tons</TableCell>
+      <TableCell className="text-foreground whitespace-nowrap">{formatNumber(order.tons)} tons</TableCell>
       <TableCell>
         <Badge className={order.shift === 'morning' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
           {order.shift === 'morning' ? 'Morning' : 'Night'}
         </Badge>
       </TableCell>
-      <TableCell>
+      <TableCell className="whitespace-nowrap">
         <RoleBasedComponent action="edit" fallback={
           order.signed_delivery_note ? (
             <Badge className="bg-success text-success-foreground">
@@ -286,9 +290,9 @@ export function History() {
           </div>
         </RoleBasedComponent>
       </TableCell>
-      <TableCell>
+      <TableCell className="whitespace-nowrap">
         <div>
-          <p className="text-sm text-foreground">
+          <p className="text-sm text-foreground whitespace-nowrap truncate max-w-[160px]">
             {order.driver_name || 'N/A'}
           </p>
           {order.phone_number ? (
@@ -304,7 +308,7 @@ export function History() {
           )}
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="whitespace-nowrap">
         <Button 
           variant="ghost" 
           size="sm"
@@ -437,20 +441,20 @@ export function History() {
                   <CollapsibleContent>
                     <div className="px-6 pb-6">
                       <div className="overflow-x-auto">
-                        <Table>
+                        <Table className="w-full table-fixed">
                           <TableHeader>
                             <TableRow className="border-border">
-                              <TableHead className="text-foreground">Delivery Number</TableHead>
-                              <TableHead className="text-foreground">Delivery Name</TableHead>
-                              <TableHead className="text-foreground">Company</TableHead>
-                              <TableHead className="text-foreground">Site</TableHead>
-                              <TableHead className="text-foreground">Date</TableHead>
+                              <TableHead className="text-foreground w-[160px]">Delivery Number</TableHead>
+                              <TableHead className="text-foreground w-[220px]">Delivery Name</TableHead>
+                              <TableHead className="text-foreground w-[180px]">Company</TableHead>
+                              <TableHead className="text-foreground w-[160px]">Site</TableHead>
+                              <TableHead className="text-foreground w-[120px]">Date</TableHead>
                               <TableHead className="text-foreground">Status</TableHead>
-                              <TableHead className="text-foreground">Tons</TableHead>
-                              <TableHead className="text-foreground">Shift</TableHead>
+                              <TableHead className="text-foreground w-[120px]">Tons</TableHead>
+                              <TableHead className="text-foreground w-[120px]">Shift</TableHead>
                               <TableHead className="text-foreground">Delivery Note</TableHead>
-                              <TableHead className="text-foreground">Contact</TableHead>
-                              <TableHead className="text-foreground">Actions</TableHead>
+                              <TableHead className="text-foreground w-[200px]">Contact</TableHead>
+                              <TableHead className="text-foreground w-[120px]">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           {deliveredOrdersByDate[date].length > 50 ? (
