@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Search, Building2, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useNavigate } from 'react-router-dom';
 import { slugifyCompany, formatNumber } from '@/lib/utils';
 import { useClientsStore } from '@/stores/clientsStore';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 export function Clients() {
   const navigate = useNavigate();
@@ -18,10 +19,16 @@ export function Clients() {
     loadClients,
     getFilteredClients,
   } = useClientsStore();
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+  const debouncedSearch = useDebouncedValue(localSearch, 300);
 
   useEffect(() => {
     loadClients();
   }, []);
+
+  useEffect(() => {
+    setSearchQuery(debouncedSearch);
+  }, [debouncedSearch, setSearchQuery]);
 
   const filteredClients = getFilteredClients();
 
@@ -148,8 +155,8 @@ export function Clients() {
                 id="clients-search"
                 name="clientsSearch"
                 placeholder="Search clients by company name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
                 className="pl-10 bg-background text-foreground border-border"
               />
             </div>

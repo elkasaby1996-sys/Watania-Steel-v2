@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,56 @@ import { type HistoryOrder, historyService } from '../lib/supabase';
 import { useToast } from '../hooks/use-toast';
 import { RoleBasedComponent } from '../components/RoleBasedComponent';
 import { roundTo3Decimals, formatNumber } from '../lib/utils';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+
+const HISTORY_ROW_HEIGHT = 56;
+const HISTORY_OVERSCAN = 6;
+
+interface VirtualizedHistoryBodyProps {
+  orders: HistoryOrder[];
+  renderRow: (order: HistoryOrder) => React.ReactElement;
+  columnCount: number;
+  maxHeight?: number;
+}
+
+const VirtualizedHistoryBody = ({
+  orders,
+  renderRow,
+  columnCount,
+  maxHeight = 520,
+}: VirtualizedHistoryBodyProps) => {
+  const [scrollTop, setScrollTop] = useState(0);
+
+  const totalHeight = orders.length * HISTORY_ROW_HEIGHT;
+  const viewportHeight = Math.min(maxHeight, totalHeight);
+  const startIndex = Math.max(0, Math.floor(scrollTop / HISTORY_ROW_HEIGHT) - HISTORY_OVERSCAN);
+  const endIndex = Math.min(
+    orders.length,
+    Math.ceil((scrollTop + viewportHeight) / HISTORY_ROW_HEIGHT) + HISTORY_OVERSCAN
+  );
+
+  const paddingTop = startIndex * HISTORY_ROW_HEIGHT;
+  const paddingBottom = Math.max(0, (orders.length - endIndex) * HISTORY_ROW_HEIGHT);
+
+  return (
+    <TableBody
+      className="block max-h-[520px] overflow-auto"
+      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+    >
+      {paddingTop > 0 && (
+        <TableRow className="table w-full border-0" style={{ height: paddingTop }}>
+          <TableCell colSpan={columnCount} className="p-0 border-0" />
+        </TableRow>
+      )}
+      {orders.slice(startIndex, endIndex).map(renderRow)}
+      {paddingBottom > 0 && (
+        <TableRow className="table w-full border-0" style={{ height: paddingBottom }}>
+          <TableCell colSpan={columnCount} className="p-0 border-0" />
+        </TableRow>
+      )}
+    </TableBody>
+  );
+};
 
 export function History() {
   const dashboardStore = useDashboardStore();
@@ -23,22 +73,10 @@ export function History() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(historySearchQuery, 300);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
-
-  // Load history orders when component mounts
-  useEffect(() => {
-    if (dashboardStore?.loadHistoryOrders) {
-      dashboardStore.loadHistoryOrders();
-    }
-  }, [dashboardStore]);
-
-  useEffect(() => {
-    if (dashboardStore?.loadHistoryOrders) {
-      dashboardStore.loadHistoryOrders();
-    }
-  }, [historySearchQuery]);
 
   const refreshHistory = () => {
     if (dashboardStore?.loadHistoryOrders) {
@@ -53,20 +91,25 @@ export function History() {
   let deliveredOrdersByDate: { [date: string]: HistoryOrder[] } = {};
   let dailyMetrics: { [date: string]: { straightBar: number; cutAndBend: number; total: number } } = {};
 
-  try {
-    deliveredOrdersByDate = getDeliveredOrdersByDate ? getDeliveredOrdersByDate(historySearchQuery) : {};
-    dailyMetrics = getDailyMetrics ? getDailyMetrics(historySearchQuery) : calculateDailyMetrics();
-  } catch (error) {
-    console.error('Error getting delivered orders or metrics:', error);
-    deliveredOrdersByDate = {};
-    dailyMetrics = {};
-  }
+  const derivedData = useMemo(() => {
+    try {
+      const grouped = getDeliveredOrdersByDate ? getDeliveredOrdersByDate(debouncedSearch) : {};
+      const metrics = getDailyMetrics ? getDailyMetrics(debouncedSearch) : calculateDailyMetrics(grouped);
+      return { grouped, metrics };
+    } catch (error) {
+      console.error('Error getting delivered orders or metrics:', error);
+      return { grouped: {}, metrics: {} };
+    }
+  }, [getDeliveredOrdersByDate, getDailyMetrics, debouncedSearch]);
 
-  function calculateDailyMetrics() {
+  deliveredOrdersByDate = derivedData.grouped;
+  dailyMetrics = derivedData.metrics;
+
+  function calculateDailyMetrics(groupedOrders: { [date: string]: HistoryOrder[] }) {
     const metrics: { [date: string]: { straightBar: number; cutAndBend: number; total: number } } = {};
     
     try {
-      Object.entries(deliveredOrdersByDate).forEach(([date, orders]) => {
+      Object.entries(groupedOrders).forEach(([date, orders]) => {
         let straightBar = 0;
         let cutAndBend = 0;
         
@@ -156,6 +199,124 @@ export function History() {
     setSelectedOrder(order);
     setDetailsDialogOpen(true);
   };
+
+  const renderHistoryRow = (order: HistoryOrder) => (
+    <TableRow key={order.id} className="border-border hover:bg-muted/50 table w-full table-fixed">
+      <TableCell className="font-mono text-foreground">
+        {order.delivery_number || order.id}
+      </TableCell>
+      <TableCell className="text-foreground">
+        {order.customer_name}
+      </TableCell>
+      <TableCell className="text-foreground">{order.company || 'N/A'}</TableCell>
+      <TableCell className="text-foreground">{order.site || 'N/A'}</TableCell>
+      <TableCell className="text-foreground">{order.date}</TableCell>
+      <TableCell>{getStatusBadge(order.status)}</TableCell>
+      <TableCell className="text-foreground">{formatNumber(order.tons)} tons</TableCell>
+      <TableCell>
+        <Badge className={order.shift === 'morning' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
+          {order.shift === 'morning' ? 'Morning' : 'Night'}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <RoleBasedComponent action="edit" fallback={
+          order.signed_delivery_note ? (
+            <Badge className="bg-success text-success-foreground">
+              <CheckCircle size={12} className="mr-1" />
+              Signed
+            </Badge>
+          ) : (
+            <Badge className="bg-gray-400 text-white">
+              <XCircle size={12} className="mr-1" />
+              Not Signed
+            </Badge>
+          )
+        }>
+          <div
+            onClick={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              try {
+                console.log('🔄 Toggling delivery note for history order:', order.id);
+                console.log('📋 Current status:', order.signed_delivery_note);
+                
+                // Toggle signed delivery note status for history order
+                const newStatus = !order.signed_delivery_note;
+                
+                const updatedHistoryOrder: Partial<HistoryOrder> = {
+                  signed_delivery_note: newStatus
+                };
+                
+                await historyService.update(order.id, updatedHistoryOrder as HistoryOrder);
+                
+                // Reload history orders
+                const dashboardState = useDashboardStore.getState();
+                if (dashboardState.loadHistoryOrders) {
+                  await dashboardState.loadHistoryOrders();
+                }
+                
+                toast({
+                  title: "Delivery Note Updated",
+                  description: `Delivery note marked as ${newStatus ? 'signed' : 'not signed'}.`,
+                });
+              } catch (error) {
+                console.error('❌ Failed to update delivery note:', error);
+                toast({
+                  title: "Error",
+                  description: "Failed to update delivery note. Please try again.",
+                  variant: "destructive"
+                });
+              }
+            }}
+            className="cursor-pointer"
+            title={`Click to mark as ${order.signed_delivery_note ? 'not signed' : 'signed'}`}
+          >
+            {order.signed_delivery_note ? (
+              <Badge className="bg-success text-success-foreground cursor-pointer hover:bg-success/80 transition-colors">
+                <CheckCircle size={12} className="mr-1" />
+                Signed
+              </Badge>
+            ) : (
+              <Badge className="bg-gray-400 text-white cursor-pointer hover:bg-gray-500 transition-colors">
+                <XCircle size={12} className="mr-1" />
+                Not Signed
+              </Badge>
+            )}
+          </div>
+        </RoleBasedComponent>
+      </TableCell>
+      <TableCell>
+        <div>
+          <p className="text-sm text-foreground">
+            {order.driver_name || 'N/A'}
+          </p>
+          {order.phone_number ? (
+            <a 
+              href={`tel:${order.phone_number.replace(/[\s\-\(\)]/g, '')}`}
+              className="text-sm text-primary hover:text-primary/80 underline cursor-pointer"
+              title="Click to call"
+            >
+              📞 {order.phone_number}
+            </a>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => handleViewOrder(order)}
+          className="bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"
+          title={hasPermission(user?.profile?.role, 'edit') ? "Edit Order Details" : "View Order Details"}
+        >
+          {hasPermission(user?.profile?.role, 'edit') ? <Edit size={16} /> : <Eye size={16} />}
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
 
   const toggleDateCollapse = (date: string) => {
     setCollapsedDates(prev => {
@@ -292,125 +453,17 @@ export function History() {
                               <TableHead className="text-foreground">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
-                          <TableBody>
-                            {deliveredOrdersByDate[date].map((order) => (
-                              <TableRow key={order.id} className="border-border hover:bg-muted/50">
-                                <TableCell className="font-mono text-foreground">
-                                  {order.delivery_number || order.id}
-                                </TableCell>
-                                <TableCell className="text-foreground">
-                                  {order.customer_name}
-                                </TableCell>
-                                <TableCell className="text-foreground">{order.company || 'N/A'}</TableCell>
-                                <TableCell className="text-foreground">{order.site || 'N/A'}</TableCell>
-                                <TableCell className="text-foreground">{order.date}</TableCell>
-                                <TableCell>{getStatusBadge(order.status)}</TableCell>
-                                <TableCell className="text-foreground">{formatNumber(order.tons)} tons</TableCell>
-                                <TableCell>
-                                  <Badge className={order.shift === 'morning' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
-                                    {order.shift === 'morning' ? 'Morning' : 'Night'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <RoleBasedComponent action="edit" fallback={
-                                    order.signed_delivery_note ? (
-                                      <Badge className="bg-success text-success-foreground">
-                                        <CheckCircle size={12} className="mr-1" />
-                                        Signed
-                                      </Badge>
-                                    ) : (
-                                      <Badge className="bg-gray-400 text-white">
-                                        <XCircle size={12} className="mr-1" />
-                                        Not Signed
-                                      </Badge>
-                                    )
-                                  }>
-                                    <div
-                                      onClick={async (e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        
-                                        try {
-                                          console.log('🔄 Toggling delivery note for history order:', order.id);
-                                          console.log('📋 Current status:', order.signed_delivery_note);
-                                          
-                                          // Toggle signed delivery note status for history order
-                                          const newStatus = !order.signed_delivery_note;
-                                          
-                                          const updatedHistoryOrder: Partial<HistoryOrder> = {
-                                            signed_delivery_note: newStatus
-                                          };
-                                          
-                                          await historyService.update(order.id, updatedHistoryOrder as HistoryOrder);
-                                          
-                                          // Reload history orders
-                                          const dashboardState = useDashboardStore.getState();
-                                          if (dashboardState.loadHistoryOrders) {
-                                            await dashboardState.loadHistoryOrders();
-                                          }
-                                          
-                                          toast({
-                                            title: "Delivery Note Updated",
-                                            description: `Delivery note marked as ${newStatus ? 'signed' : 'not signed'}.`,
-                                          });
-                                        } catch (error) {
-                                          console.error('❌ Failed to update delivery note:', error);
-                                          toast({
-                                            title: "Error",
-                                            description: "Failed to update delivery note. Please try again.",
-                                            variant: "destructive"
-                                          });
-                                        }
-                                      }}
-                                      className="cursor-pointer"
-                                      title={`Click to mark as ${order.signed_delivery_note ? 'not signed' : 'signed'}`}
-                                    >
-                                      {order.signed_delivery_note ? (
-                                        <Badge className="bg-success text-success-foreground cursor-pointer hover:bg-success/80 transition-colors">
-                                          <CheckCircle size={12} className="mr-1" />
-                                          Signed
-                                        </Badge>
-                                      ) : (
-                                        <Badge className="bg-gray-400 text-white cursor-pointer hover:bg-gray-500 transition-colors">
-                                          <XCircle size={12} className="mr-1" />
-                                          Not Signed
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </RoleBasedComponent>
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <p className="text-sm text-foreground">
-                                      {order.driver_name || 'N/A'}
-                                    </p>
-                                    {order.phone_number ? (
-                                      <a 
-                                        href={`tel:${order.phone_number.replace(/[\s\-\(\)]/g, '')}`}
-                                        className="text-sm text-primary hover:text-primary/80 underline cursor-pointer"
-                                        title="Click to call"
-                                      >
-                                        📞 {order.phone_number}
-                                      </a>
-                                    ) : (
-                                      <span className="text-sm text-muted-foreground">-</span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={() => handleViewOrder(order)}
-                                    className="bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"
-                                    title={hasPermission(user?.profile?.role, 'edit') ? "Edit Order Details" : "View Order Details"}
-                                  >
-                                    {hasPermission(user?.profile?.role, 'edit') ? <Edit size={16} /> : <Eye size={16} />}
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
+                          {deliveredOrdersByDate[date].length > 50 ? (
+                            <VirtualizedHistoryBody
+                              orders={deliveredOrdersByDate[date]}
+                              renderRow={renderHistoryRow}
+                              columnCount={11}
+                            />
+                          ) : (
+                            <TableBody>
+                              {deliveredOrdersByDate[date].map(renderHistoryRow)}
+                            </TableBody>
+                          )}
                         </Table>
                       </div>
                     </div>
