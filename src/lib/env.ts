@@ -16,13 +16,6 @@ export const getEnvVar = (key: string): string | undefined => {
       return (import.meta as any).env[key];
     }
 
-    if (key === 'VITE_SUPABASE_URL') {
-      return DEFAULT_SUPABASE_URL;
-    }
-    if (key === 'VITE_SUPABASE_ANON_KEY') {
-      return DEFAULT_SUPABASE_ANON_KEY;
-    }
-
     return undefined;
   } catch (error) {
     console.warn(`Failed to get environment variable ${key}:`, error);
