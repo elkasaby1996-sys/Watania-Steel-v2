@@ -1,11 +1,19 @@
 type QueryKey = unknown;
 
+type QuerySnapshot<T> = {
+  data?: T;
+  error?: Error;
+  updatedAt: number;
+  isFetching: boolean;
+};
+
 type CacheEntry<T> = {
   data?: T;
   error?: Error;
   updatedAt: number;
   promise?: Promise<T>;
   subscribers: Set<() => void>;
+  snapshot: QuerySnapshot<T>;
 };
 
 type FetchOptions = {
@@ -22,12 +30,26 @@ const getEntry = <T>(key: QueryKey): CacheEntry<T> => {
   if (existing) {
     return existing as CacheEntry<T>;
   }
+  const snapshot: QuerySnapshot<T> = {
+    updatedAt: 0,
+    isFetching: false,
+  };
   const entry: CacheEntry<T> = {
     updatedAt: 0,
     subscribers: new Set(),
+    snapshot,
   };
   cache.set(keyString, entry);
   return entry;
+};
+
+const updateSnapshot = <T>(entry: CacheEntry<T>) => {
+  entry.snapshot = {
+    data: entry.data,
+    error: entry.error,
+    updatedAt: entry.updatedAt,
+    isFetching: Boolean(entry.promise),
+  };
 };
 
 export const getQueryData = <T>(key: QueryKey): T | undefined => {
@@ -40,6 +62,7 @@ export const setQueryData = <T>(key: QueryKey, data: T) => {
   entry.error = undefined;
   entry.updatedAt = Date.now();
   entry.promise = undefined;
+  updateSnapshot(entry);
   entry.subscribers.forEach((notify) => notify());
 };
 
@@ -47,6 +70,7 @@ export const setQueryError = (key: QueryKey, error: Error) => {
   const entry = getEntry(key);
   entry.error = error;
   entry.promise = undefined;
+  updateSnapshot(entry);
   entry.subscribers.forEach((notify) => notify());
 };
 
@@ -83,9 +107,11 @@ export const fetchQuery = async <T>(
     .finally(() => {
       const latestEntry = getEntry<T>(key);
       latestEntry.promise = undefined;
+      updateSnapshot(latestEntry);
     });
 
   entry.promise = promise;
+  updateSnapshot(entry);
   entry.subscribers.forEach((notify) => notify());
   return promise;
 };
@@ -94,6 +120,7 @@ export const invalidateQueries = (keyPrefix?: QueryKey) => {
   if (!keyPrefix) {
     cache.forEach((entry) => {
       entry.updatedAt = 0;
+      updateSnapshot(entry);
       entry.subscribers.forEach((notify) => notify());
     });
     return;
@@ -103,6 +130,7 @@ export const invalidateQueries = (keyPrefix?: QueryKey) => {
   cache.forEach((entry, key) => {
     if (key.startsWith(prefixString)) {
       entry.updatedAt = 0;
+      updateSnapshot(entry);
       entry.subscribers.forEach((notify) => notify());
     }
   });
@@ -118,10 +146,5 @@ export const subscribe = (key: QueryKey, callback: () => void) => {
 
 export const getQuerySnapshot = <T>(key: QueryKey) => {
   const entry = getEntry<T>(key);
-  return {
-    data: entry.data,
-    error: entry.error,
-    updatedAt: entry.updatedAt,
-    isFetching: Boolean(entry.promise),
-  };
+  return entry.snapshot;
 };
