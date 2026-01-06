@@ -5,7 +5,6 @@ interface CachedQueryOptions {
   staleTime?: number;
   refetchIntervalMs?: number;
   refetchOnWindowFocus?: boolean;
-  enabled?: boolean;
 }
 
 export const useCachedQuery = <T>(
@@ -13,15 +12,9 @@ export const useCachedQuery = <T>(
   fetcher: (signal?: AbortSignal) => Promise<T>,
   options: CachedQueryOptions = {}
 ) => {
-  const {
-    staleTime = 30000,
-    refetchIntervalMs,
-    refetchOnWindowFocus = true,
-    enabled = true,
-  } = options;
+  const { staleTime = 30000, refetchIntervalMs, refetchOnWindowFocus = true } = options;
 
-  const keyString = useMemo(() => JSON.stringify(key), [key]);
-  const keyMemo = useMemo(() => key, [keyString]);
+  const keyMemo = useMemo(() => key, [JSON.stringify(key)]);
 
   const snapshot = useSyncExternalStore(
     (callback) => subscribe(keyMemo, callback),
@@ -29,9 +22,6 @@ export const useCachedQuery = <T>(
   );
 
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
     const controller = new AbortController();
     const shouldFetch = snapshot.data === undefined || isStale(keyMemo, staleTime);
     if (shouldFetch) {
@@ -39,20 +29,20 @@ export const useCachedQuery = <T>(
     }
 
     return () => controller.abort();
-  }, [keyMemo, fetcher, staleTime, enabled]);
+  }, [keyMemo, fetcher, snapshot.data, snapshot.updatedAt, staleTime]);
 
   useEffect(() => {
-    if (!refetchIntervalMs || !enabled) return;
+    if (!refetchIntervalMs) return;
     const id = window.setInterval(() => {
       const controller = new AbortController();
       fetchQuery(keyMemo, () => fetcher(controller.signal), { staleTime }).catch(() => undefined);
     }, refetchIntervalMs);
 
     return () => window.clearInterval(id);
-  }, [keyMemo, fetcher, refetchIntervalMs, staleTime, enabled]);
+  }, [keyMemo, fetcher, refetchIntervalMs, staleTime]);
 
   useEffect(() => {
-    if (!refetchOnWindowFocus || !enabled) return;
+    if (!refetchOnWindowFocus) return;
 
     const onFocus = () => {
       const controller = new AbortController();
@@ -61,7 +51,7 @@ export const useCachedQuery = <T>(
 
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [keyMemo, fetcher, refetchOnWindowFocus, staleTime, enabled]);
+  }, [keyMemo, fetcher, refetchOnWindowFocus, staleTime]);
 
   return {
     data: snapshot.data,

@@ -4,25 +4,22 @@ import { queryKeys } from '@/lib/queryKeys';
 import { fetchActiveOrders, fetchActivities, fetchHistoryOrders } from '@/lib/dataFetchers';
 import { useDashboardStore } from '@/stores/dashboardStore';
 
-export const useDashboardDataSync = (enabled: boolean) => {
+export const useDashboardDataSync = () => {
   const setDashboardState = useDashboardStore.setState;
 
   const ordersQuery = useCachedQuery(queryKeys.orders({ scope: 'active' }), fetchActiveOrders, {
     staleTime: 30000,
     refetchIntervalMs: 60000,
-    enabled,
   });
 
   const historyQuery = useCachedQuery(queryKeys.historyOrders({ scope: 'delivered' }), fetchHistoryOrders, {
     staleTime: 60000,
     refetchIntervalMs: 90000,
-    enabled,
   });
 
   const activitiesQuery = useCachedQuery(queryKeys.activities({ scope: 'recent' }), fetchActivities, {
     staleTime: 30000,
     refetchIntervalMs: 60000,
-    enabled,
   });
 
   useEffect(() => {

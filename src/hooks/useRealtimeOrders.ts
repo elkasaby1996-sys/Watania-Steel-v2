@@ -5,14 +5,11 @@ import { queryKeys } from '@/lib/queryKeys';
 
 const CHANNEL_NAME = 'orders-realtime';
 
-export const useRealtimeOrders = (enabled: boolean) => {
+export const useRealtimeOrders = () => {
   const retryRef = useRef(0);
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
     let channel = supabase.channel(CHANNEL_NAME);
 
     const subscribe = () => {
@@ -56,5 +53,5 @@ export const useRealtimeOrders = (enabled: boolean) => {
       }
       supabase.removeChannel(channel);
     };
-  }, [enabled]);
+  }, []);
 };

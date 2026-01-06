@@ -25,10 +25,8 @@ import { logReactRender } from './lib/performance';
 function App() {
   const { sidebarCollapsed } = useDashboardStore();
   const { initialize } = useAuthStore();
-  const { user } = useAuthStore();
-  const dataEnabled = Boolean(user);
-  useDashboardDataSync(dataEnabled);
-  useRealtimeOrders(dataEnabled);
+  useDashboardDataSync();
+  useRealtimeOrders();
 
   useEffect(() => {
     // Initialize auth first
