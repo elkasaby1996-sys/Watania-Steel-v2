@@ -80,16 +80,6 @@ export const authService = {
     }
   },
 
-  // Sign out
-  async signOut() {
-    if (!supabase) {
-      return { error: null };
-    }
-
-    const { error } = await supabase.auth.signOut();
-    return { error };
-  },
-
   // Get current user
   async getCurrentUser(): Promise<AuthUser | null> {
     try {
