@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { orderService, activityService, historyService, supabase, type Order as DBOrder, type Activity as DBActivity, type HistoryOrder } from '../lib/supabase';
 import { roundTo3Decimals } from '../lib/utils';
+import { fetchQuery, getQueryData, invalidateQueries, setQueryData } from '../lib/queryCache';
+import { queryKeys } from '../lib/queryKeys';
+import { fetchActiveOrders, fetchActivities, fetchHistoryOrders } from '../lib/dataFetchers';
 
 // Transform database types to frontend types
 interface Order {
@@ -158,30 +161,23 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   loadOrders: async () => {
     set({ loading: true, error: null });
     try {
-      const dbOrders = await orderService.getAll();
-      const orders = dbOrders.map(dbToFrontend);
-      
-      // Show ALL non-delivered orders in today's orders
-      const activeOrders = orders.filter(o => o.status !== 'delivered');
-      
-      console.log('📊 Loaded orders:', {
-        total: orders.length,
-        active: activeOrders.length,
-        statuses: orders.reduce((acc: any, o) => {
-          acc[o.status] = (acc[o.status] || 0) + 1;
-          return acc;
-        }, {})
-      });
-      
-      const stats = {
-        todayOrders: activeOrders.length,
-        inProgress: activeOrders.filter(o => o.status === 'in-progress').length,
-        completed: activeOrders.filter(o => o.status === 'completed').length,
-        delayed: activeOrders.filter(o => o.status === 'delayed').length,
-        delivered: get().stats?.delivered || 0
-      };
-      
-      set({ orders: activeOrders, stats, loading: false });
+      const cacheKey = queryKeys.orders({ scope: 'active' });
+      const cachedOrders = getQueryData<Order[]>(cacheKey);
+
+      if (cachedOrders) {
+        const stats = {
+          todayOrders: cachedOrders.length,
+          inProgress: cachedOrders.filter(o => o.status === 'in-progress').length,
+          completed: cachedOrders.filter(o => o.status === 'completed').length,
+          delayed: cachedOrders.filter(o => o.status === 'delayed').length,
+          delivered: get().stats?.delivered || 0
+        };
+        set({ orders: cachedOrders, stats, loading: false });
+      }
+
+      const orders = await fetchQuery(cacheKey, fetchActiveOrders, { staleTime: 30000 });
+      setQueryData(cacheKey, orders);
+      set({ loading: false });
     } catch (error) {
       console.error('Failed to load orders:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to load orders', loading: false });
@@ -190,17 +186,21 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   loadHistoryOrders: async () => {
     try {
-      console.log('📚 Loading history orders...');
-      const historyOrders = await historyService.getAll();
-      console.log('📊 History orders loaded:', historyOrders.length, 'orders');
-      
-      set(state => ({
-        historyOrders,
-        stats: {
-          ...state.stats,
-          delivered: historyOrders.length
-        }
-      }));
+      const cacheKey = queryKeys.historyOrders({ scope: 'delivered' });
+      const cachedHistory = getQueryData<HistoryOrder[]>(cacheKey);
+
+      if (cachedHistory) {
+        set(state => ({
+          historyOrders: cachedHistory,
+          stats: {
+            ...state.stats,
+            delivered: cachedHistory.length
+          }
+        }));
+      }
+
+      const historyOrders = await fetchQuery(cacheKey, fetchHistoryOrders, { staleTime: 60000 });
+      setQueryData(cacheKey, historyOrders);
     } catch (error) {
       console.error('Failed to load history orders:', error);
       set({ 
@@ -212,14 +212,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   loadActivities: async () => {
     try {
-      const dbActivities = await activityService.getRecent(10);
-      const activities = dbActivities.map(activity => ({
-        id: activity.id,
-        type: activity.type,
-        message: activity.message,
-        timestamp: activity.timestamp
-      }));
-      set({ activities });
+      const cacheKey = queryKeys.activities({ scope: 'recent' });
+      const cachedActivities = getQueryData<ActivityItem[]>(cacheKey);
+
+      if (cachedActivities) {
+        set({ activities: cachedActivities });
+      }
+
+      const activities = await fetchQuery(cacheKey, fetchActivities, { staleTime: 30000 });
+      setQueryData(cacheKey, activities);
     } catch (error) {
       console.error('Failed to load activities:', error);
     }
@@ -227,6 +228,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   updateOrderStatus: async (orderId, status) => {
     try {
+      const ordersKey = queryKeys.orders({ scope: 'active' });
+      const historyKey = queryKeys.historyOrders({ scope: 'delivered' });
+
       if (status === 'delivered') {
         const order = get().orders.find(o => o.id === orderId);
         if (order) {
@@ -244,21 +248,28 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
             return { orders, stats };
           });
           
-          get().loadHistoryOrders();
+          setQueryData(ordersKey, get().orders);
+          invalidateQueries(historyKey);
         }
       } else {
         const updateData = { status };
+        set(state => ({
+          orders: state.orders.map(order =>
+            order.id === orderId ? { ...order, status } : order
+          )
+        }));
         await orderService.update(orderId, updateData);
-        await get().loadOrders();
+        setQueryData(ordersKey, get().orders);
       }
 
       await activityService.create({
         type: 'order_updated',
         message: `Order ${orderId} status updated to ${status}`
       });
-      get().loadActivities();
+      invalidateQueries(queryKeys.activities({ scope: 'recent' }));
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to update order status' });
+      invalidateQueries(queryKeys.orders({ scope: 'active' }));
     }
   },
 
@@ -283,15 +294,18 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         return { orders, stats };
       });
 
-      get().loadHistoryOrders();
+      setQueryData(queryKeys.orders({ scope: 'active' }), get().orders);
+      invalidateQueries(queryKeys.historyOrders({ scope: 'delivered' }));
 
       await activityService.create({
         type: 'order_completed',
         message: `Order ${orderId} has been marked as delivered`
       });
-      get().loadActivities();
+      invalidateQueries(queryKeys.activities({ scope: 'recent' }));
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to mark order as delivered' });
+      invalidateQueries(queryKeys.orders({ scope: 'active' }));
+      invalidateQueries(queryKeys.historyOrders({ scope: 'delivered' }));
     }
   },
 
@@ -300,6 +314,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     
     try {
       const dbOrder = frontendToDb(order);
+      const ordersKey = queryKeys.orders({ scope: 'active' });
+      const historyKey = queryKeys.historyOrders({ scope: 'delivered' });
       
       if (order.status === 'delivered') {
         const historyOrderData = {
@@ -349,7 +365,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           },
           loading: false
         }));
+        setQueryData(historyKey, get().historyOrders);
       } else {
+        const optimisticOrder = dbToFrontend({ ...dbOrder });
+        set(state => ({
+          orders: [optimisticOrder, ...state.orders],
+        }));
+        setQueryData(ordersKey, get().orders);
+
         const createdOrder = await orderService.create(dbOrder);
         const newOrder = dbToFrontend(createdOrder);
         
@@ -364,6 +387,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           };
           return { orders, stats, loading: false };
         });
+        setQueryData(ordersKey, get().orders);
       }
 
       try {
@@ -371,7 +395,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           type: 'order_created',
           message: `New order ${order.id} created for ${order.customerName}`
         });
-        get().loadActivities();
+        invalidateQueries(queryKeys.activities({ scope: 'recent' }));
       } catch (activityError) {
         console.warn('Failed to create activity:', activityError);
       }
@@ -381,6 +405,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         error: error instanceof Error ? error.message : 'Failed to create order',
         loading: false 
       });
+      invalidateQueries(queryKeys.orders({ scope: 'active' }));
+      invalidateQueries(queryKeys.historyOrders({ scope: 'delivered' }));
       throw error;
     }
   },
@@ -388,17 +414,32 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   updateOrder: async (updatedOrder) => {
     try {
       console.log('🔄 Store: Updating ACTIVE order:', updatedOrder.id, 'status:', updatedOrder.status);
+      const ordersKey = queryKeys.orders({ scope: 'active' });
+      const historyKey = queryKeys.historyOrders({ scope: 'delivered' });
       
       if (updatedOrder.status === 'delivered') {
         console.log('📤 Status changed to delivered, moving to history');
         await historyService.moveOrderToHistory(updatedOrder);
-        await get().loadOrders();
-        await get().loadHistoryOrders();
+        set(state => ({
+          orders: state.orders.filter(order => order.id !== updatedOrder.id),
+          historyOrders: state.historyOrders,
+          stats: {
+            ...state.stats,
+            delivered: state.stats.delivered + 1
+          }
+        }));
+        setQueryData(ordersKey, get().orders);
+        invalidateQueries(historyKey);
       } else {
         console.log('📝 Updating in active orders');
         const dbOrder = frontendToDb(updatedOrder);
+        set(state => ({
+          orders: state.orders.map(order =>
+            order.id === updatedOrder.id ? updatedOrder : order
+          )
+        }));
+        setQueryData(ordersKey, get().orders);
         await orderService.update(updatedOrder.id, dbOrder);
-        await get().loadOrders();
       }
 
       try {
@@ -406,7 +447,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           type: 'order_updated',
           message: `Order ${updatedOrder.id} has been updated`
         });
-        get().loadActivities();
+        invalidateQueries(queryKeys.activities({ scope: 'recent' }));
       } catch (activityError) {
         console.warn('Failed to create activity:', activityError);
       }
@@ -414,33 +455,43 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       console.error('❌ Store: Failed to update active order:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to update active order';
       set({ error: errorMessage });
+      invalidateQueries(queryKeys.orders({ scope: 'active' }));
+      invalidateQueries(queryKeys.historyOrders({ scope: 'delivered' }));
       throw new Error(errorMessage);
     }
   },
 
   deleteOrder: async (orderId) => {
+    const ordersKey = queryKeys.orders({ scope: 'active' });
+    const previousOrders = get().orders;
+    const previousStats = get().stats;
+
     try {
+      const nextOrders = previousOrders.filter(order => order.id !== orderId);
+      set({ orders: nextOrders });
+      setQueryData(ordersKey, nextOrders);
+
       await orderService.delete(orderId);
       
-      set(state => {
-        const orders = state.orders.filter(order => order.id !== orderId);
-        const stats = {
-          todayOrders: orders.length,
-          inProgress: orders.length,
-          completed: 0,
-          delayed: 0,
+      set(state => ({
+        stats: {
+          todayOrders: state.orders.length,
+          inProgress: state.orders.filter(o => o.status === 'in-progress').length,
+          completed: state.orders.filter(o => o.status === 'completed').length,
+          delayed: state.orders.filter(o => o.status === 'delayed').length,
           delivered: state.stats.delivered
-        };
-        return { orders, stats };
-      });
+        }
+      }));
 
       await activityService.create({
         type: 'order_updated',
         message: `Order ${orderId} has been deleted`
       });
-      get().loadActivities();
+      invalidateQueries(queryKeys.activities({ scope: 'recent' }));
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to delete order' });
+      invalidateQueries(queryKeys.orders({ scope: 'active' }));
+      set({ orders: previousOrders, stats: previousStats });
     }
   },
 
