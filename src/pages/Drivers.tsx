@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { DriversTable } from '../components/DriversTable';
 import { DriversMetrics } from '../components/DriversMetrics';
 import { DatabaseSchemaAlert } from '../components/DatabaseSchemaAlert';
 import { RoleBasedComponent } from '../components/RoleBasedComponent';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 export function Drivers() {
   const navigate = useNavigate();
@@ -22,6 +23,8 @@ export function Drivers() {
   const loadMetrics = driversStore?.loadMetrics || (() => Promise.resolve());
   const drivers = driversStore?.drivers || [];
   const error = driversStore?.error || null;
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+  const debouncedSearch = useDebouncedValue(localSearch, 300);
 
   useEffect(() => {
     if (loadDrivers && loadMetrics) {
@@ -29,6 +32,10 @@ export function Drivers() {
       loadMetrics();
     }
   }, [loadDrivers, loadMetrics]);
+
+  useEffect(() => {
+    setSearchQuery(debouncedSearch);
+  }, [debouncedSearch, setSearchQuery]);
 
 
   // Show database setup alert if drivers table doesn't exist OR is_active column is missing
@@ -80,8 +87,8 @@ export function Drivers() {
                 id="drivers-search"
                 name="driversSearch"
                 placeholder="Search drivers by name or phone number..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
                 className="pl-10 bg-background text-foreground border-border"
               />
             </div>

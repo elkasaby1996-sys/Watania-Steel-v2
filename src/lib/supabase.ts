@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { getEnvVar } from './env'
 import { roundTo3Decimals } from './utils'
+import { instrumentedFetch } from './performance'
 
 // Get Supabase credentials from environment variables
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL')
@@ -9,7 +10,12 @@ const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY')
 // Create Supabase client with the actual credentials
 export const supabase = createClient(
   supabaseUrl || 'https://lzjzdogiuxenlojeudjt.supabase.co',
-  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6anpkb2dpdXhlbmxvamV1ZGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg2MTMyMjksImV4cCI6MjA3NDE4OTIyOX0.q3kAu-fEJbcYel_H8vxcc0RP3QxAWgCkTF6aqpSCZH4'
+  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6anpkb2dpdXhlbmxvamV1ZGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg2MTMyMjksImV4cCI6MjA3NDE4OTIyOX0.q3kAu-fEJbcYel_H8vxcc0RP3QxAWgCkTF6aqpSCZH4',
+  {
+    global: {
+      fetch: instrumentedFetch,
+    },
+  }
 );
 
 // Database types
@@ -101,6 +107,10 @@ export interface HistoryOrder {
   updated_at?: string;
 }
 
+const ORDER_COLUMNS = 'id,customer_name,date,status,amount,tons,shift,delivery_number,company,site,driver_id,driver_name,phone_number,delivered_at,signed_delivery_note,order_type,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm,created_at,updated_at';
+const HISTORY_COLUMNS = 'id,customer_name,date,status,amount,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at,signed_delivery_note,order_type,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm,created_at,updated_at';
+const DRIVER_COLUMNS = 'id,name,phone_number,is_active,created_at,updated_at';
+const ACTIVITY_COLUMNS = 'id,type,message,timestamp';
 // Helper functions to transform between DB and frontend formats
 export const dbToFrontend = (dbOrder: Order): any => {
   return {
@@ -164,25 +174,61 @@ export const frontendToDb = (order: any): any => {
 
 // Database operations
 export const orderService = {
-  async getAll(): Promise<Order[]> {
+  async list(options: {
+    status?: Order['status'][];
+    limit?: number;
+    offset?: number;
+    sortBy?: 'created_at' | 'date' | 'updated_at';
+    sortDirection?: 'asc' | 'desc';
+    search?: string;
+    signal?: AbortSignal;
+  } = {}): Promise<Order[]> {
     try {
-      console.log('Fetching all orders from database...');
-      const { data, error } = await supabase
+      const {
+        status,
+        limit = 500,
+        offset = 0,
+        sortBy = 'created_at',
+        sortDirection = 'desc',
+        search,
+      } = options;
+
+      let query = supabase
         .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select(ORDER_COLUMNS)
+        .order(sortBy, { ascending: sortDirection === 'asc' })
+        .range(offset, offset + limit - 1);
+
+      if (status?.length) {
+        query = query.in('status', status);
+      }
+
+      if (search) {
+        query = query.or(
+          `id.ilike.%${search}%,customer_name.ilike.%${search}%,company.ilike.%${search}%,site.ilike.%${search}%,driver_name.ilike.%${search}%,phone_number.ilike.%${search}%,delivery_number.ilike.%${search}%`
+        );
+      }
+
+      if (options.signal) {
+        query = query.abortSignal(options.signal);
+      }
+
+      const { data, error } = await query;
       
       if (error) {
         console.error('Database error:', error);
         throw error;
       }
       
-      console.log('Raw data from database:', data);
       return data || [];
     } catch (error) {
       console.error('Failed to fetch orders:', error);
       throw error;
     }
+  },
+
+  async getAll(): Promise<Order[]> {
+    return orderService.list();
   },
 
   async create(order: any): Promise<Order> {
@@ -196,7 +242,7 @@ export const orderService = {
       const { data, error } = await supabase
         .from('orders')
         .insert([orderData])
-        .select()
+        .select(ORDER_COLUMNS)
         .single();
       
       if (error) {
@@ -221,7 +267,7 @@ export const orderService = {
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
-        .select('*')
+        .select(ORDER_COLUMNS)
         .single();
       
       if (error) {
@@ -258,12 +304,30 @@ export const orderService = {
 };
 
 export const driverService = {
-  async getAll(): Promise<Driver[]> {
+  async list(options: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    signal?: AbortSignal;
+  } = {}): Promise<Driver[]> {
     try {
-      const { data, error } = await supabase
+      const { limit = 200, offset = 0, search } = options;
+
+      let query = supabase
         .from('drivers')
-        .select('*')
-        .order('name', { ascending: true });
+        .select(DRIVER_COLUMNS)
+        .order('name', { ascending: true })
+        .range(offset, offset + limit - 1);
+
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,phone_number.ilike.%${search}%`);
+      }
+
+      if (options.signal) {
+        query = query.abortSignal(options.signal);
+      }
+
+      const { data, error } = await query;
       
       if (error) {
         if (error.code === 'PGRST116' || error.message?.includes('relation "drivers" does not exist')) {
@@ -278,6 +342,10 @@ export const driverService = {
       console.error('Failed to fetch drivers:', error);
       return [];
     }
+  },
+
+  async getAll(): Promise<Driver[]> {
+    return driverService.list();
   },
 
   async create(driver: any): Promise<Driver> {
@@ -339,7 +407,7 @@ export const driverService = {
     try {
       const { data, error } = await supabase
         .from('drivers')
-        .select('*')
+        .select(DRIVER_COLUMNS)
         .eq('id', id)
         .single();
       
@@ -541,12 +609,40 @@ export const driverService = {
 };
 
 export const historyService = {
-  async getAll(): Promise<HistoryOrder[]> {
+  async list(options: {
+    limit?: number;
+    offset?: number;
+    sortBy?: 'delivered_at' | 'date' | 'updated_at';
+    sortDirection?: 'asc' | 'desc';
+    search?: string;
+    signal?: AbortSignal;
+  } = {}): Promise<HistoryOrder[]> {
     try {
-      const { data, error } = await supabase
+      const {
+        limit = 500,
+        offset = 0,
+        sortBy = 'delivered_at',
+        sortDirection = 'desc',
+        search,
+      } = options;
+
+      let query = supabase
         .from('history_orders')
-        .select('*')
-        .order('delivered_at', { ascending: false });
+        .select(HISTORY_COLUMNS)
+        .order(sortBy, { ascending: sortDirection === 'asc' })
+        .range(offset, offset + limit - 1);
+
+      if (search) {
+        query = query.or(
+          `id.ilike.%${search}%,customer_name.ilike.%${search}%,company.ilike.%${search}%,site.ilike.%${search}%,driver_name.ilike.%${search}%,phone_number.ilike.%${search}%,delivery_number.ilike.%${search}%`
+        );
+      }
+
+      if (options.signal) {
+        query = query.abortSignal(options.signal);
+      }
+
+      const { data, error } = await query;
       
       if (error) {
         if (error.code === 'PGRST116' || error.message?.includes('relation "history_orders" does not exist')) {
@@ -562,6 +658,10 @@ export const historyService = {
       console.error('Failed to fetch history orders:', error);
       return [];
     }
+  },
+
+  async getAll(): Promise<HistoryOrder[]> {
+    return historyService.list();
   },
 
   async moveOrderToHistory(order: any): Promise<void> {
@@ -679,7 +779,7 @@ export const historyService = {
     try {
       const { data: existingOrder } = await supabase
         .from('history_orders')
-        .select('*')
+        .select(HISTORY_COLUMNS)
         .eq('id', id)
         .single();
       
@@ -696,7 +796,7 @@ export const historyService = {
         .from('history_orders')
         .update(updateData)
         .eq('id', id)
-        .select()
+        .select(HISTORY_COLUMNS)
         .single();
       
       if (error) {
@@ -921,13 +1021,15 @@ export const clientService = {
         .from('orders')
         .select(CLIENT_ORDER_COLUMNS, { count: 'exact' })
         .eq('company', company)
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       let historyQuery = supabase
         .from('history_orders')
         .select(CLIENT_ORDER_COLUMNS, { count: 'exact' })
         .eq('company', company)
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       // Apply date filters if provided
       if (startDate) {
@@ -980,11 +1082,26 @@ export const clientService = {
 // Inventory service for managing steel inventory tables
 export const inventoryService = {
   // Fetch all data from a specific inventory table
-  async getTableData(tableName: string): Promise<Record<string, any>[]> {
+  async getTableData(
+    tableName: string,
+    options: { columns?: string; limit?: number; offset?: number; signal?: AbortSignal } = {}
+  ): Promise<Record<string, any>[]> {
     try {
-      const { data, error } = await supabase
+      const { columns = '*', limit, offset = 0, signal } = options;
+
+      let query = supabase
         .from(tableName)
-        .select('*');
+        .select(columns);
+
+      if (typeof limit === 'number') {
+        query = query.range(offset, offset + limit - 1);
+      }
+
+      if (signal) {
+        query = query.abortSignal(signal);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error(`Error fetching ${tableName}:`, error);
@@ -1307,13 +1424,23 @@ export const offcutUsageService = {
 };
 
 export const activityService = {
-  async getRecent(limit: number = 10): Promise<Activity[]> {
+  async list(options: {
+    limit?: number;
+    signal?: AbortSignal;
+  } = {}): Promise<Activity[]> {
     try {
-      const { data, error } = await supabase
+      const { limit = 10 } = options;
+      let query = supabase
         .from('activities')
-        .select('*')
+        .select(ACTIVITY_COLUMNS)
         .order('timestamp', { ascending: false })
         .limit(limit);
+
+      if (options.signal) {
+        query = query.abortSignal(options.signal);
+      }
+
+      const { data, error } = await query;
       
       if (error) {
         throw error;
@@ -1324,6 +1451,10 @@ export const activityService = {
       console.error('Failed to fetch activities:', error);
       return [];
     }
+  },
+
+  async getRecent(limit: number = 10): Promise<Activity[]> {
+    return activityService.list({ limit });
   },
 
   async create(activity: any): Promise<Activity> {
