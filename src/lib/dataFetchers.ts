@@ -4,14 +4,7 @@ import { timeAsync } from '@/lib/performance';
 const DEFAULT_PAGE_SIZE = 500;
 const ACTIVE_STATUSES = new Set(['pending', 'in-progress', 'completed', 'delayed']);
 
-const normalizeStatus = (status?: string) => {
-  if (!status) return '';
-  return status
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-');
-};
+const normalizeStatus = (status?: string) => (status ? status.toLowerCase() : '');
 
 const fetchAllPages = async <T>(
   fetchPage: (limit: number, offset: number) => Promise<T[]>,
@@ -49,7 +42,7 @@ export const fetchActiveOrders = async (signal?: AbortSignal) => {
       .map(dbToFrontend)
       .map((order) => ({
         ...order,
-        status: (normalizeStatus(order.status) || 'pending') as typeof order.status,
+        status: normalizeStatus(order.status) as typeof order.status,
       }))
       .filter((order) => ACTIVE_STATUSES.has(order.status));
   });
