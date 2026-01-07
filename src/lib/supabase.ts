@@ -589,6 +589,19 @@ export const historyService = {
     const { page, pageSize, filters, signal } = options;
     const start = Math.max(0, (page - 1) * pageSize);
     const end = start + pageSize - 1;
+    const isAbortError = (error: unknown) => {
+      if (!error) {
+        return false;
+      }
+      if (error instanceof Error) {
+        return (
+          error.name === 'AbortError' ||
+          error.message.includes('AbortError') ||
+          error.message.includes('signal is aborted')
+        );
+      }
+      return typeof error === 'object' && 'name' in error && (error as { name?: string }).name === 'AbortError';
+    };
 
     try {
       let query = supabase
@@ -624,6 +637,9 @@ export const historyService = {
       const { data, error, count } = await query.range(start, end);
 
       if (error) {
+        if (isAbortError(error)) {
+          throw error;
+        }
         if (error.code === 'PGRST116' || error.message?.includes('relation "history_orders" does not exist')) {
           console.warn('History orders table does not exist yet.');
           return { data: [], count: 0 };
@@ -634,6 +650,9 @@ export const historyService = {
 
       return { data: data || [], count: count || 0 };
     } catch (error) {
+      if (isAbortError(error)) {
+        throw error;
+      }
       console.error('Failed to fetch paginated history orders:', error);
       return { data: [], count: 0 };
     }

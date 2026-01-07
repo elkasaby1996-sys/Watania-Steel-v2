@@ -51,8 +51,6 @@ export function History() {
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
-  const inFlightRef = useRef(false);
-  const requestKeyRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -78,23 +76,31 @@ export function History() {
   }, [statusFilter, companyFilter, dateFrom, dateTo, debouncedSearch]);
 
   const fetchHistoryOrders = useCallback(async () => {
-    const requestKey = JSON.stringify({ page, pageSize, filters });
-    if (inFlightRef.current && requestKeyRef.current === requestKey) {
-      return;
-    }
-
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
-
+    const previousController = abortRef.current;
     const controller = new AbortController();
     abortRef.current = controller;
-    inFlightRef.current = true;
-    requestKeyRef.current = requestKey;
     const requestId = ++requestIdRef.current;
+
+    if (previousController) {
+      previousController.abort();
+    }
 
     setLoading(true);
     setError(null);
+
+    const isAbortError = (error: unknown) => {
+      if (!error) {
+        return false;
+      }
+      if (error instanceof Error) {
+        return (
+          error.name === 'AbortError' ||
+          error.message.includes('AbortError') ||
+          error.message.includes('signal is aborted')
+        );
+      }
+      return typeof error === 'object' && 'name' in error && (error as { name?: string }).name === 'AbortError';
+    };
 
     try {
       const result = await historyService.getPaginated({
@@ -111,7 +117,7 @@ export function History() {
       setHistoryOrders(result.data);
       setTotalCount(result.count);
     } catch (fetchError) {
-      if (controller.signal.aborted || requestId !== requestIdRef.current) {
+      if (controller.signal.aborted || requestId !== requestIdRef.current || isAbortError(fetchError)) {
         return;
       }
 
@@ -122,7 +128,6 @@ export function History() {
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false);
-        inFlightRef.current = false;
       }
     }
   }, [page, pageSize, filters]);
