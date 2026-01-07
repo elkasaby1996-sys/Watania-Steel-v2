@@ -295,12 +295,10 @@ export function DailySummaryCard() {
 
   return (
     <Card className="h-full">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold text-foreground">
           Daily Summary (Last 30 Days of Data)
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4 text-sm text-muted-foreground">
         <div className="text-xs text-muted-foreground">
           {showLoading ? (
             <div className="h-3 w-40 rounded bg-muted animate-pulse" />
@@ -311,36 +309,34 @@ export function DailySummaryCard() {
         {showLoading ? (
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
-              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
-                <div className="h-7 w-28 rounded bg-muted animate-pulse" />
-                <div className="h-3 w-36 rounded bg-muted animate-pulse" />
-              </div>
-              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
-                <div className="h-7 w-28 rounded bg-muted animate-pulse" />
-                <div className="h-3 w-36 rounded bg-muted animate-pulse" />
-              </div>
+              {[...Array(2)].map((_, index) => (
+                <div key={`kpi-skel-${index}`} className="space-y-2 rounded-xl bg-muted/20 p-4">
+                  <div className="h-7 w-28 rounded bg-muted animate-pulse" />
+                  <div className="h-3 w-36 rounded bg-muted animate-pulse" />
+                </div>
+              ))}
             </div>
-            <div className="space-y-4 md:border-l md:border-border/60 md:pl-6">
-              <div className="space-y-2">
+            <div className="space-y-6">
+              <div className="space-y-3">
                 <div className="h-3 w-24 rounded bg-muted animate-pulse" />
-                <div className="flex flex-wrap gap-2">
+                <div className="space-y-2">
                   {[...Array(3)].map((_, index) => (
-                    <div key={`diameter-skel-${index}`} className="h-6 w-24 rounded-full bg-muted animate-pulse" />
+                    <div key={`diameter-skel-${index}`} className="h-5 w-full rounded bg-muted/30 animate-pulse" />
                   ))}
                 </div>
               </div>
-              <div className="space-y-2 border-t border-border/60 pt-4">
+              <div className="space-y-3">
                 <div className="h-3 w-24 rounded bg-muted animate-pulse" />
-                <div className="flex flex-wrap gap-2">
+                <div className="space-y-2">
                   {[...Array(3)].map((_, index) => (
-                    <div key={`client-skel-${index}`} className="h-6 w-24 rounded-full bg-muted animate-pulse" />
+                    <div key={`client-skel-${index}`} className="h-5 w-full rounded bg-muted/30 animate-pulse" />
                   ))}
                 </div>
               </div>
             </div>
           </div>
         ) : content.isEmpty ? (
-          <div className="rounded-lg border border-dashed border-border/70 bg-muted/10 p-6 text-center">
+          <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-6 text-center">
             <p className="text-sm font-medium text-foreground">No daily summary data yet</p>
             <p className="mt-2 text-xs text-muted-foreground">
               Add orders with recent dates to see averages, top diameters, and top clients here.
@@ -349,53 +345,67 @@ export function DailySummaryCard() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
-              <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
-                <div className="text-2xl font-semibold text-foreground">{content.avgCutAndBend}</div>
-                <div className="text-xs text-muted-foreground">Avg Cut &amp; Bend/day (t)</div>
+              <div className="rounded-xl bg-muted/20 p-4">
+                <div className="flex items-end gap-1 text-2xl font-semibold text-foreground">
+                  <span>{content.avgCutAndBend}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">Avg Cut &amp; Bend/day</div>
               </div>
-              <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
-                <div className="text-2xl font-semibold text-foreground">{content.avgStraightBar}</div>
-                <div className="text-xs text-muted-foreground">Avg Straight Bar/day (t)</div>
+              <div className="rounded-xl bg-muted/20 p-4">
+                <div className="flex items-end gap-1 text-2xl font-semibold text-foreground">
+                  <span>{content.avgStraightBar}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">Avg Straight Bar/day</div>
               </div>
             </div>
-            <div className="space-y-4 md:border-l md:border-border/60 md:pl-6">
-              <div className="space-y-2">
+            <div className="space-y-6">
+              <div className="space-y-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Top diameters</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="divide-y divide-border/50 rounded-lg bg-muted/10">
                   {content.topDiameters.length > 0 ? (
                     content.topDiameters.map((item, index) => (
-                      <span
+                      <div
                         key={`${item.label}-${index}`}
-                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-xs text-foreground/90"
+                        className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
                       >
-                        <span className="font-semibold text-muted-foreground">{index + 1})</span>
-                        <span>
-                          {item.label} {formatTons(item.tons)}t
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted/40 text-[11px] text-muted-foreground">
+                            {index + 1}
+                          </span>
+                          <span className="text-foreground">{item.label}</span>
+                        </div>
+                        <span className="text-sm font-medium text-foreground/90">
+                          {formatTons(item.tons)}t
                         </span>
-                      </span>
+                      </div>
                     ))
                   ) : (
-                    <span className="text-xs text-muted-foreground">No diameter totals yet.</span>
+                    <div className="px-3 py-2 text-xs text-muted-foreground">No diameter totals yet.</div>
                   )}
                 </div>
               </div>
-              <div className="space-y-2 border-t border-border/60 pt-4">
+              <div className="space-y-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Top clients</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="divide-y divide-border/50 rounded-lg bg-muted/10">
                   {content.topClients.length > 0 ? (
                     content.topClients.map((item, index) => (
-                      <span
+                      <div
                         key={`${item.name}-${index}`}
-                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-xs text-foreground/90"
+                        className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
                       >
-                        <span className="font-semibold text-muted-foreground">{index + 1})</span>
-                        <span>
-                          {item.name} {formatTons(item.tons)}t
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted/40 text-[11px] text-muted-foreground">
+                            {index + 1}
+                          </span>
+                          <span className="text-foreground">{item.name}</span>
+                        </div>
+                        <span className="text-sm font-medium text-foreground/90">
+                          {formatTons(item.tons)}t
                         </span>
-                      </span>
+                      </div>
                     ))
                   ) : (
-                    <span className="text-xs text-muted-foreground">No client totals yet.</span>
+                    <div className="px-3 py-2 text-xs text-muted-foreground">No client totals yet.</div>
                   )}
                 </div>
               </div>
