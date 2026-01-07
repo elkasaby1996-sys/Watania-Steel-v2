@@ -51,8 +51,6 @@ export function History() {
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
-  const inFlightRef = useRef(false);
-  const requestKeyRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -78,20 +76,14 @@ export function History() {
   }, [statusFilter, companyFilter, dateFrom, dateTo, debouncedSearch]);
 
   const fetchHistoryOrders = useCallback(async () => {
-    const requestKey = JSON.stringify({ page, pageSize, filters });
-    if (inFlightRef.current && requestKeyRef.current === requestKey) {
-      return;
-    }
-
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
-
+    const previousController = abortRef.current;
     const controller = new AbortController();
     abortRef.current = controller;
-    inFlightRef.current = true;
-    requestKeyRef.current = requestKey;
     const requestId = ++requestIdRef.current;
+
+    if (previousController) {
+      previousController.abort();
+    }
 
     setLoading(true);
     setError(null);
@@ -104,7 +96,7 @@ export function History() {
         signal: controller.signal
       });
 
-      if (controller.signal.aborted || requestId !== requestIdRef.current) {
+      if (controller.signal.aborted || requestId !== requestIdRef.current || result.aborted) {
         return;
       }
 
@@ -122,7 +114,6 @@ export function History() {
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false);
-        inFlightRef.current = false;
       }
     }
   }, [page, pageSize, filters]);
