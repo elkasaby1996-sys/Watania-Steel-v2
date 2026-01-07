@@ -284,8 +284,8 @@ export function DailySummaryCard() {
     }
 
     return {
-      avgCutAndBend: formatTons(summaryData.avgCutAndBend),
-      avgStraightBar: formatTons(summaryData.avgStraightBar),
+      avgCutAndBend: `${formatTons(summaryData.avgCutAndBend)} t`,
+      avgStraightBar: `${formatTons(summaryData.avgStraightBar)} t`,
       topDiameters: summaryData.topDiameters,
       topClients: summaryData.topClients,
       maxDate: summaryData.maxDate,
@@ -299,15 +299,13 @@ export function DailySummaryCard() {
         <CardTitle className="text-base font-semibold text-foreground">
           Daily Summary (Last 30 Days of Data)
         </CardTitle>
-        <CardDescription className="text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           {showLoading ? (
-            <span className="inline-block h-3 w-40 rounded bg-muted/60 align-middle animate-pulse" />
+            <div className="h-3 w-40 rounded bg-muted animate-pulse" />
           ) : (
             <span>Based on max date: {content.maxDate || 'Not available yet'}</span>
           )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="text-sm text-muted-foreground">
+        </div>
         {showLoading ? (
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
@@ -348,16 +346,14 @@ export function DailySummaryCard() {
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
               <div className="rounded-xl bg-muted/20 p-4">
-                <div className="flex items-end gap-2 text-2xl font-semibold text-foreground">
+                <div className="flex items-end gap-1 text-2xl font-semibold text-foreground">
                   <span>{content.avgCutAndBend}</span>
-                  <span className="text-sm font-medium text-muted-foreground">t</span>
                 </div>
                 <div className="text-xs text-muted-foreground">Avg Cut &amp; Bend/day</div>
               </div>
               <div className="rounded-xl bg-muted/20 p-4">
-                <div className="flex items-end gap-2 text-2xl font-semibold text-foreground">
+                <div className="flex items-end gap-1 text-2xl font-semibold text-foreground">
                   <span>{content.avgStraightBar}</span>
-                  <span className="text-sm font-medium text-muted-foreground">t</span>
                 </div>
                 <div className="text-xs text-muted-foreground">Avg Straight Bar/day</div>
               </div>
