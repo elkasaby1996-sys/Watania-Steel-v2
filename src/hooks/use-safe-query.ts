@@ -101,8 +101,11 @@ export function useSafeQuery<T>(
         if (requestId === requestIdRef.current) {
           setIsLoading(false);
         }
-        if (inFlightKeyRef.current === requestKey) {
+        if (inFlightPromiseRef.current === promise) {
           inFlightPromiseRef.current = null;
+          if (inFlightKeyRef.current === requestKey) {
+            inFlightKeyRef.current = null;
+          }
         }
       }
     },
