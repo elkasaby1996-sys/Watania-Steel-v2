@@ -53,7 +53,12 @@ type DailySummaryRow = DiameterRow & {
   company?: string | null;
 };
 
-const formatDate = (date: Date) => date.toISOString().split('T')[0];
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const formatTons = (value: number) =>
   new Intl.NumberFormat('en-US', {
@@ -65,13 +70,18 @@ export function DailySummaryCard() {
   const today = useMemo(() => new Date(), []);
   const startDate = useMemo(() => {
     const date = new Date(today);
-    date.setDate(date.getDate() - 29);
+    date.setDate(date.getDate() - 30);
     return date;
   }, [today]);
 
   const { data, isLoading } = useSafeQuery<DailySummary>(
     'daily-summary',
     async ({ signal }) => {
+      const todayStr = formatLocalDate(today);
+      const startStr = formatLocalDate(startDate);
+      if (import.meta.env.DEV) {
+        console.debug('[DailySummary] window', { startStr, todayStr });
+      }
       let query = supabase
         .from('orders')
         .select(
@@ -91,8 +101,8 @@ export function DailySummaryCard() {
           breakdown_32mm
         `
         )
-        .gte('date', formatDate(startDate))
-        .lte('date', formatDate(today));
+        .gte('date', startStr)
+        .lte('date', todayStr);
 
       if (signal) {
         query = query.abortSignal(signal);
@@ -104,9 +114,15 @@ export function DailySummaryCard() {
       }
 
       const rows = (orders || []) as DailySummaryRow[];
+      if (import.meta.env.DEV) {
+        console.debug('[DailySummary] rows', {
+          count: rows.length,
+          sample: rows.slice(0, 2)
+        });
+      }
       const totalOrders = rows.length;
       const daySet = new Set(rows.map((row) => row.date).filter(Boolean));
-      const dayCount = daySet.size || 30;
+      const dayCount = daySet.size || 0;
 
       const cutAndBendTotal = rows
         .filter((row) => row.order_type === 'cut-and-bend')
@@ -126,7 +142,8 @@ export function DailySummaryCard() {
         .slice(0, 3);
 
       const clientTotals = rows.reduce<Record<string, number>>((acc, row) => {
-        const company = row.company?.trim() || 'Unknown';
+        const company = row.company?.trim();
+        if (!company) return acc;
         acc[company] = (acc[company] || 0) + (Number(row.tons) || 0);
         return acc;
       }, {});
@@ -137,8 +154,8 @@ export function DailySummaryCard() {
         .slice(0, 3);
 
       return {
-        avgCutAndBend: cutAndBendTotal / dayCount,
-        avgStraightBar: straightBarTotal / dayCount,
+        avgCutAndBend: dayCount > 0 ? cutAndBendTotal / dayCount : 0,
+        avgStraightBar: dayCount > 0 ? straightBarTotal / dayCount : 0,
         topDiameters,
         topClients,
         dayCount,
@@ -155,10 +172,10 @@ export function DailySummaryCard() {
   const content = useMemo(() => {
     if (!data || data.totalOrders === 0) {
       return {
-        avgCutAndBend: '—',
-        avgStraightBar: '—',
-        topDiameters: '—',
-        topClients: '—'
+        avgCutAndBend: 'No data in last 30 days',
+        avgStraightBar: 'No data in last 30 days',
+        topDiameters: 'No data in last 30 days',
+        topClients: 'No data in last 30 days'
       };
     }
 
