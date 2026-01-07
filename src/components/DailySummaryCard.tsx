@@ -20,6 +20,7 @@ type DailySummary = {
   topClients: ClientSummary[];
   dayCount: number;
   totalOrders: number;
+  maxDate: string | null;
 };
 
 const DIAMETER_FIELDS: { key: keyof DiameterRow; label: string }[] = [
@@ -60,66 +61,117 @@ const formatLocalDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const parseDateString = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+};
+
 const formatTons = (value: number) =>
   new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 2,
     minimumFractionDigits: 2
   }).format(value);
 
+const isMissingTableError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const message = 'message' in error ? String(error.message) : '';
+  return message.includes('does not exist') || message.includes('PGRST116');
+};
+
 export function DailySummaryCard() {
   const today = useMemo(() => new Date(), []);
-  const startDate = useMemo(() => {
-    const date = new Date(today);
-    date.setDate(date.getDate() - 30);
-    return date;
-  }, [today]);
 
   const { data, isLoading } = useSafeQuery<DailySummary>(
     'daily-summary',
     async ({ signal }) => {
-      const todayStr = formatLocalDate(today);
-      const startStr = formatLocalDate(startDate);
-      if (import.meta.env.DEV) {
-        console.debug('[DailySummary] window', { startStr, todayStr });
-      }
-      let query = supabase
-        .from('orders')
-        .select(
-          `
-          date,
-          order_type,
-          tons,
-          company,
-          breakdown_8mm,
-          breakdown_10mm,
-          breakdown_12mm,
-          breakdown_14mm,
-          breakdown_16mm,
-          breakdown_18mm,
-          breakdown_20mm,
-          breakdown_25mm,
-          breakdown_32mm
-        `
-        )
-        .gte('date', startStr)
-        .lte('date', todayStr);
+      const fetchMaxDate = async (table: 'orders' | 'history_orders') => {
+        try {
+          let maxQuery = supabase.from(table).select('date').order('date', { ascending: false }).limit(1);
+          if (signal) {
+            maxQuery = maxQuery.abortSignal(signal);
+          }
+          const { data: maxData, error: maxError } = await maxQuery;
+          if (maxError) {
+            throw maxError;
+          }
+          return maxData?.[0]?.date || null;
+        } catch (error) {
+          if (isMissingTableError(error)) {
+            return null;
+          }
+          throw error;
+        }
+      };
 
-      if (signal) {
-        query = query.abortSignal(signal);
+      const [ordersMax, historyMax] = await Promise.all([
+        fetchMaxDate('orders'),
+        fetchMaxDate('history_orders')
+      ]);
+
+      const maxDate =
+        ordersMax && historyMax ? (ordersMax > historyMax ? ordersMax : historyMax) : ordersMax || historyMax;
+
+      if (!maxDate) {
+        return {
+          avgCutAndBend: 0,
+          avgStraightBar: 0,
+          topDiameters: [],
+          topClients: [],
+          dayCount: 0,
+          totalOrders: 0,
+          maxDate: null
+        };
       }
 
-      const { data: orders, error } = await query;
-      if (error) {
-        throw error;
-      }
+      const maxDateValue = parseDateString(maxDate);
+      maxDateValue.setDate(maxDateValue.getDate() - 30);
+      const startStr = formatLocalDate(maxDateValue);
 
-      const rows = (orders || []) as DailySummaryRow[];
-      if (import.meta.env.DEV) {
-        console.debug('[DailySummary] rows', {
-          count: rows.length,
-          sample: rows.slice(0, 2)
-        });
-      }
+      const selectColumns = `
+        date,
+        order_type,
+        tons,
+        company,
+        breakdown_8mm,
+        breakdown_10mm,
+        breakdown_12mm,
+        breakdown_14mm,
+        breakdown_16mm,
+        breakdown_18mm,
+        breakdown_20mm,
+        breakdown_25mm,
+        breakdown_32mm
+      `;
+
+      const fetchRows = async (table: 'orders' | 'history_orders') => {
+        try {
+          let query = supabase
+            .from(table)
+            .select(selectColumns)
+            .gte('date', startStr)
+            .lte('date', maxDate);
+          if (signal) {
+            query = query.abortSignal(signal);
+          }
+          const { data: rows, error } = await query;
+          if (error) {
+            throw error;
+          }
+          return rows || [];
+        } catch (error) {
+          if (isMissingTableError(error)) {
+            return [];
+          }
+          throw error;
+        }
+      };
+
+      const [ordersRows, historyRows] = await Promise.all([
+        fetchRows('orders'),
+        fetchRows('history_orders')
+      ]);
+
+      const rows = [...ordersRows, ...historyRows] as DailySummaryRow[];
       const totalOrders = rows.length;
       const daySet = new Set(rows.map((row) => row.date).filter(Boolean));
       const dayCount = daySet.size || 0;
@@ -159,10 +211,11 @@ export function DailySummaryCard() {
         topDiameters,
         topClients,
         dayCount,
-        totalOrders
+        totalOrders,
+        maxDate
       };
     },
-    [startDate, today],
+    [today],
     {
       refreshOnFocus: true,
       refreshOnReconnect: true
@@ -172,10 +225,11 @@ export function DailySummaryCard() {
   const content = useMemo(() => {
     if (!data || data.totalOrders === 0) {
       return {
-        avgCutAndBend: 'No data in last 30 days',
-        avgStraightBar: 'No data in last 30 days',
-        topDiameters: 'No data in last 30 days',
-        topClients: 'No data in last 30 days'
+        avgCutAndBend: 'No data available',
+        avgStraightBar: 'No data available',
+        topDiameters: 'No data available',
+        topClients: 'No data available',
+        maxDate: data?.maxDate || null
       };
     }
 
@@ -189,7 +243,8 @@ export function DailySummaryCard() {
       topClients:
         data.topClients.length > 0
           ? data.topClients.map((item) => `${item.name} (${formatTons(item.tons)} t)`).join(', ')
-          : '—'
+          : '—',
+      maxDate: data.maxDate
     };
   }, [data]);
 
@@ -201,6 +256,9 @@ export function DailySummaryCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
+          Based on max date: {content.maxDate || '—'}
+        </p>
         <div className="flex items-center justify-between gap-2">
           <span>Avg Cut &amp; Bend / day (t)</span>
           <span className="text-foreground font-medium">
