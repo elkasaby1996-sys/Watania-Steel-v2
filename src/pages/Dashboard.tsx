@@ -2,7 +2,8 @@ import React from 'react';
 import { HeroSection } from '@/components/HeroSection';
 import { DashboardCards } from '@/components/DashboardCards';
 import { OrderTable } from '@/components/OrderTable';
-import { ActivityFeed } from '@/components/ActivityFeed';
+import { SteelMixWidget } from '@/components/SteelMixWidget';
+import { SignedDeliveryNotesCard } from '@/components/SignedDeliveryNotesCard';
 
 export function Dashboard() {
   return (
@@ -10,8 +11,9 @@ export function Dashboard() {
       <HeroSection />
       <DashboardCards />
       <OrderTable />
-      <div className="grid grid-cols-1 gap-6">
-        <ActivityFeed />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <SteelMixWidget />
+        <SignedDeliveryNotesCard />
       </div>
     </div>
   );

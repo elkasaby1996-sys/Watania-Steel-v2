@@ -1,36 +1,42 @@
-import { Package, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Package, Scissors, Ruler, Weight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { useDashboardStore } from '../stores/dashboardStore';
 
 export function DashboardCards() {
-  const { stats } = useDashboardStore();
+  const { dashboardMetrics, metricsLoading } = useDashboardStore();
+
+  const formatTons = (value: number) =>
+    new Intl.NumberFormat('en-US', {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0
+    }).format(value);
 
   const cards = [
     {
       title: "Today's Orders",
-      value: stats.todayOrders,
+      value: metricsLoading ? '—' : dashboardMetrics.todayOrders,
       icon: Package,
       color: 'text-primary',
       bgColor: 'bg-primary/20'
     },
     {
-      title: 'In Progress',
-      value: stats.inProgress,
-      icon: Clock,
+      title: 'Total Cut & Bend (t)',
+      value: metricsLoading ? '—' : formatTons(dashboardMetrics.cutAndBendTons),
+      icon: Scissors,
       color: 'text-tertiary-foreground',
       bgColor: 'bg-tertiary/30'
     },
     {
-      title: 'Completed',
-      value: stats.completed,
-      icon: CheckCircle,
+      title: 'Total Straight Bar (t)',
+      value: metricsLoading ? '—' : formatTons(dashboardMetrics.straightBarTons),
+      icon: Ruler,
       color: 'text-success',
       bgColor: 'bg-success/20'
     },
     {
-      title: 'Delayed',
-      value: stats.delayed,
-      icon: AlertTriangle,
+      title: 'Total Tons (t)',
+      value: metricsLoading ? '—' : formatTons(dashboardMetrics.totalTons),
+      icon: Weight,
       color: 'text-warning',
       bgColor: 'bg-warning/20'
     }
