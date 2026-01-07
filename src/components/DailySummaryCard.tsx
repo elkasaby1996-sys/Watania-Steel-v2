@@ -237,66 +237,147 @@ export function DailySummaryCard() {
   );
 
   const content = useMemo(() => {
-    if (!data || data.totalOrders === 0) {
+    if (!data) {
       return {
-        avgCutAndBend: 'No data available',
-        avgStraightBar: 'No data available',
-        topDiameters: 'No data available',
-        topClients: 'No data available',
-        maxDate: data?.maxDate || null
+        avgCutAndBend: null,
+        avgStraightBar: null,
+        topDiameters: [],
+        topClients: [],
+        maxDate: null,
+        isEmpty: true
+      };
+    }
+
+    if (data.totalOrders === 0) {
+      return {
+        avgCutAndBend: null,
+        avgStraightBar: null,
+        topDiameters: [],
+        topClients: [],
+        maxDate: data.maxDate,
+        isEmpty: true
       };
     }
 
     return {
       avgCutAndBend: `${formatTons(data.avgCutAndBend)} t`,
       avgStraightBar: `${formatTons(data.avgStraightBar)} t`,
-      topDiameters:
-        data.topDiameters.length > 0
-          ? data.topDiameters.map((item) => `${item.label} (${formatTons(item.tons)} t)`).join(', ')
-          : '—',
-      topClients:
-        data.topClients.length > 0
-          ? data.topClients.map((item) => `${item.name} (${formatTons(item.tons)} t)`).join(', ')
-          : '—',
-      maxDate: data.maxDate
+      topDiameters: data.topDiameters,
+      topClients: data.topClients,
+      maxDate: data.maxDate,
+      isEmpty: false
     };
   }, [data]);
 
   return (
     <Card className="h-full">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold text-foreground">
           Daily Summary (Last 30 Days of Data)
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm text-muted-foreground">
-        <p className="text-xs text-muted-foreground">
-          Based on max date: {content.maxDate || '—'}
-        </p>
-        <div className="flex items-center justify-between gap-2">
-          <span>Avg Cut &amp; Bend / day (t)</span>
-          <span className="text-foreground font-medium">
-            {isLoading ? '—' : content.avgCutAndBend}
-          </span>
+      <CardContent className="space-y-4 text-sm text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
+          {isLoading ? (
+            <div className="h-3 w-40 rounded bg-muted animate-pulse" />
+          ) : (
+            <>Based on max date: {content.maxDate || 'Not available yet'}</>
+          )}
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <span>Avg Straight Bar / day (t)</span>
-          <span className="text-foreground font-medium">
-            {isLoading ? '—' : content.avgStraightBar}
-          </span>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Top diameters</p>
-          <p className="text-foreground text-sm">
-            {isLoading ? '—' : content.topDiameters}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Top clients</p>
-          <p className="text-foreground text-sm">
-            {isLoading ? '—' : content.topClients}
-          </p>
-        </div>
+        {isLoading ? (
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-4">
+              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div className="h-7 w-28 rounded bg-muted animate-pulse" />
+                <div className="h-3 w-36 rounded bg-muted animate-pulse" />
+              </div>
+              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div className="h-7 w-28 rounded bg-muted animate-pulse" />
+                <div className="h-3 w-36 rounded bg-muted animate-pulse" />
+              </div>
+            </div>
+            <div className="space-y-4 md:border-l md:border-border/60 md:pl-6">
+              <div className="space-y-2">
+                <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+                <div className="flex flex-wrap gap-2">
+                  {[...Array(3)].map((_, index) => (
+                    <div key={`diameter-skel-${index}`} className="h-6 w-24 rounded-full bg-muted animate-pulse" />
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2 border-t border-border/60 pt-4">
+                <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+                <div className="flex flex-wrap gap-2">
+                  {[...Array(3)].map((_, index) => (
+                    <div key={`client-skel-${index}`} className="h-6 w-24 rounded-full bg-muted animate-pulse" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : content.isEmpty ? (
+          <div className="rounded-lg border border-dashed border-border/70 bg-muted/10 p-6 text-center">
+            <p className="text-sm font-medium text-foreground">No daily summary data yet</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Add orders with recent dates to see averages, top diameters, and top clients here.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
+                <div className="text-2xl font-semibold text-foreground">{content.avgCutAndBend}</div>
+                <div className="text-xs text-muted-foreground">Avg Cut &amp; Bend/day (t)</div>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
+                <div className="text-2xl font-semibold text-foreground">{content.avgStraightBar}</div>
+                <div className="text-xs text-muted-foreground">Avg Straight Bar/day (t)</div>
+              </div>
+            </div>
+            <div className="space-y-4 md:border-l md:border-border/60 md:pl-6">
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Top diameters</p>
+                <div className="flex flex-wrap gap-2">
+                  {content.topDiameters.length > 0 ? (
+                    content.topDiameters.map((item, index) => (
+                      <span
+                        key={`${item.label}-${index}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-xs text-foreground/90"
+                      >
+                        <span className="font-semibold text-muted-foreground">{index + 1})</span>
+                        <span>
+                          {item.label} {formatTons(item.tons)}t
+                        </span>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No diameter totals yet.</span>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2 border-t border-border/60 pt-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Top clients</p>
+                <div className="flex flex-wrap gap-2">
+                  {content.topClients.length > 0 ? (
+                    content.topClients.map((item, index) => (
+                      <span
+                        key={`${item.name}-${index}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-xs text-foreground/90"
+                      >
+                        <span className="font-semibold text-muted-foreground">{index + 1})</span>
+                        <span>
+                          {item.name} {formatTons(item.tons)}t
+                        </span>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No client totals yet.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
