@@ -306,6 +306,8 @@ export function DailySummaryCard() {
             <span>Based on max date: {content.maxDate || 'Not available yet'}</span>
           )}
         </div>
+      </CardHeader>
+      <CardContent>
         {showLoading ? (
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
