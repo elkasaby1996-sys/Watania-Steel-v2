@@ -145,7 +145,7 @@ interface DashboardState {
   loadOrders: () => Promise<void>;
   loadHistoryOrders: () => Promise<void>;
   loadActivities: () => Promise<void>;
-  loadDashboardMetrics: (signal?: AbortSignal) => Promise<void>;
+  loadDashboardMetrics: (signal?: AbortSignal, isLatest?: () => boolean) => Promise<void>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
   markAsDelivered: (orderId: string) => Promise<void>;
   addOrder: (order: Order) => Promise<void>;
@@ -268,8 +268,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  loadDashboardMetrics: async (signal) => {
-    set({ metricsLoading: true });
+  loadDashboardMetrics: async (signal, isLatest) => {
+    if (!isLatest || isLatest()) {
+      set({ metricsLoading: true });
+    }
     const todayDate = new Date().toISOString().split('T')[0];
 
     try {
@@ -349,30 +351,47 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         }
       });
 
-      set({
-        dashboardMetrics: {
-          todayOrders: totalOrders,
-          cutAndBendTons,
-          straightBarTons,
-          totalTons,
-          signedOrders,
-          totalOrders,
-          steelMix: steelMixTotals
-        },
-        metricsLoading: false
-      });
+      if (!isLatest || isLatest()) {
+        set({
+          dashboardMetrics: {
+            todayOrders: totalOrders,
+            cutAndBendTons,
+            straightBarTons,
+            totalTons,
+            signedOrders,
+            totalOrders,
+            steelMix: steelMixTotals
+          },
+          metricsLoading: false
+        });
+      }
     } catch (error) {
+      const errorName =
+        typeof (error as { name?: unknown }).name === 'string'
+          ? String((error as { name?: unknown }).name)
+          : '';
+      const errorMessage =
+        typeof (error as { message?: unknown }).message === 'string'
+          ? String((error as { message?: unknown }).message)
+          : '';
+      const errorDetails =
+        typeof (error as { details?: unknown }).details === 'string'
+          ? String((error as { details?: unknown }).details)
+          : '';
       const isAbortError =
-        error instanceof Error &&
-        (error.name === 'AbortError' ||
-          error.message.includes('AbortError') ||
-          ('details' in error && String(error.details).includes('AbortError')));
+        errorName === 'AbortError' ||
+        errorMessage.includes('AbortError') ||
+        errorDetails.includes('AbortError');
       if (isAbortError) {
-        set({ metricsLoading: false });
+        if (!isLatest || isLatest()) {
+          set({ metricsLoading: false });
+        }
         return;
       }
       console.error('Failed to load dashboard metrics:', error);
-      set({ metricsLoading: false });
+      if (!isLatest || isLatest()) {
+        set({ metricsLoading: false });
+      }
     }
   },
 
