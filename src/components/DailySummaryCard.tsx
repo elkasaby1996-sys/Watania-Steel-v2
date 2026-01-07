@@ -30,6 +30,7 @@ type SummaryCacheEntry = {
 
 const SUMMARY_CACHE_TTL_MS = 60_000;
 const summaryCache = new Map<string, SummaryCacheEntry>();
+let latestSummaryCacheKey: string | null = null;
 
 const DIAMETER_FIELDS: { key: keyof DiameterRow; label: string }[] = [
   { key: 'breakdown_8mm', label: '8mm' },
@@ -86,10 +87,30 @@ const isMissingTableError = (error: unknown) => {
   return message.includes('does not exist') || message.includes('PGRST116');
 };
 
+const getFreshSummaryCache = () => {
+  if (!latestSummaryCacheKey) {
+    return null;
+  }
+  const entry = summaryCache.get(latestSummaryCacheKey);
+  if (!entry) {
+    return null;
+  }
+  if (Date.now() - entry.cachedAt > SUMMARY_CACHE_TTL_MS) {
+    return null;
+  }
+  return entry;
+};
+
 export function DailySummaryCard() {
+  const cachedEntry = useMemo(() => getFreshSummaryCache(), []);
+  const cachedData = cachedEntry?.data ?? null;
   const { data, isLoading } = useSafeQuery<DailySummary>(
     'daily-summary',
     async ({ signal }) => {
+      const freshCache = getFreshSummaryCache();
+      if (freshCache) {
+        return freshCache.data;
+      }
       const fetchMaxDate = async (table: 'orders' | 'history_orders') => {
         try {
           let maxQuery = supabase.from(table).select('date').order('date', { ascending: false }).limit(1);
@@ -227,17 +248,20 @@ export function DailySummaryCard() {
         maxDate
       };
       summaryCache.set(cacheKey, { data: summaryResult, cachedAt: now });
+      latestSummaryCacheKey = cacheKey;
       return summaryResult;
     },
     [],
     {
-      refreshOnFocus: true,
+      refreshOnFocus: false,
       refreshOnReconnect: false
     }
   );
 
+  const summaryData = data ?? cachedData;
+  const showLoading = isLoading && !summaryData;
   const content = useMemo(() => {
-    if (!data) {
+    if (!summaryData) {
       return {
         avgCutAndBend: null,
         avgStraightBar: null,
@@ -248,26 +272,26 @@ export function DailySummaryCard() {
       };
     }
 
-    if (data.totalOrders === 0) {
+    if (summaryData.totalOrders === 0) {
       return {
         avgCutAndBend: null,
         avgStraightBar: null,
         topDiameters: [],
         topClients: [],
-        maxDate: data.maxDate,
+        maxDate: summaryData.maxDate,
         isEmpty: true
       };
     }
 
     return {
-      avgCutAndBend: `${formatTons(data.avgCutAndBend)} t`,
-      avgStraightBar: `${formatTons(data.avgStraightBar)} t`,
-      topDiameters: data.topDiameters,
-      topClients: data.topClients,
-      maxDate: data.maxDate,
+      avgCutAndBend: `${formatTons(summaryData.avgCutAndBend)} t`,
+      avgStraightBar: `${formatTons(summaryData.avgStraightBar)} t`,
+      topDiameters: summaryData.topDiameters,
+      topClients: summaryData.topClients,
+      maxDate: summaryData.maxDate,
       isEmpty: false
     };
-  }, [data]);
+  }, [summaryData]);
 
   return (
     <Card className="h-full">
@@ -278,13 +302,13 @@ export function DailySummaryCard() {
       </CardHeader>
       <CardContent className="space-y-4 text-sm text-muted-foreground">
         <div className="text-xs text-muted-foreground">
-          {isLoading ? (
+          {showLoading ? (
             <div className="h-3 w-40 rounded bg-muted animate-pulse" />
           ) : (
             <>Based on max date: {content.maxDate || 'Not available yet'}</>
           )}
         </div>
-        {isLoading ? (
+        {showLoading ? (
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
