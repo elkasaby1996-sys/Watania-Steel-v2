@@ -78,9 +78,26 @@ export function useSafeQuery<T>(
       setIsLoading(true);
       setError(null);
 
-      const promise = fetcherRef.current({ signal: controller.signal });
       inFlightKeyRef.current = requestKey;
-      inFlightPromiseRef.current = promise;
+      let promise: Promise<T> | null = null;
+
+      try {
+        promise = fetcherRef.current({ signal: controller.signal });
+        inFlightPromiseRef.current = promise;
+      } catch (err) {
+        if (!isAbortError(err) && requestId === requestIdRef.current) {
+          const nextError = err instanceof Error ? err : new Error('Request failed');
+          setError(nextError);
+        }
+        if (requestId === requestIdRef.current) {
+          setIsLoading(false);
+        }
+        inFlightPromiseRef.current = null;
+        if (inFlightKeyRef.current === requestKey) {
+          inFlightKeyRef.current = null;
+        }
+        return null;
+      }
 
       try {
         const response = await promise;
@@ -95,7 +112,9 @@ export function useSafeQuery<T>(
           return null;
         }
         const nextError = err instanceof Error ? err : new Error('Request failed');
-        setError(nextError);
+        if (requestId === requestIdRef.current) {
+          setError(nextError);
+        }
         return null;
       } finally {
         if (requestId === requestIdRef.current) {
@@ -117,7 +136,16 @@ export function useSafeQuery<T>(
   }, [fetcher]);
 
   useEffect(() => {
-    execute();
+    const run = async () => {
+      try {
+        await execute();
+      } catch (err) {
+        if (!isAbortError(err)) {
+          setError(err instanceof Error ? err : new Error('Request failed'));
+        }
+      }
+    };
+    void run();
     return () => {
       abortRef.current?.abort();
     };
@@ -127,7 +155,11 @@ export function useSafeQuery<T>(
     if (!enabled) return;
 
     const handleRefresh = () => {
-      execute(true);
+      void execute(true).catch((err) => {
+        if (!isAbortError(err)) {
+          setError(err instanceof Error ? err : new Error('Request failed'));
+        }
+      });
     };
 
     if (refreshOnFocus) {
