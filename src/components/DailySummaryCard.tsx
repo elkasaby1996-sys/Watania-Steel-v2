@@ -301,13 +301,11 @@ export function DailySummaryCard() {
         </CardTitle>
         <div className="text-xs text-muted-foreground">
           {showLoading ? (
-            <div className="h-3 w-40 rounded bg-muted/60 animate-pulse" />
+            <div className="h-3 w-40 rounded bg-muted animate-pulse" />
           ) : (
             <>Based on max date: {content.maxDate || 'Not available yet'}</>
           )}
         </div>
-      </CardHeader>
-      <CardContent className="text-sm text-muted-foreground">
         {showLoading ? (
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
