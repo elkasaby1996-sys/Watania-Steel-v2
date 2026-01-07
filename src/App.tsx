@@ -20,7 +20,7 @@ import { useDashboardStore } from './stores/dashboardStore';
 import { useAuthStore } from './stores/authStore';
 
 function App() {
-  const { sidebarCollapsed, loadOrders, loadActivities } = useDashboardStore();
+  const { sidebarCollapsed, loadOrders, loadDashboardMetrics } = useDashboardStore();
   const { initialize } = useAuthStore();
 
   useEffect(() => {
@@ -31,14 +31,14 @@ function App() {
   useEffect(() => {
     // Load initial data after auth is initialized
     loadOrders();
-    loadActivities();
+    loadDashboardMetrics();
     
     // Load history orders for the history page
     const dashboardStore = useDashboardStore.getState();
     if (dashboardStore.loadHistoryOrders) {
       dashboardStore.loadHistoryOrders();
     }
-  }, [loadOrders, loadActivities]);
+  }, [loadOrders, loadDashboardMetrics]);
 
   return (
     <ErrorBoundary>

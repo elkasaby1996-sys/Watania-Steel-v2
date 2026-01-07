@@ -102,6 +102,26 @@ interface DashboardStats {
   delivered: number;
 }
 
+interface DashboardMetrics {
+  todayOrders: number;
+  cutAndBendTons: number;
+  straightBarTons: number;
+  totalTons: number;
+  signedOrders: number;
+  totalOrders: number;
+  steelMix: {
+    '8mm': number;
+    '10mm': number;
+    '12mm': number;
+    '14mm': number;
+    '16mm': number;
+    '18mm': number;
+    '20mm': number;
+    '25mm': number;
+    '32mm': number;
+  };
+}
+
 interface ActivityItem {
   id: string;
   type: 'order_created' | 'order_updated' | 'order_completed';
@@ -114,15 +134,18 @@ interface DashboardState {
   orders: Order[];
   historyOrders: HistoryOrder[];
   stats: DashboardStats;
+  dashboardMetrics: DashboardMetrics;
   activities: ActivityItem[];
   searchQuery: string;
   loading: boolean;
+  metricsLoading: boolean;
   error: string | null;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSearchQuery: (query: string) => void;
   loadOrders: () => Promise<void>;
   loadHistoryOrders: () => Promise<void>;
   loadActivities: () => Promise<void>;
+  loadDashboardMetrics: () => Promise<void>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
   markAsDelivered: (orderId: string) => Promise<void>;
   addOrder: (order: Order) => Promise<void>;
@@ -149,8 +172,28 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     delayed: 0,
     delivered: 0
   },
+  dashboardMetrics: {
+    todayOrders: 0,
+    cutAndBendTons: 0,
+    straightBarTons: 0,
+    totalTons: 0,
+    signedOrders: 0,
+    totalOrders: 0,
+    steelMix: {
+      '8mm': 0,
+      '10mm': 0,
+      '12mm': 0,
+      '14mm': 0,
+      '16mm': 0,
+      '18mm': 0,
+      '20mm': 0,
+      '25mm': 0,
+      '32mm': 0,
+    }
+  },
   activities: [],
   loading: false,
+  metricsLoading: false,
   error: null,
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setSearchQuery: (query) => set({ searchQuery: query }),
@@ -222,6 +265,103 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       set({ activities });
     } catch (error) {
       console.error('Failed to load activities:', error);
+    }
+  },
+
+  loadDashboardMetrics: async () => {
+    set({ metricsLoading: true });
+    const todayDate = new Date().toISOString().split('T')[0];
+
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          date,
+          status,
+          tons,
+          order_type,
+          signed_delivery_note,
+          breakdown_8mm,
+          breakdown_10mm,
+          breakdown_12mm,
+          breakdown_14mm,
+          breakdown_16mm,
+          breakdown_18mm,
+          breakdown_20mm,
+          breakdown_25mm,
+          breakdown_32mm
+        `)
+        .eq('date', todayDate);
+
+      if (error) {
+        throw error;
+      }
+
+      const orders = data || [];
+      const totalOrders = orders.length;
+      let cutAndBendTons = 0;
+      let straightBarTons = 0;
+      let totalTons = 0;
+      let signedOrders = 0;
+      const steelMixTotals = {
+        '8mm': 0,
+        '10mm': 0,
+        '12mm': 0,
+        '14mm': 0,
+        '16mm': 0,
+        '18mm': 0,
+        '20mm': 0,
+        '25mm': 0,
+        '32mm': 0,
+      };
+
+      orders.forEach(order => {
+        const tons = Number(order.tons) || 0;
+        totalTons += tons;
+
+        if (order.order_type === 'cut-and-bend') {
+          cutAndBendTons += tons;
+        } else if (order.order_type === 'straight-bar') {
+          straightBarTons += tons;
+        }
+
+        if (order.signed_delivery_note) {
+          signedOrders += 1;
+        }
+
+        if (order.status === 'in-progress' || order.status === 'delayed') {
+          steelMixTotals['8mm'] += Number(order.breakdown_8mm) || 0;
+          steelMixTotals['10mm'] += Number(order.breakdown_10mm) || 0;
+          steelMixTotals['12mm'] += Number(order.breakdown_12mm) || 0;
+          steelMixTotals['14mm'] += Number(order.breakdown_14mm) || 0;
+          steelMixTotals['16mm'] += Number(order.breakdown_16mm) || 0;
+          steelMixTotals['18mm'] += Number(order.breakdown_18mm) || 0;
+          steelMixTotals['20mm'] += Number(order.breakdown_20mm) || 0;
+          steelMixTotals['25mm'] += Number(order.breakdown_25mm) || 0;
+          steelMixTotals['32mm'] += Number(order.breakdown_32mm) || 0;
+        }
+      });
+
+      set({
+        dashboardMetrics: {
+          todayOrders: totalOrders,
+          cutAndBendTons,
+          straightBarTons,
+          totalTons,
+          signedOrders,
+          totalOrders,
+          steelMix: steelMixTotals
+        },
+        metricsLoading: false
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        set({ metricsLoading: false });
+        return;
+      }
+      console.error('Failed to load dashboard metrics:', error);
+      set({ metricsLoading: false });
     }
   },
 
