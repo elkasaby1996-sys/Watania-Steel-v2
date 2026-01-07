@@ -37,6 +37,7 @@ export function useSafeQuery<T>(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const dataRef = useRef<T | null>(null);
+  const fetcherRef = useRef(fetcher);
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
   const inFlightKeyRef = useRef<string | null>(null);
@@ -77,7 +78,7 @@ export function useSafeQuery<T>(
       setIsLoading(true);
       setError(null);
 
-      const promise = fetcher({ signal: controller.signal });
+      const promise = fetcherRef.current({ signal: controller.signal });
       inFlightKeyRef.current = requestKey;
       inFlightPromiseRef.current = promise;
 
@@ -105,15 +106,19 @@ export function useSafeQuery<T>(
         }
       }
     },
-    [enabled, fetcher, requestKey]
+    [enabled, requestKey]
   );
+
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
 
   useEffect(() => {
     execute();
     return () => {
       abortRef.current?.abort();
     };
-  }, [execute, ...deps]);
+  }, [execute]);
 
   useEffect(() => {
     if (!enabled) return;
