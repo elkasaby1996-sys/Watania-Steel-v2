@@ -78,11 +78,6 @@ export function History() {
   }, [statusFilter, companyFilter, dateFrom, dateTo, debouncedSearch]);
 
   const fetchHistoryOrders = useCallback(async () => {
-    if (inFlightRef.current && abortRef.current?.signal.aborted) {
-      inFlightRef.current = false;
-      requestKeyRef.current = null;
-    }
-
     const requestKey = JSON.stringify({ page, pageSize, filters });
     if (inFlightRef.current && requestKeyRef.current === requestKey) {
       return;
@@ -153,8 +148,6 @@ export function History() {
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
-      inFlightRef.current = false;
-      requestKeyRef.current = null;
     };
   }, []);
 
