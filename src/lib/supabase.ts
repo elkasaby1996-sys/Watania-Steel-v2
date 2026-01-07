@@ -101,6 +101,19 @@ export interface HistoryOrder {
   updated_at?: string;
 }
 
+export interface HistoryOrderFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  status?: string;
+  company?: string;
+  deliveryNumberOrId?: string;
+}
+
+export interface HistoryOrderPage {
+  data: HistoryOrder[];
+  count: number;
+}
+
 // Helper functions to transform between DB and frontend formats
 export const dbToFrontend = (dbOrder: Order): any => {
   return {
@@ -540,6 +553,9 @@ export const driverService = {
   }
 };
 
+const HISTORY_ORDER_LIST_COLUMNS =
+  'id,customer_name,date,status,amount,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at,signed_delivery_note,order_type';
+
 export const historyService = {
   async getAll(): Promise<HistoryOrder[]> {
     try {
@@ -561,6 +577,65 @@ export const historyService = {
     } catch (error) {
       console.error('Failed to fetch history orders:', error);
       return [];
+    }
+  },
+
+  async getPaginated(options: {
+    page: number;
+    pageSize: number;
+    filters?: HistoryOrderFilters;
+    signal?: AbortSignal;
+  }): Promise<HistoryOrderPage> {
+    const { page, pageSize, filters, signal } = options;
+    const start = Math.max(0, (page - 1) * pageSize);
+    const end = start + pageSize - 1;
+
+    try {
+      let query = supabase
+        .from('history_orders')
+        .select(HISTORY_ORDER_LIST_COLUMNS, { count: 'exact' })
+        .order('delivered_at', { ascending: false });
+
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      if (filters?.company) {
+        query = query.ilike('company', `%${filters.company}%`);
+      }
+
+      if (filters?.dateFrom) {
+        query = query.gte('date', filters.dateFrom);
+      }
+
+      if (filters?.dateTo) {
+        query = query.lte('date', filters.dateTo);
+      }
+
+      if (filters?.deliveryNumberOrId) {
+        const term = filters.deliveryNumberOrId.replace(/,/g, '');
+        query = query.or(`delivery_number.ilike.%${term}%,id.ilike.%${term}%`);
+      }
+
+      if (signal) {
+        query = query.abortSignal(signal);
+      }
+
+      const { data, error, count } = await query.range(start, end);
+
+      if (error) {
+        if (error.code === 'PGRST116' || error.message?.includes('relation "history_orders" does not exist')) {
+          console.warn('History orders table does not exist yet.');
+          return { data: [], count: 0 };
+        }
+        console.error('Database error fetching history orders:', error);
+        return { data: [], count: 0 };
+      }
+
+      return { data: data || [], count: count || 0 };
+    } catch (error) {
+      console.error('Failed to fetch paginated history orders:', error);
+      return { data: [], count: 0 };
     }
   },
 

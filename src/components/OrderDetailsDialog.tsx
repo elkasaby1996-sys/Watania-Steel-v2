@@ -21,6 +21,7 @@ interface OrderDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   readOnly?: boolean;
+  onHistoryUpdated?: () => void | Promise<void>;
 }
 
 interface OrderFormData {
@@ -49,7 +50,13 @@ interface OrderFormData {
   };
 }
 
-export function OrderDetailsDialog({ order, open, onOpenChange, readOnly = false }: OrderDetailsDialogProps) {
+export function OrderDetailsDialog({
+  order,
+  open,
+  onOpenChange,
+  readOnly = false,
+  onHistoryUpdated
+}: OrderDetailsDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<OrderFormData>({
@@ -77,6 +84,18 @@ export function OrderDetailsDialog({ order, open, onOpenChange, readOnly = false
       '32mm': ''
     }
   });
+
+  const notifyHistoryUpdated = async () => {
+    if (onHistoryUpdated) {
+      await onHistoryUpdated();
+      return;
+    }
+
+    const dashboardState = useDashboardStore.getState();
+    if (dashboardState.loadHistoryOrders) {
+      await dashboardState.loadHistoryOrders();
+    }
+  };
 
   const { user } = useAuthStore();
   const { toast } = useToast();
@@ -301,9 +320,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, readOnly = false
             if (dashboardState.loadOrders) {
               await dashboardState.loadOrders();
             }
-            if (dashboardState.loadHistoryOrders) {
-              await dashboardState.loadHistoryOrders();
-            }
+            await notifyHistoryUpdated();
           }, 500);
           
           return;
@@ -317,10 +334,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, readOnly = false
           });
           
           setTimeout(async () => {
-            const dashboardState = useDashboardStore.getState();
-            if (dashboardState.loadHistoryOrders) {
-              await dashboardState.loadHistoryOrders();
-            }
+            await notifyHistoryUpdated();
           }, 500);
         }
       } else {
@@ -402,8 +416,8 @@ export function OrderDetailsDialog({ order, open, onOpenChange, readOnly = false
           if (dashboardState.loadOrders) {
             await dashboardState.loadOrders();
           }
-          if (formData.status === 'delivered' && dashboardState.loadHistoryOrders) {
-            await dashboardState.loadHistoryOrders();
+          if (formData.status === 'delivered') {
+            await notifyHistoryUpdated();
           }
         }, 500);
       }
