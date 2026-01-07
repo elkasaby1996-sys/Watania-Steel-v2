@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { slugifyCompany, formatNumber } from '@/lib/utils';
 import { useClientsStore } from '@/stores/clientsStore';
 
 export function Clients() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     loading,
     error,
@@ -22,6 +23,13 @@ export function Clients() {
   useEffect(() => {
     loadClients();
   }, []);
+
+  useEffect(() => {
+    const companyParam = searchParams.get('company');
+    if (companyParam && companyParam !== searchQuery) {
+      setSearchQuery(companyParam);
+    }
+  }, [searchParams, searchQuery, setSearchQuery]);
 
   const filteredClients = getFilteredClients();
 
