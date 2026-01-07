@@ -303,7 +303,7 @@ export function DailySummaryCard() {
           {showLoading ? (
             <div className="h-3 w-40 rounded bg-muted animate-pulse" />
           ) : (
-            <>Based on max date: {content.maxDate || 'Not available yet'}</>
+            <span>Based on max date: {content.maxDate || 'Not available yet'}</span>
           )}
         </div>
         {showLoading ? (
