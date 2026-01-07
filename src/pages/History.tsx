@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,11 +21,12 @@ import {
 import { OrderDetailsDialog } from '../components/OrderDetailsDialog';
 import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { type HistoryOrder, historyService, type HistoryOrderFilters } from '../lib/supabase';
 import { useToast } from '../hooks/use-toast';
 import { RoleBasedComponent } from '../components/RoleBasedComponent';
 import { roundTo3Decimals, formatNumber } from '../lib/utils';
+import { useSafeQuery } from '../hooks/use-safe-query';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const HISTORY_REFRESH_DEBOUNCE_MS = 300;
@@ -34,6 +35,7 @@ export function History() {
   const { user } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -47,11 +49,6 @@ export function History() {
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [historyOrders, setHistoryOrders] = useState<HistoryOrder[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const abortRef = useRef<AbortController | null>(null);
-  const requestIdRef = useRef(0);
 
   useEffect(() => {
     const debounceTimer = window.setTimeout(() => {
@@ -65,6 +62,13 @@ export function History() {
     setPage(1);
   }, [debouncedSearch, statusFilter, companyFilter, dateFrom, dateTo, pageSize]);
 
+  useEffect(() => {
+    const searchFromParams = searchParams.get('search');
+    if (searchFromParams && searchFromParams !== historySearchQuery) {
+      setHistorySearchQuery(searchFromParams);
+    }
+  }, [historySearchQuery, searchParams]);
+
   const filters: HistoryOrderFilters = useMemo(() => {
     return {
       status: statusFilter === 'all' ? undefined : statusFilter,
@@ -75,76 +79,44 @@ export function History() {
     };
   }, [statusFilter, companyFilter, dateFrom, dateTo, debouncedSearch]);
 
-  const fetchHistoryOrders = useCallback(async () => {
-    const previousController = abortRef.current;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const requestId = ++requestIdRef.current;
-
-    if (previousController) {
-      previousController.abort();
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
+  const { data: historyPage, isLoading, error, refetch } = useSafeQuery(
+    'history-orders',
+    async ({ signal }) => {
       const result = await historyService.getPaginated({
         page,
         pageSize,
         filters,
-        signal: controller.signal
+        signal
       });
-
-      if (controller.signal.aborted || requestId !== requestIdRef.current || result.aborted) {
-        return;
+      if (result.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
       }
+      return result;
+    },
+    [page, pageSize, filters],
+    {
+      refreshOnFocus: true,
+      refreshOnReconnect: true
+    }
+  );
+  const loading = isLoading;
+  const errorMessage = error?.message || null;
 
-      setHistoryOrders(result.data);
-      setTotalCount(result.count);
-    } catch (fetchError) {
-      if (controller.signal.aborted || requestId !== requestIdRef.current) {
-        return;
-      }
+  useEffect(() => {
+    setHistoryOrders(historyPage?.data || []);
+    setTotalCount(historyPage?.count || 0);
+  }, [historyPage]);
 
-      const message = fetchError instanceof Error ? fetchError.message : 'Failed to load history orders.';
-      setError(message);
+  useEffect(() => {
+    if (errorMessage) {
       setHistoryOrders([]);
       setTotalCount(0);
-    } finally {
-      if (requestId === requestIdRef.current) {
-        setLoading(false);
-      }
     }
-  }, [page, pageSize, filters]);
-
-  useEffect(() => {
-    fetchHistoryOrders();
-  }, [fetchHistoryOrders]);
-
-  useEffect(() => {
-    const handleFocus = () => {
-      fetchHistoryOrders();
-    };
-
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('online', handleFocus);
-
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('online', handleFocus);
-    };
-  }, [fetchHistoryOrders]);
-
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+  }, [errorMessage]);
 
   const refreshHistory = useCallback(() => {
-    fetchHistoryOrders();
-  }, [fetchHistoryOrders]);
+    refetch();
+  }, [refetch]);
 
   const deliveredOrdersByDate = useMemo(() => {
     const grouped: { [date: string]: HistoryOrder[] } = {};
@@ -381,10 +353,10 @@ export function History() {
         </div>
       </Card>
 
-      {error ? (
+      {errorMessage ? (
         <Card>
           <div className="p-4 text-sm text-destructive">
-            {error}
+            {errorMessage}
           </div>
         </Card>
       ) : null}

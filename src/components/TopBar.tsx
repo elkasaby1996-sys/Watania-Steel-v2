@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
 import { getRoleDisplayName } from '../lib/auth';
+import { GlobalSearch } from './GlobalSearch';
 
 export function TopBar() {
   const { sidebarCollapsed } = useDashboardStore();
@@ -38,8 +39,9 @@ export function TopBar() {
       sidebarCollapsed ? 'left-16' : 'left-64'
     }`}>
       <div className="flex items-center justify-between h-full px-6">
-        <div className="flex-1 flex items-center">
+        <div className="flex-1 flex items-center gap-6">
           <h1 className="font-headline font-bold text-xl text-gray-50">Factory Management System</h1>
+          <GlobalSearch />
         </div>
 
         <div className="flex items-center gap-4">

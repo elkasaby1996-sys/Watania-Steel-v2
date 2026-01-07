@@ -145,7 +145,7 @@ interface DashboardState {
   loadOrders: () => Promise<void>;
   loadHistoryOrders: () => Promise<void>;
   loadActivities: () => Promise<void>;
-  loadDashboardMetrics: () => Promise<void>;
+  loadDashboardMetrics: (signal?: AbortSignal) => Promise<void>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
   markAsDelivered: (orderId: string) => Promise<void>;
   addOrder: (order: Order) => Promise<void>;
@@ -268,12 +268,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  loadDashboardMetrics: async () => {
+  loadDashboardMetrics: async (signal) => {
     set({ metricsLoading: true });
     const todayDate = new Date().toISOString().split('T')[0];
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           id,
@@ -293,6 +293,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           breakdown_32mm
         `)
         .eq('date', todayDate);
+
+      if (signal) {
+        query = query.abortSignal(signal);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         throw error;
@@ -356,7 +362,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         metricsLoading: false
       });
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
+      const isAbortError =
+        error instanceof Error &&
+        (error.name === 'AbortError' || error.message.includes('AbortError'));
+      if (isAbortError) {
         set({ metricsLoading: false });
         return;
       }

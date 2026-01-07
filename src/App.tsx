@@ -18,10 +18,24 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useDashboardStore } from './stores/dashboardStore';
 import { useAuthStore } from './stores/authStore';
+import { useSafeQuery } from './hooks/use-safe-query';
 
 function App() {
   const { sidebarCollapsed, loadOrders, loadDashboardMetrics } = useDashboardStore();
   const { initialize } = useAuthStore();
+
+  useSafeQuery(
+    'dashboard-metrics',
+    async ({ signal }) => {
+      await loadDashboardMetrics(signal);
+      return null;
+    },
+    [loadDashboardMetrics],
+    {
+      refreshOnFocus: true,
+      refreshOnReconnect: true
+    }
+  );
 
   useEffect(() => {
     // Initialize auth first
@@ -31,14 +45,12 @@ function App() {
   useEffect(() => {
     // Load initial data after auth is initialized
     loadOrders();
-    loadDashboardMetrics();
-    
     // Load history orders for the history page
     const dashboardStore = useDashboardStore.getState();
     if (dashboardStore.loadHistoryOrders) {
       dashboardStore.loadHistoryOrders();
     }
-  }, [loadOrders, loadDashboardMetrics]);
+  }, [loadOrders]);
 
   return (
     <ErrorBoundary>
