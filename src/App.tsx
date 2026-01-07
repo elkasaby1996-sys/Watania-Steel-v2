@@ -37,14 +37,15 @@ function App() {
       metricsControllerRef.current?.abort();
       const controller = new AbortController();
       metricsControllerRef.current = controller;
+      const isLatest = () => requestId === metricsRequestIdRef.current;
 
       try {
-        await loadDashboardMetrics(controller.signal);
+        await loadDashboardMetrics(controller.signal, isLatest);
       } catch (error) {
         const isAbortError =
           error instanceof Error &&
           (error.name === 'AbortError' || error.message.includes('AbortError'));
-        if (!isAbortError && requestId === metricsRequestIdRef.current) {
+        if (!isAbortError && isLatest()) {
           console.error('Failed to refresh dashboard metrics:', error);
         }
       }
