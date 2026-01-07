@@ -23,6 +23,14 @@ type DailySummary = {
   maxDate: string | null;
 };
 
+type SummaryCacheEntry = {
+  data: DailySummary;
+  cachedAt: number;
+};
+
+const SUMMARY_CACHE_TTL_MS = 60_000;
+const summaryCache = new Map<string, SummaryCacheEntry>();
+
 const DIAMETER_FIELDS: { key: keyof DiameterRow; label: string }[] = [
   { key: 'breakdown_8mm', label: '8mm' },
   { key: 'breakdown_10mm', label: '10mm' },
@@ -79,8 +87,6 @@ const isMissingTableError = (error: unknown) => {
 };
 
 export function DailySummaryCard() {
-  const today = useMemo(() => new Date(), []);
-
   const { data, isLoading } = useSafeQuery<DailySummary>(
     'daily-summary',
     async ({ signal }) => {
@@ -126,6 +132,12 @@ export function DailySummaryCard() {
       const maxDateValue = parseDateString(maxDate);
       maxDateValue.setDate(maxDateValue.getDate() - 30);
       const startStr = formatLocalDate(maxDateValue);
+      const cacheKey = `${maxDate}:${startStr}`;
+      const cached = summaryCache.get(cacheKey);
+      const now = Date.now();
+      if (cached && now - cached.cachedAt < SUMMARY_CACHE_TTL_MS) {
+        return cached.data;
+      }
 
       const selectColumns = `
         date,
@@ -205,7 +217,7 @@ export function DailySummaryCard() {
         .sort((a, b) => b.tons - a.tons)
         .slice(0, 3);
 
-      return {
+      const summaryResult = {
         avgCutAndBend: dayCount > 0 ? cutAndBendTotal / dayCount : 0,
         avgStraightBar: dayCount > 0 ? straightBarTotal / dayCount : 0,
         topDiameters,
@@ -214,11 +226,13 @@ export function DailySummaryCard() {
         totalOrders,
         maxDate
       };
+      summaryCache.set(cacheKey, { data: summaryResult, cachedAt: now });
+      return summaryResult;
     },
-    [today],
+    [],
     {
       refreshOnFocus: true,
-      refreshOnReconnect: true
+      refreshOnReconnect: false
     }
   );
 
