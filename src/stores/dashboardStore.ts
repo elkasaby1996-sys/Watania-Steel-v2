@@ -364,7 +364,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     } catch (error) {
       const isAbortError =
         error instanceof Error &&
-        (error.name === 'AbortError' || error.message.includes('AbortError'));
+        (error.name === 'AbortError' ||
+          error.message.includes('AbortError') ||
+          ('details' in error && String(error.details).includes('AbortError')));
       if (isAbortError) {
         set({ metricsLoading: false });
         return;

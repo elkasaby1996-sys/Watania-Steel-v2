@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { Dashboard } from './pages/Dashboard';
@@ -22,6 +22,8 @@ import { useAuthStore } from './stores/authStore';
 function App() {
   const { sidebarCollapsed, loadOrders, loadDashboardMetrics } = useDashboardStore();
   const { initialize } = useAuthStore();
+  const metricsRequestIdRef = useRef(0);
+  const metricsControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     // Initialize auth first
@@ -29,17 +31,31 @@ function App() {
   }, [initialize]);
 
   useEffect(() => {
-    const controllerRef = { current: new AbortController() };
-    const loadMetrics = () => loadDashboardMetrics(controllerRef.current.signal);
+    const loadMetrics = async () => {
+      metricsRequestIdRef.current += 1;
+      const requestId = metricsRequestIdRef.current;
+      metricsControllerRef.current?.abort();
+      const controller = new AbortController();
+      metricsControllerRef.current = controller;
+
+      try {
+        await loadDashboardMetrics(controller.signal);
+      } catch (error) {
+        const isAbortError =
+          error instanceof Error &&
+          (error.name === 'AbortError' || error.message.includes('AbortError'));
+        if (!isAbortError && requestId === metricsRequestIdRef.current) {
+          console.error('Failed to refresh dashboard metrics:', error);
+        }
+      }
+    };
 
     // Load initial data after auth is initialized
     loadOrders();
-    loadMetrics();
+    void loadMetrics();
 
     const handleRefresh = () => {
-      controllerRef.current.abort();
-      controllerRef.current = new AbortController();
-      loadDashboardMetrics(controllerRef.current.signal);
+      void loadMetrics();
     };
 
     window.addEventListener('focus', handleRefresh);
@@ -51,7 +67,7 @@ function App() {
       dashboardStore.loadHistoryOrders();
     }
     return () => {
-      controllerRef.current.abort();
+      metricsControllerRef.current?.abort();
       window.removeEventListener('focus', handleRefresh);
       window.removeEventListener('online', handleRefresh);
     };

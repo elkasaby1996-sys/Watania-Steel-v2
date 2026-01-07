@@ -29,11 +29,23 @@ const EMPTY_RESULTS: SearchResults = {
 };
 
 const SEARCH_LIMIT = 6;
+const ENABLE_CLIENT_SEARCH = false;
 
 const isMissingTableError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
   const message = 'message' in error ? String(error.message) : '';
-  return message.includes('does not exist') || message.includes('PGRST116');
+  const status = 'status' in error ? Number(error.status) : 0;
+  return (
+    status === 404 ||
+    message.includes('does not exist') ||
+    message.includes('PGRST116')
+  );
+};
+const isAbortError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const name = 'name' in error ? String(error.name) : '';
+  const message = 'message' in error ? String(error.message) : '';
+  return name === 'AbortError' || message.includes('AbortError');
 };
 
 const buildPrimary = (item: { delivery_number?: string | null; id: string }) =>
@@ -48,6 +60,7 @@ export function GlobalSearch() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [clientSearchEnabled, setClientSearchEnabled] = useState(ENABLE_CLIENT_SEARCH);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -67,130 +80,164 @@ export function GlobalSearch() {
     return () => window.clearTimeout(timer);
   }, [query]);
 
+  useEffect(() => {
+    if (!ENABLE_CLIENT_SEARCH) return;
+
+    const checkClientsTable = async () => {
+      try {
+        const { error } = await supabase.from('clients').select('id').limit(1);
+        if (error) {
+          if (isMissingTableError(error)) {
+            setClientSearchEnabled(false);
+          }
+          return;
+        }
+        setClientSearchEnabled(true);
+      } catch (error) {
+        if (!isMissingTableError(error)) {
+          setClientSearchEnabled(false);
+        }
+      }
+    };
+
+    void checkClientsTable();
+  }, []);
+
   const hasQuery = debouncedQuery.length >= 2;
 
-  const { data, isLoading } = useSafeQuery(
+  const { data, isLoading, error } = useSafeQuery(
     'global-search',
     async ({ signal }) => {
       if (!hasQuery) {
         return EMPTY_RESULTS;
       }
 
-      const term = debouncedQuery.replace(/,/g, ' ');
-      const match = `id.ilike.%${term}%,delivery_number.ilike.%${term}%,customer_name.ilike.%${term}%,company.ilike.%${term}%,site.ilike.%${term}%,driver_name.ilike.%${term}%,phone_number.ilike.%${term}%`;
-
-      let ordersQuery = supabase
-        .from('orders')
-        .select('id,delivery_number,company,site')
-        .or(match)
-        .limit(SEARCH_LIMIT);
-
-      if (signal) {
-        ordersQuery = ordersQuery.abortSignal(signal);
-      }
-
-      const { data: ordersData, error: ordersError } = await ordersQuery;
-      if (ordersError) {
-        throw ordersError;
-      }
-
-      let historyItems: SearchItem[] = [];
       try {
-        let historyQuery = supabase
-          .from('history_orders')
-          .select('id,delivery_number,company,site')
-          .or(match)
-          .limit(SEARCH_LIMIT);
+        const term = debouncedQuery.replace(/,/g, ' ');
+        const match = `id.ilike.%${term}%,delivery_number.ilike.%${term}%,customer_name.ilike.%${term}%,company.ilike.%${term}%,site.ilike.%${term}%,driver_name.ilike.%${term}%,phone_number.ilike.%${term}%`;
 
-        if (signal) {
-          historyQuery = historyQuery.abortSignal(signal);
-        }
-
-        const { data: historyData, error: historyError } = await historyQuery;
-        if (historyError) {
-          throw historyError;
-        }
-
-        historyItems = (historyData || []).map((item) => ({
-          id: item.id,
-          type: 'history',
-          primary: buildPrimary(item),
-          secondary: buildSecondary(item)
-        }));
-      } catch (historyError) {
-        if (!isMissingTableError(historyError)) {
-          throw historyError;
-        }
-
-        let deliveredQuery = supabase
+        let ordersQuery = supabase
           .from('orders')
           .select('id,delivery_number,company,site')
-          .in('status', ['delivered', 'completed'])
           .or(match)
           .limit(SEARCH_LIMIT);
 
         if (signal) {
-          deliveredQuery = deliveredQuery.abortSignal(signal);
+          ordersQuery = ordersQuery.abortSignal(signal);
         }
 
-        const { data: deliveredData, error: deliveredError } = await deliveredQuery;
-        if (deliveredError) {
-          throw deliveredError;
+        const { data: ordersData, error: ordersError } = await ordersQuery;
+        if (ordersError) {
+          throw ordersError;
         }
 
-        historyItems = (deliveredData || []).map((item) => ({
+        let historyItems: SearchItem[] = [];
+        try {
+          let historyQuery = supabase
+            .from('history_orders')
+            .select('id,delivery_number,company,site')
+            .or(match)
+            .limit(SEARCH_LIMIT);
+
+          if (signal) {
+            historyQuery = historyQuery.abortSignal(signal);
+          }
+
+          const { data: historyData, error: historyError } = await historyQuery;
+          if (historyError) {
+            throw historyError;
+          }
+
+          historyItems = (historyData || []).map((item) => ({
+            id: item.id,
+            type: 'history',
+            primary: buildPrimary(item),
+            secondary: buildSecondary(item)
+          }));
+        } catch (historyError) {
+          if (!isMissingTableError(historyError)) {
+            throw historyError;
+          }
+
+          let deliveredQuery = supabase
+            .from('orders')
+            .select('id,delivery_number,company,site')
+            .in('status', ['delivered', 'completed'])
+            .or(match)
+            .limit(SEARCH_LIMIT);
+
+          if (signal) {
+            deliveredQuery = deliveredQuery.abortSignal(signal);
+          }
+
+          const { data: deliveredData, error: deliveredError } = await deliveredQuery;
+          if (deliveredError) {
+            throw deliveredError;
+          }
+
+          historyItems = (deliveredData || []).map((item) => ({
+            id: item.id,
+            type: 'history',
+            primary: buildPrimary(item),
+            secondary: buildSecondary(item)
+          }));
+        }
+
+        let clientItems: SearchItem[] = [];
+        if (clientSearchEnabled) {
+          try {
+            let clientsQuery = supabase
+              .from('clients')
+              .select('id,company,name')
+              .or(`company.ilike.%${term}%,name.ilike.%${term}%`)
+              .limit(SEARCH_LIMIT);
+
+            if (signal) {
+              clientsQuery = clientsQuery.abortSignal(signal);
+            }
+
+            const { data: clientsData, error: clientsError } = await clientsQuery;
+            if (clientsError) {
+              throw clientsError;
+            }
+
+            clientItems = (clientsData || []).map((client) => {
+              const company = client.company || client.name || '';
+              return {
+                id: client.id,
+                type: 'client',
+                primary: company || client.id,
+                secondary: 'Client',
+                company
+              };
+            });
+          } catch (clientError) {
+            if (isMissingTableError(clientError)) {
+              setClientSearchEnabled(false);
+            } else {
+              throw clientError;
+            }
+          }
+        }
+
+        const orderItems: SearchItem[] = (ordersData || []).map((item) => ({
           id: item.id,
-          type: 'history',
+          type: 'order',
           primary: buildPrimary(item),
           secondary: buildSecondary(item)
         }));
+
+        return {
+          orders: orderItems,
+          history: historyItems,
+          clients: clientItems
+        };
+      } catch (error) {
+        if (isAbortError(error)) {
+          return EMPTY_RESULTS;
+        }
+        return EMPTY_RESULTS;
       }
-
-      let clientItems: SearchItem[] = [];
-      try {
-        let clientsQuery = supabase
-          .from('clients')
-          .select('id,company,name')
-          .or(`company.ilike.%${term}%,name.ilike.%${term}%`)
-          .limit(SEARCH_LIMIT);
-
-        if (signal) {
-          clientsQuery = clientsQuery.abortSignal(signal);
-        }
-
-        const { data: clientsData, error: clientsError } = await clientsQuery;
-        if (clientsError) {
-          throw clientsError;
-        }
-
-        clientItems = (clientsData || []).map((client) => {
-          const company = client.company || client.name || '';
-          return {
-            id: client.id,
-            type: 'client',
-            primary: company || client.id,
-            secondary: 'Client',
-            company
-          };
-        });
-      } catch (clientError) {
-        if (!isMissingTableError(clientError)) {
-          throw clientError;
-        }
-      }
-
-      const orderItems: SearchItem[] = (ordersData || []).map((item) => ({
-        id: item.id,
-        type: 'order',
-        primary: buildPrimary(item),
-        secondary: buildSecondary(item)
-      }));
-
-      return {
-        orders: orderItems,
-        history: historyItems,
-        clients: clientItems
-      };
     },
     [debouncedQuery],
     {
@@ -200,7 +247,7 @@ export function GlobalSearch() {
     }
   );
 
-  const results = data || EMPTY_RESULTS;
+  const results = error ? EMPTY_RESULTS : data || EMPTY_RESULTS;
 
   const topResult = useMemo(() => {
     return results.orders[0] || results.history[0] || results.clients[0] || null;
