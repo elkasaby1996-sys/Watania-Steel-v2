@@ -252,7 +252,7 @@ export function DailySummaryCard() {
     <Card className="h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold text-foreground">
-          Daily Summary (Last 30 Days)
+          Daily Summary (Last 30 Days of Data)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
