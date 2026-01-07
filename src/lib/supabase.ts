@@ -112,6 +112,7 @@ export interface HistoryOrderFilters {
 export interface HistoryOrderPage {
   data: HistoryOrder[];
   count: number;
+  aborted?: boolean;
 }
 
 // Helper functions to transform between DB and frontend formats
@@ -600,7 +601,12 @@ export const historyService = {
           error.message.includes('signal is aborted')
         );
       }
-      return typeof error === 'object' && 'name' in error && (error as { name?: string }).name === 'AbortError';
+      return (
+        typeof error === 'object' &&
+        (('name' in error && (error as { name?: string }).name === 'AbortError') ||
+          ('message' in error && String((error as { message?: string }).message).includes('AbortError')) ||
+          ('details' in error && String((error as { details?: string }).details).includes('AbortError')))
+      );
     };
 
     try {
@@ -638,7 +644,7 @@ export const historyService = {
 
       if (error) {
         if (isAbortError(error)) {
-          throw error;
+          return { data: [], count: 0, aborted: true };
         }
         if (error.code === 'PGRST116' || error.message?.includes('relation "history_orders" does not exist')) {
           console.warn('History orders table does not exist yet.');
@@ -651,7 +657,7 @@ export const historyService = {
       return { data: data || [], count: count || 0 };
     } catch (error) {
       if (isAbortError(error)) {
-        throw error;
+        return { data: [], count: 0, aborted: true };
       }
       console.error('Failed to fetch paginated history orders:', error);
       return { data: [], count: 0 };

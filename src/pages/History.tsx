@@ -88,20 +88,6 @@ export function History() {
     setLoading(true);
     setError(null);
 
-    const isAbortError = (error: unknown) => {
-      if (!error) {
-        return false;
-      }
-      if (error instanceof Error) {
-        return (
-          error.name === 'AbortError' ||
-          error.message.includes('AbortError') ||
-          error.message.includes('signal is aborted')
-        );
-      }
-      return typeof error === 'object' && 'name' in error && (error as { name?: string }).name === 'AbortError';
-    };
-
     try {
       const result = await historyService.getPaginated({
         page,
@@ -110,14 +96,14 @@ export function History() {
         signal: controller.signal
       });
 
-      if (controller.signal.aborted || requestId !== requestIdRef.current) {
+      if (controller.signal.aborted || requestId !== requestIdRef.current || result.aborted) {
         return;
       }
 
       setHistoryOrders(result.data);
       setTotalCount(result.count);
     } catch (fetchError) {
-      if (controller.signal.aborted || requestId !== requestIdRef.current || isAbortError(fetchError)) {
+      if (controller.signal.aborted || requestId !== requestIdRef.current) {
         return;
       }
 
