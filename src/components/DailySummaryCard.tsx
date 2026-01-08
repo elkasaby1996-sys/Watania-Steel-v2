@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
 import { useSafeQuery } from '@/hooks/use-safe-query';
 
@@ -41,17 +41,15 @@ const EMPTY_SUMMARY: DailySummary = {
   maxDate: null
 };
 
-const DIAMETER_FIELDS: { key: keyof DiameterRow; label: string }[] = [
-  { key: 'breakdown_8mm', label: '8mm' },
-  { key: 'breakdown_10mm', label: '10mm' },
-  { key: 'breakdown_12mm', label: '12mm' },
-  { key: 'breakdown_14mm', label: '14mm' },
-  { key: 'breakdown_16mm', label: '16mm' },
-  { key: 'breakdown_18mm', label: '18mm' },
-  { key: 'breakdown_20mm', label: '20mm' },
-  { key: 'breakdown_25mm', label: '25mm' },
-  { key: 'breakdown_32mm', label: '32mm' }
-];
+const EMPTY_SUMMARY: DailySummary = {
+  avgCutAndBend: 0,
+  avgStraightBar: 0,
+  topDiameters: [],
+  topClients: [],
+  dayCount: 0,
+  totalOrders: 0,
+  maxDate: null
+};
 
 type DiameterRow = {
   breakdown_8mm?: number | null;
@@ -64,6 +62,18 @@ type DiameterRow = {
   breakdown_25mm?: number | null;
   breakdown_32mm?: number | null;
 };
+
+const DIAMETER_FIELDS: { key: keyof DiameterRow; label: string }[] = [
+  { key: 'breakdown_8mm', label: '8mm' },
+  { key: 'breakdown_10mm', label: '10mm' },
+  { key: 'breakdown_12mm', label: '12mm' },
+  { key: 'breakdown_14mm', label: '14mm' },
+  { key: 'breakdown_16mm', label: '16mm' },
+  { key: 'breakdown_18mm', label: '18mm' },
+  { key: 'breakdown_20mm', label: '20mm' },
+  { key: 'breakdown_25mm', label: '25mm' },
+  { key: 'breakdown_32mm', label: '32mm' }
+];
 
 type DailySummaryRow = DiameterRow & {
   date: string;
@@ -92,15 +102,15 @@ const formatTons = (value: number) =>
 
 const isAbortError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
-  const name = 'name' in error ? String(error.name) : '';
-  const message = 'message' in error ? String(error.message) : '';
+  const name = 'name' in error ? String((error as any).name) : '';
+  const message = 'message' in error ? String((error as any).message) : '';
   return name === 'AbortError' || message.includes('AbortError');
 };
 
 const isMissingTableError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
-  const message = 'message' in error ? String(error.message) : '';
-  const status = 'status' in error ? Number(error.status) : undefined;
+  const message = 'message' in error ? String((error as any).message) : '';
+  const status = 'status' in error ? Number((error as any).status) : undefined;
   return (
     message.includes('does not exist') ||
     message.includes('schema cache') ||
@@ -110,152 +120,147 @@ const isMissingTableError = (error: unknown) => {
 };
 
 const getFreshSummaryCache = () => {
-  if (!latestSummaryCacheKey) {
-    return null;
-  }
+  if (!latestSummaryCacheKey) return null;
   const entry = summaryCache.get(latestSummaryCacheKey);
-  if (!entry) {
-    return null;
-  }
-  if (Date.now() - entry.cachedAt > SUMMARY_CACHE_TTL_MS) {
-    return null;
-  }
+  if (!entry) return null;
+  if (Date.now() - entry.cachedAt > SUMMARY_CACHE_TTL_MS) return null;
   return entry;
 };
 
 export function DailySummaryCard() {
   const cachedEntry = useMemo(() => getFreshSummaryCache(), []);
   const cachedData = cachedEntry?.data ?? null;
+
   const { data, isLoading } = useSafeQuery<DailySummary>(
     'daily-summary',
     async ({ signal }) => {
       const freshCache = getFreshSummaryCache();
-      if (freshCache) {
-        return freshCache.data;
-      }
+      if (freshCache) return freshCache.data;
 
       try {
         const fetchMaxDate = async (table: 'orders' | 'history_orders') => {
-          let maxQuery = supabase
-            .from(table)
-            .select('date')
-            .not('date', 'is', null)
-            .order('date', { ascending: false })
-            .limit(1);
-          if (signal) {
-            maxQuery = maxQuery.abortSignal(signal);
+          try {
+            let q = supabase.from(table).select('date').order('date', { ascending: false }).limit(1);
+            if (signal) q = q.abortSignal(signal);
+            const { data, error } = await q;
+            if (error) throw error;
+            return data?.[0]?.date ?? null;
+          } catch (err) {
+            if (isMissingTableError(err)) return null;
+            throw err;
           }
-          const { data: maxData, error: maxError } = await maxQuery;
-          if (maxError) {
-            throw maxError;
-          }
-          return maxData?.[0]?.date ?? null;
         };
 
-        const [ordersMax, historyMax] = await Promise.all([fetchMaxDate('orders'), fetchMaxDate('history_orders')]);
-        const maxDate =
-          ordersMax && historyMax ? (ordersMax > historyMax ? ordersMax : historyMax) : ordersMax || historyMax;
-        if (!maxDate) {
-          return EMPTY_SUMMARY;
-        }
+        const [ordersMax, historyMax] = await Promise.all([
+          fetchMaxDate('orders'),
+          fetchMaxDate('history_orders')
+        ]);
 
-        const maxDateValue = parseDateString(maxDate);
-        maxDateValue.setDate(maxDateValue.getDate() - 30);
-        const startDate = formatLocalDate(maxDateValue);
-        const cacheKey = `${maxDate}:${startDate}`;
-        const cached = summaryCache.get(cacheKey);
+        const maxDate =
+          ordersMax && historyMax ? (ordersMax > historyMax ? ordersMax : historyMax) : (ordersMax ?? historyMax);
+
+        if (!maxDate) return EMPTY_SUMMARY;
+
+        const maxDateObj = parseDateString(maxDate);
+        maxDateObj.setDate(maxDateObj.getDate() - 30);
+        const startStr = formatLocalDate(maxDateObj);
+
+        const cacheKey = `${maxDate}:${startStr}`;
         const now = Date.now();
+        const cached = summaryCache.get(cacheKey);
         if (cached && now - cached.cachedAt < SUMMARY_CACHE_TTL_MS) {
+          latestSummaryCacheKey = cacheKey;
           return cached.data;
         }
 
         const selectColumns = `
-          date,
-          order_type,
-          tons,
-          company,
-          breakdown_8mm,
-          breakdown_10mm,
-          breakdown_12mm,
-          breakdown_14mm,
-          breakdown_16mm,
-          breakdown_18mm,
-          breakdown_20mm,
-          breakdown_25mm,
-          breakdown_32mm
+          date, order_type, tons, company,
+          breakdown_8mm, breakdown_10mm, breakdown_12mm, breakdown_14mm, breakdown_16mm,
+          breakdown_18mm, breakdown_20mm, breakdown_25mm, breakdown_32mm
         `;
 
         const fetchRows = async (table: 'orders' | 'history_orders') => {
-          let query = supabase.from(table).select(selectColumns).gte('date', startDate).lte('date', maxDate);
-          if (signal) {
-            query = query.abortSignal(signal);
+          try {
+            let q = supabase
+              .from(table)
+              .select(selectColumns)
+              .gte('date', startStr)
+              .lte('date', maxDate);
+
+            if (signal) q = q.abortSignal(signal);
+
+            const { data, error } = await q;
+            if (error) throw error;
+            return (data ?? []) as DailySummaryRow[];
+          } catch (err) {
+            if (isMissingTableError(err)) return [] as DailySummaryRow[];
+            throw err;
           }
-          const { data: rows, error } = await query;
-          if (error) {
-            throw error;
-          }
-          return rows ?? [];
         };
 
-        const [ordersRows, historyRows] = await Promise.all([fetchRows('orders'), fetchRows('history_orders')]);
+        const [ordersRows, historyRows] = await Promise.all([
+          fetchRows('orders'),
+          fetchRows('history_orders')
+        ]);
 
-        const rows = [...ordersRows, ...historyRows] as DailySummaryRow[];
+        const rows = [...ordersRows, ...historyRows];
         const totalOrders = rows.length;
 
-        const daySet = new Set(rows.map((row) => row.date).filter(Boolean));
-        const dayCount = daySet.size || 0;
+        const dayCount = new Set(rows.map((r) => r.date).filter(Boolean)).size;
 
         const cutAndBendTotal = rows
-          .filter((row) => row.order_type === 'cut-and-bend')
-          .reduce((sum, row) => sum + (Number(row.tons) || 0), 0);
+          .filter((r) => r.order_type === 'cut-and-bend')
+          .reduce((sum, r) => sum + (Number(r.tons) || 0), 0);
+
         const straightBarTotal = rows
-          .filter((row) => row.order_type === 'straight-bar')
-          .reduce((sum, row) => sum + (Number(row.tons) || 0), 0);
+          .filter((r) => r.order_type === 'straight-bar')
+          .reduce((sum, r) => sum + (Number(r.tons) || 0), 0);
 
         const diameterTotals = DIAMETER_FIELDS.map(({ key, label }) => ({
           label,
-          tons: rows.reduce((sum, row) => sum + (Number(row[key]) || 0), 0)
+          tons: rows.reduce((sum, r) => sum + (Number((r as any)[key]) || 0), 0)
         }));
 
         const topDiameters = diameterTotals
-          .filter((item) => item.tons > 0)
+          .filter((d) => d.tons > 0)
           .sort((a, b) => b.tons - a.tons)
           .slice(0, 3);
 
-        const clientTotals = rows.reduce<Record<string, { name: string; tons: number }>>((acc, row) => {
-          const company = row.company?.trim();
+        const normalizeCompany = (name: string) => name.trim().replace(/\s+/g, ' ');
+
+        const clientTotals = rows.reduce<Record<string, number>>((acc, r) => {
+          const companyRaw = r.company ?? '';
+          const company = normalizeCompany(companyRaw);
           if (!company) return acc;
-          if (!acc[company]) {
-            acc[company] = { name: company, tons: 0 };
-          }
-          acc[company].tons += Number(row.tons) || 0;
+          acc[company] = (acc[company] || 0) + (Number(r.tons) || 0);
           return acc;
         }, {});
 
-        const topClients = Object.values(clientTotals)
+        const topClients = Object.entries(clientTotals)
+          .map(([name, tons]) => ({ name, tons }))
           .sort((a, b) => b.tons - a.tons)
           .slice(0, 3);
 
-        const avgCutAndBend = dayCount > 0 ? cutAndBendTotal / dayCount : 0;
-        const avgStraightBar = dayCount > 0 ? straightBarTotal / dayCount : 0;
-        const summaryResult = {
-          avgCutAndBend,
-          avgStraightBar,
+        const summary: DailySummary = {
+          avgCutAndBend: dayCount > 0 ? cutAndBendTotal / dayCount : 0,
+          avgStraightBar: dayCount > 0 ? straightBarTotal / dayCount : 0,
           topDiameters,
           topClients,
           dayCount,
           totalOrders,
           maxDate
         };
-        summaryCache.set(cacheKey, { data: summaryResult, cachedAt: now });
+
+        summaryCache.set(cacheKey, { data: summary, cachedAt: now });
         latestSummaryCacheKey = cacheKey;
-        return summaryResult;
-      } catch (error) {
-        if (signal?.aborted || isAbortError(error)) {
-          return cachedData ?? EMPTY_SUMMARY;
+
+        return summary;
+      } catch (err) {
+        if (signal?.aborted || isAbortError(err)) {
+          return getFreshSummaryCache()?.data ?? cachedData ?? EMPTY_SUMMARY;
         }
-        console.error('[DailySummary] Failed to load summary', error);
-        return cachedData ?? EMPTY_SUMMARY;
+        console.error('[DailySummary] Failed to load summary', err);
+        return getFreshSummaryCache()?.data ?? cachedData ?? EMPTY_SUMMARY;
       }
     },
     [],
@@ -267,14 +272,15 @@ export function DailySummaryCard() {
 
   const summaryData = data ?? cachedData;
   const showLoading = isLoading && !summaryData;
+
   const content = useMemo(() => {
     if (!summaryData) {
       return {
-        avgCutAndBend: null,
-        avgStraightBar: null,
-        topDiameters: [],
-        topClients: [],
-        maxDate: null,
+        avgCutAndBend: null as string | null,
+        avgStraightBar: null as string | null,
+        topDiameters: [] as DiameterSummary[],
+        topClients: [] as ClientSummary[],
+        maxDate: null as string | null,
         isEmpty: true
       };
     }
@@ -314,6 +320,7 @@ export function DailySummaryCard() {
           )}
         </div>
       </CardHeader>
+
       <CardContent>
         {showLoading ? (
           <div className="grid gap-6 md:grid-cols-2">
@@ -360,6 +367,7 @@ export function DailySummaryCard() {
                 </div>
                 <div className="text-xs text-muted-foreground">Avg Cut &amp; Bend/day</div>
               </div>
+
               <div className="rounded-xl bg-muted/20 p-4">
                 <div className="flex items-end gap-1 text-2xl font-semibold text-foreground">
                   <span>{content.avgStraightBar}</span>
@@ -367,6 +375,7 @@ export function DailySummaryCard() {
                 <div className="text-xs text-muted-foreground">Avg Straight Bar/day</div>
               </div>
             </div>
+
             <div className="space-y-6">
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Top diameters</p>
@@ -383,9 +392,7 @@ export function DailySummaryCard() {
                           </span>
                           <span className="text-foreground">{item.label}</span>
                         </div>
-                        <span className="text-sm font-medium text-foreground/90">
-                          {formatTons(item.tons)}t
-                        </span>
+                        <span className="text-sm font-medium text-foreground/90">{formatTons(item.tons)}t</span>
                       </div>
                     ))
                   ) : (
@@ -393,6 +400,7 @@ export function DailySummaryCard() {
                   )}
                 </div>
               </div>
+
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Top clients</p>
                 <div className="divide-y divide-border/50 rounded-lg bg-muted/10">
@@ -408,9 +416,7 @@ export function DailySummaryCard() {
                           </span>
                           <span className="text-foreground">{item.name}</span>
                         </div>
-                        <span className="text-sm font-medium text-foreground/90">
-                          {formatTons(item.tons)}t
-                        </span>
+                        <span className="text-sm font-medium text-foreground/90">{formatTons(item.tons)}t</span>
                       </div>
                     ))
                   ) : (
