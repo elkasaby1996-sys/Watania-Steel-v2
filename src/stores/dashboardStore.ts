@@ -811,22 +811,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   }
 }));
 
-export const useSummaryOrders = () => {
-  const { orders, historyOrders, loading } = useDashboardStore(
-    (state) => ({
-      orders: state.orders,
-      historyOrders: state.historyOrders,
-      loading: state.loading
-    }),
-    shallow
-  );
-
-  return useMemo(
-    () => ({
-      orders,
-      historyOrders,
-      loading
-    }),
-    [orders, historyOrders, loading]
-  );
-};
+export const useSummaryOrders = () =>
+  useDashboardStore((state) => ({
+    recentOrders: state.orders,
+    historyOrders: state.historyOrders
+  }));
