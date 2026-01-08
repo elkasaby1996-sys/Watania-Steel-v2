@@ -148,7 +148,7 @@ export function SteelAnalytics() {
       isMounted = false;
       controller.abort();
     };
-  }, [selectedRangeDays, reloadToken]);
+  }, [selectedRangeDays, filterMode, reloadToken]);
 
   const analytics = useMemo(() => computeAnalytics(rows, filterMode), [rows, filterMode]);
 
@@ -167,8 +167,6 @@ export function SteelAnalytics() {
       percentage: entry.percentOfTotalBreakdown,
     }))
   ), [analytics.diameterDistribution]);
-
-  const monthlyEstimate = analytics.dailyAverage * 30;
 
   const handleReset = () => {
     setSelectedRangeDays(30);
@@ -284,15 +282,15 @@ export function SteelAnalytics() {
         </Card>
       )}
 
-      {/* Monthly Average Card */}
+      {/* Actual Totals Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Monthly Average
+            Actual Totals
           </CardTitle>
           <CardDescription>
-            Summary metrics derived from daily totals
+            Summary metrics derived from actual tons in the selected range
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -313,23 +311,14 @@ export function SteelAnalytics() {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-foreground">
-                    {formatNumber(monthlyEstimate)}
+                    {formatNumber(analytics.totalTons)}
                   </p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>30-Day Normalized Output</span>
-                    <span className="text-xs text-muted-foreground/70" title="Calculated as Daily Average × 30">
-                      Calculated as Daily Average × 30
-                    </span>
-                  </div>
+                  <p className="text-sm text-muted-foreground">Total Tons (Actual in Range)</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                 <div className="p-4 rounded-lg border border-border bg-card">
-                  <p className="text-muted-foreground">Total Tons</p>
-                  <p className="font-semibold text-foreground">{formatNumber(analytics.totalTons)} tons</p>
-                </div>
-                <div className="p-4 rounded-lg border border-border bg-card">
-                  <p className="text-muted-foreground">Daily Average</p>
+                  <p className="text-muted-foreground">Daily Average (Actual)</p>
                   <p className="font-semibold text-foreground">{formatNumber(analytics.dailyAverage)} tons</p>
                 </div>
                 <div className="p-4 rounded-lg border border-border bg-card">
@@ -339,6 +328,10 @@ export function SteelAnalytics() {
                 <div className="p-4 rounded-lg border border-border bg-card">
                   <p className="text-muted-foreground">Rows Analyzed</p>
                   <p className="font-semibold text-foreground">{rows.length} rows</p>
+                </div>
+                <div className="p-4 rounded-lg border border-border bg-card">
+                  <p className="text-muted-foreground">Total Tons (Actual)</p>
+                  <p className="font-semibold text-foreground">{formatNumber(analytics.totalTons)} tons</p>
                 </div>
               </div>
             </div>
@@ -409,7 +402,7 @@ export function SteelAnalytics() {
           <CardContent>
             {loading ? (
               <div className="h-80 bg-muted animate-pulse rounded" />
-            ) : analytics.breakdownApplicable ? (
+            ) : (
               <div className="flex flex-col gap-6">
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
@@ -456,10 +449,6 @@ export function SteelAnalytics() {
                     </div>
                   ))}
                 </div>
-              </div>
-            ) : (
-              <div className="h-80 flex items-center justify-center text-sm text-muted-foreground bg-muted/30 rounded">
-                Diameter breakdown not applicable for Straight Bar orders.
               </div>
             )}
           </CardContent>

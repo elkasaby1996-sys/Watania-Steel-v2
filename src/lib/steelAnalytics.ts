@@ -38,7 +38,6 @@ export type AnalyticsResult = {
   activeDays: number;
   dailySeries: DailySeriesEntry[];
   diameterDistribution: DiameterDistributionEntry[];
-  breakdownApplicable: boolean;
 };
 
 const rangeCache = new Map<string, AnalyticsRow[]>();
@@ -191,10 +190,6 @@ export const computeAnalytics = (rows: AnalyticsRow[], filterMode: FilterMode): 
   const filtered = filterMode === 'all'
     ? rows
     : rows.filter((row) => row.order_type === filterMode);
-  const breakdownApplicable = filterMode !== 'straight-bar';
-  const breakdownRows = filterMode === 'all'
-    ? rows.filter((row) => row.order_type === 'cut-and-bend')
-    : filtered;
 
   const dailyTotals = new Map<string, number>();
 
@@ -219,41 +214,29 @@ export const computeAnalytics = (rows: AnalyticsRow[], filterMode: FilterMode): 
     return acc;
   }, {});
 
-  if (breakdownApplicable) {
-    breakdownRows.forEach((row) => {
-      breakdownFields.forEach((field) => {
-        const value = Number(row[field]) || 0;
-        diameterTotals[field] += value;
-      });
+  filtered.forEach((row) => {
+    breakdownFields.forEach((field) => {
+      const value = Number(row[field]) || 0;
+      diameterTotals[field] += value;
     });
-  }
+  });
 
-  const rawDistribution = breakdownFields
-    .map((field) => ({
-      label: field.replace('breakdown_', '').replace('mm', 'mm'),
-      tons: roundTo3Decimals(diameterTotals[field]),
-    }))
-    .filter((entry) => entry.tons > 0)
-    .sort((a, b) => b.tons - a.tons);
+  const breakdownTotal = Object.values(diameterTotals).reduce((sum, value) => sum + value, 0);
 
-  const maxSlices = 5;
-  const primarySlices = rawDistribution.slice(0, maxSlices);
-  const overflowSlices = rawDistribution.slice(maxSlices);
-  const otherTons = overflowSlices.reduce((sum, entry) => sum + entry.tons, 0);
-
-  const groupedDistribution = otherTons > 0
-    ? [...primarySlices, { label: 'Other', tons: roundTo3Decimals(otherTons) }]
-    : primarySlices;
-
-  const breakdownTotal = groupedDistribution.reduce((sum, entry) => sum + entry.tons, 0);
-
-  const diameterDistribution = groupedDistribution.map((entry) => ({
-    label: entry.label,
-    tons: roundTo3Decimals(entry.tons),
-    percentOfTotalBreakdown: breakdownTotal > 0
-      ? roundTo3Decimals((entry.tons / breakdownTotal) * 100)
-      : 0,
-  }));
+  const diameterDistribution = breakdownFields
+    .map((field) => {
+      const label = field.replace('breakdown_', '').replace('mm', 'mm');
+      const tons = diameterTotals[field];
+      const percentOfTotalBreakdown = breakdownTotal > 0
+        ? roundTo3Decimals((tons / breakdownTotal) * 100)
+        : 0;
+      return {
+        label,
+        tons: roundTo3Decimals(tons),
+        percentOfTotalBreakdown,
+      };
+    })
+    .filter((entry) => entry.tons > 0);
 
   return {
     totalTons: roundTo3Decimals(totalTons),
@@ -264,6 +247,5 @@ export const computeAnalytics = (rows: AnalyticsRow[], filterMode: FilterMode): 
       tons: roundTo3Decimals(entry.tons),
     })),
     diameterDistribution,
-    breakdownApplicable,
   };
 };
