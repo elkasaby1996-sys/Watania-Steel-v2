@@ -41,16 +41,6 @@ const EMPTY_SUMMARY: DailySummary = {
   maxDate: null
 };
 
-const EMPTY_SUMMARY: DailySummary = {
-  avgCutAndBend: 0,
-  avgStraightBar: 0,
-  topDiameters: [],
-  topClients: [],
-  dayCount: 0,
-  totalOrders: 0,
-  maxDate: null
-};
-
 type DiameterRow = {
   breakdown_8mm?: number | null;
   breakdown_10mm?: number | null;
@@ -107,6 +97,8 @@ const isAbortError = (error: unknown) => {
   return name === 'AbortError' || message.includes('AbortError');
 };
 
+const normalizeCompany = (name: string) => name.trim().replace(/\s+/g, ' ');
+
 const isMissingTableError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
   const message = 'message' in error ? String((error as any).message) : '';
@@ -140,7 +132,13 @@ export function DailySummaryCard() {
       try {
         const fetchMaxDate = async (table: 'orders' | 'history_orders') => {
           try {
-            let q = supabase.from(table).select('date').order('date', { ascending: false }).limit(1);
+            let q = supabase
+              .from(table)
+              .select('date')
+              .not('date', 'is', null)
+              .neq('date', '')
+              .order('date', { ascending: false })
+              .limit(1);
             if (signal) q = q.abortSignal(signal);
             const { data, error } = await q;
             if (error) throw error;
@@ -184,6 +182,8 @@ export function DailySummaryCard() {
             let q = supabase
               .from(table)
               .select(selectColumns)
+              .not('date', 'is', null)
+              .neq('date', '')
               .gte('date', startStr)
               .lte('date', maxDate);
 
@@ -225,8 +225,6 @@ export function DailySummaryCard() {
           .filter((d) => d.tons > 0)
           .sort((a, b) => b.tons - a.tons)
           .slice(0, 3);
-
-        const normalizeCompany = (name: string) => name.trim().replace(/\s+/g, ' ');
 
         const clientTotals = rows.reduce<Record<string, number>>((acc, r) => {
           const companyRaw = r.company ?? '';
