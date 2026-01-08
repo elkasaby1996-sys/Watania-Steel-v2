@@ -315,7 +315,12 @@ export function SteelAnalytics() {
                   <p className="text-3xl font-bold text-foreground">
                     {formatNumber(monthlyEstimate)}
                   </p>
-                  <p className="text-sm text-muted-foreground">tons per month (30-day normalized)</p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>30-Day Normalized Output</span>
+                    <span className="text-xs text-muted-foreground/70" title="Calculated as Daily Average × 30">
+                      Calculated as Daily Average × 30
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
@@ -332,7 +337,7 @@ export function SteelAnalytics() {
                   <p className="font-semibold text-foreground">{analytics.activeDays} days</p>
                 </div>
                 <div className="p-4 rounded-lg border border-border bg-card">
-                  <p className="text-muted-foreground">Orders Count</p>
+                  <p className="text-muted-foreground">Rows Analyzed</p>
                   <p className="font-semibold text-foreground">{rows.length} rows</p>
                 </div>
               </div>
@@ -404,7 +409,7 @@ export function SteelAnalytics() {
           <CardContent>
             {loading ? (
               <div className="h-80 bg-muted animate-pulse rounded" />
-            ) : (
+            ) : analytics.breakdownApplicable ? (
               <div className="flex flex-col gap-6">
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
@@ -430,8 +435,8 @@ export function SteelAnalytics() {
                           color: 'hsl(0, 0%, 98%)',
                         }}
                         formatter={(value, _, props) => [
-                          `${value}t (${props.payload.percentage}%)`,
-                          props.payload.name,
+                          `${value}t (${props?.payload?.percentage ?? 0}%)`,
+                          props?.payload?.name ?? '',
                         ]}
                         labelFormatter={() => ''}
                       />
@@ -451,6 +456,10 @@ export function SteelAnalytics() {
                     </div>
                   ))}
                 </div>
+              </div>
+            ) : (
+              <div className="h-80 flex items-center justify-center text-sm text-muted-foreground bg-muted/30 rounded">
+                Diameter breakdown not applicable for Straight Bar orders.
               </div>
             )}
           </CardContent>
