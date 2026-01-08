@@ -84,7 +84,13 @@ const formatTons = (value: number) =>
 const isMissingTableError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
   const message = 'message' in error ? String(error.message) : '';
-  return message.includes('does not exist') || message.includes('PGRST116');
+  const status = 'status' in error ? Number(error.status) : undefined;
+  return (
+    message.includes('does not exist') ||
+    message.includes('schema cache') ||
+    message.includes('PGRST116') ||
+    status === 404
+  );
 };
 
 const getFreshSummaryCache = () => {
