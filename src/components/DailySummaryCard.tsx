@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSummaryOrders, useDashboardStore } from '@/stores/dashboardStore';
+import { useSafeQuery } from '@/hooks/use-safe-query';
+import { supabase } from '@/lib/supabase';
 
 type DiameterSummary = {
   label: string;
@@ -63,6 +64,15 @@ type DailySummaryRow = DiameterRow & {
   company?: string | null;
 };
 
+type SummaryOrderRow = DailySummaryRow & {
+  status?: string | null;
+};
+
+type SummaryQueryResult = {
+  orders: SummaryOrderRow[];
+  historyOrders: DailySummaryRow[];
+};
+
 const formatLocalDate = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -88,9 +98,98 @@ const getMaxDate = (dates: string[]) => {
 
 const normalizeCompany = (name: string) => name.trim().replace(/\s+/g, ' ');
 
+const isMissingTableError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const message = 'message' in error ? String(error.message) : '';
+  const status = 'status' in error ? Number(error.status) : 0;
+  return (
+    status === 404 ||
+    message.includes('does not exist') ||
+    message.includes('PGRST116')
+  );
+};
+
 export function DailySummaryCard() {
-  const { recentOrders, historyOrders } = useSummaryOrders();
-  const loading = useDashboardStore((state) => state.loading);
+  const cutoffDate = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 90);
+    return formatLocalDate(date);
+  }, []);
+
+  const { data, isLoading } = useSafeQuery<SummaryQueryResult>(
+    'daily-summary',
+    async ({ signal }) => {
+      let ordersQuery = supabase
+        .from('orders')
+        .select(
+          'date,order_type,tons,company,status,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm'
+        )
+        .gte('date', cutoffDate)
+        .neq('status', 'delivered');
+
+      if (signal) {
+        ordersQuery = ordersQuery.abortSignal(signal);
+      }
+
+      const { data: ordersData, error: ordersError } = await ordersQuery;
+      if (ordersError) {
+        throw ordersError;
+      }
+
+      let historyOrders: DailySummaryRow[] = [];
+      try {
+        let historyQuery = supabase
+          .from('history_orders')
+          .select(
+            'date,order_type,tons,company,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm'
+          )
+          .gte('date', cutoffDate);
+
+        if (signal) {
+          historyQuery = historyQuery.abortSignal(signal);
+        }
+
+        const { data: historyData, error: historyError } = await historyQuery;
+        if (historyError) {
+          throw historyError;
+        }
+
+        historyOrders = historyData || [];
+      } catch (historyError) {
+        if (!isMissingTableError(historyError)) {
+          throw historyError;
+        }
+
+        let deliveredQuery = supabase
+          .from('orders')
+          .select(
+            'date,order_type,tons,company,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm'
+          )
+          .gte('date', cutoffDate)
+          .in('status', ['delivered', 'completed']);
+
+        if (signal) {
+          deliveredQuery = deliveredQuery.abortSignal(signal);
+        }
+
+        const { data: deliveredData, error: deliveredError } = await deliveredQuery;
+        if (deliveredError) {
+          throw deliveredError;
+        }
+
+        historyOrders = deliveredData || [];
+      }
+
+      return {
+        orders: ordersData || [],
+        historyOrders
+      };
+    },
+    [cutoffDate]
+  );
+
+  const recentOrders = data?.orders ?? [];
+  const historyOrders = data?.historyOrders ?? [];
 
   const summaryData = useMemo<DailySummary>(() => {
     if (!recentOrders.length && !historyOrders.length) {
@@ -100,18 +199,18 @@ export function DailySummaryCard() {
     const normalizedOrders: DailySummaryRow[] = [
       ...recentOrders.map((order) => ({
         date: order.date,
-        order_type: order.orderType,
+        order_type: order.order_type,
         tons: order.tons,
         company: order.company,
-        breakdown_8mm: order.breakdown?.['8mm'],
-        breakdown_10mm: order.breakdown?.['10mm'],
-        breakdown_12mm: order.breakdown?.['12mm'],
-        breakdown_14mm: order.breakdown?.['14mm'],
-        breakdown_16mm: order.breakdown?.['16mm'],
-        breakdown_18mm: order.breakdown?.['18mm'],
-        breakdown_20mm: order.breakdown?.['20mm'],
-        breakdown_25mm: order.breakdown?.['25mm'],
-        breakdown_32mm: order.breakdown?.['32mm']
+        breakdown_8mm: order.breakdown_8mm,
+        breakdown_10mm: order.breakdown_10mm,
+        breakdown_12mm: order.breakdown_12mm,
+        breakdown_14mm: order.breakdown_14mm,
+        breakdown_16mm: order.breakdown_16mm,
+        breakdown_18mm: order.breakdown_18mm,
+        breakdown_20mm: order.breakdown_20mm,
+        breakdown_25mm: order.breakdown_25mm,
+        breakdown_32mm: order.breakdown_32mm
       })),
       ...historyOrders.map((order) => ({
         date: order.date,
@@ -137,7 +236,7 @@ export function DailySummaryCard() {
     }
 
     const maxDateObj = parseDateString(maxDate);
-    maxDateObj.setDate(maxDateObj.getDate() - 30);
+    maxDateObj.setDate(maxDateObj.getDate() - 90);
     const startStr = formatLocalDate(maxDateObj);
 
     const rows = normalizedOrders.filter((row) => row.date >= startStr && row.date <= maxDate);
@@ -186,7 +285,7 @@ export function DailySummaryCard() {
     };
   }, [historyOrders, recentOrders]);
 
-  const showLoading = loading && summaryData.totalOrders === 0;
+  const showLoading = isLoading && summaryData.totalOrders === 0;
 
   const content = useMemo(() => {
     if (!summaryData) {
@@ -225,7 +324,7 @@ export function DailySummaryCard() {
     <Card className="h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold text-foreground">
-          Daily Summary (Last 30 Days of Data)
+          Daily Summary (Last 90 Days of Data)
         </CardTitle>
         <div className="text-xs text-muted-foreground">
           {showLoading ? (
@@ -268,7 +367,7 @@ export function DailySummaryCard() {
           </div>
         ) : content.isEmpty ? (
           <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-6 text-center">
-            <p className="text-sm font-medium text-foreground">No data available for the last 30 days of data</p>
+            <p className="text-sm font-medium text-foreground">No data available for the last 90 days of data</p>
             <p className="mt-2 text-xs text-muted-foreground">
               Add recent orders to see averages, top diameters, and top clients here.
             </p>
