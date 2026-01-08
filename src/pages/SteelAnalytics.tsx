@@ -28,10 +28,9 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { formatNumber } from '@/lib/utils';
 import {
-  computeAnalytics,
-  fetchAnalyticsRows,
+  fetchAnalyticsSummary,
   fetchMaxDateAcrossTables,
-  type AnalyticsRow,
+  type AnalyticsSummary,
   type FilterMode,
 } from '@/lib/steelAnalytics';
 
@@ -66,7 +65,7 @@ export function SteelAnalytics() {
   const navigate = useNavigate();
   const [selectedRangeDays, setSelectedRangeDays] = useState<(typeof RANGE_OPTIONS)[number]>(30);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
-  const [rows, setRows] = useState<AnalyticsRow[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [range, setRange] = useState<{ startDate: string; endDate: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,11 +73,6 @@ export function SteelAnalytics() {
   const [reloadToken, setReloadToken] = useState(0);
 
   const abortRef = useRef<AbortController | null>(null);
-  const filterModeRef = useRef(filterMode);
-
-  useEffect(() => {
-    filterModeRef.current = filterMode;
-  }, [filterMode]);
 
   useEffect(() => {
     let isMounted = true;
@@ -97,7 +91,7 @@ export function SteelAnalytics() {
         if (!maxDate) {
           if (!isMounted) return;
           setRange(null);
-          setRows([]);
+          setAnalytics(null);
           setLastUpdated(new Date());
           setLoading(false);
           return;
@@ -106,30 +100,19 @@ export function SteelAnalytics() {
         const endDate = maxDate;
         const startDate = subtractDays(endDate, selectedRangeDays);
 
-        const fetchedRows = await fetchAnalyticsRows({
+        const summary = await fetchAnalyticsSummary({
           startDate,
           endDate,
+          mode: filterMode,
           signal: controller.signal,
         });
 
         if (!isMounted) return;
 
         setRange({ startDate, endDate });
-        setRows(fetchedRows);
+        setAnalytics(summary);
         setLastUpdated(new Date());
         setLoading(false);
-
-        if (import.meta.env.DEV) {
-          const analytics = computeAnalytics(fetchedRows, filterModeRef.current);
-          console.debug('[steel-analytics] load', {
-            range: selectedRangeDays,
-            startDate,
-            endDate,
-            rowsCount: fetchedRows.length,
-            activeDays: analytics.activeDays,
-            totalTons: analytics.totalTons,
-          });
-        }
       } catch (err) {
         if (!isMounted) return;
 
@@ -150,23 +133,23 @@ export function SteelAnalytics() {
     };
   }, [selectedRangeDays, filterMode, reloadToken]);
 
-  const analytics = useMemo(() => computeAnalytics(rows, filterMode), [rows, filterMode]);
-
   const lineChartData = useMemo(() => (
-    analytics.dailySeries.map((entry) => ({
+    (analytics?.timeSeries ?? []).map((entry) => ({
       date: formatDateLabel(entry.date),
       tons: entry.tons,
       fullDate: entry.date,
     }))
-  ), [analytics.dailySeries]);
+  ), [analytics?.timeSeries]);
 
-  const pieChartData = useMemo(() => (
-    analytics.diameterDistribution.map((entry) => ({
+  const pieChartData = useMemo(() => {
+    const totals = (analytics?.diameterTotals ?? []).filter((entry) => entry.tons > 0);
+    const totalBreakdown = totals.reduce((sum, entry) => sum + entry.tons, 0);
+    return totals.map((entry) => ({
       name: entry.label,
       value: entry.tons,
-      percentage: entry.percentOfTotalBreakdown,
-    }))
-  ), [analytics.diameterDistribution]);
+      percentage: totalBreakdown > 0 ? Math.round((entry.tons / totalBreakdown) * 1000) / 10 : 0,
+    }));
+  }, [analytics?.diameterTotals]);
 
   const handleReset = () => {
     setSelectedRangeDays(30);
@@ -311,7 +294,7 @@ export function SteelAnalytics() {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-foreground">
-                    {formatNumber(analytics.totalTons)}
+                    {formatNumber(analytics?.totalTons ?? 0)}
                   </p>
                   <p className="text-sm text-muted-foreground">Total Tons (Actual in Range)</p>
                 </div>
@@ -319,19 +302,23 @@ export function SteelAnalytics() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                 <div className="p-4 rounded-lg border border-border bg-card">
                   <p className="text-muted-foreground">Daily Average (Actual)</p>
-                  <p className="font-semibold text-foreground">{formatNumber(analytics.dailyAverage)} tons</p>
+                  <p className="font-semibold text-foreground">
+                    {formatNumber(analytics?.dailyAverage ?? 0)} tons
+                  </p>
                 </div>
                 <div className="p-4 rounded-lg border border-border bg-card">
                   <p className="text-muted-foreground">Active Days</p>
-                  <p className="font-semibold text-foreground">{analytics.activeDays} days</p>
+                  <p className="font-semibold text-foreground">{analytics?.activeDays ?? 0} days</p>
                 </div>
                 <div className="p-4 rounded-lg border border-border bg-card">
                   <p className="text-muted-foreground">Rows Analyzed</p>
-                  <p className="font-semibold text-foreground">{rows.length} rows</p>
+                  <p className="font-semibold text-foreground">{analytics?.rowsAnalyzed ?? 0} rows</p>
                 </div>
                 <div className="p-4 rounded-lg border border-border bg-card">
                   <p className="text-muted-foreground">Total Tons (Actual)</p>
-                  <p className="font-semibold text-foreground">{formatNumber(analytics.totalTons)} tons</p>
+                  <p className="font-semibold text-foreground">
+                    {formatNumber(analytics?.totalTons ?? 0)} tons
+                  </p>
                 </div>
               </div>
             </div>
