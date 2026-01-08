@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/lib/supabase';
-import { useSafeQuery } from '@/hooks/use-safe-query';
+import { useSummaryOrders, useDashboardStore } from '@/stores/dashboardStore';
 
 type DiameterSummary = {
   label: string;
@@ -21,24 +20,6 @@ type DailySummary = {
   dayCount: number;
   totalOrders: number;
   maxDate: string | null;
-};
-
-type SummaryCacheEntry = {
-  data: DailySummary;
-  cachedAt: number;
-};
-
-const SUMMARY_CACHE_TTL_MS = 60_000;
-const summaryCache = new Map<string, SummaryCacheEntry>();
-let latestSummaryCacheKey: string | null = null;
-const EMPTY_SUMMARY: DailySummary = {
-  avgCutAndBend: 0,
-  avgStraightBar: 0,
-  topDiameters: [],
-  topClients: [],
-  dayCount: 0,
-  totalOrders: 0,
-  maxDate: null
 };
 
 const EMPTY_SUMMARY: DailySummary = {
@@ -100,178 +81,112 @@ const formatTons = (value: number) =>
     minimumFractionDigits: 2
   }).format(value);
 
-const isAbortError = (error: unknown) => {
-  if (!error || typeof error !== 'object') return false;
-  const name = 'name' in error ? String((error as any).name) : '';
-  const message = 'message' in error ? String((error as any).message) : '';
-  return name === 'AbortError' || message.includes('AbortError');
+const getMaxDate = (dates: string[]) => {
+  if (dates.length === 0) return null;
+  return dates.reduce((max, value) => (value > max ? value : max), dates[0]);
 };
 
-const isMissingTableError = (error: unknown) => {
-  if (!error || typeof error !== 'object') return false;
-  const message = 'message' in error ? String((error as any).message) : '';
-  const status = 'status' in error ? Number((error as any).status) : undefined;
-  return (
-    message.includes('does not exist') ||
-    message.includes('schema cache') ||
-    message.includes('PGRST116') ||
-    status === 404
-  );
-};
-
-const getFreshSummaryCache = () => {
-  if (!latestSummaryCacheKey) return null;
-  const entry = summaryCache.get(latestSummaryCacheKey);
-  if (!entry) return null;
-  if (Date.now() - entry.cachedAt > SUMMARY_CACHE_TTL_MS) return null;
-  return entry;
-};
+const normalizeCompany = (name: string) => name.trim().replace(/\s+/g, ' ');
 
 export function DailySummaryCard() {
-  const cachedEntry = useMemo(() => getFreshSummaryCache(), []);
-  const cachedData = cachedEntry?.data ?? null;
+  const { recentOrders, historyOrders } = useSummaryOrders();
+  const loading = useDashboardStore((state) => state.loading);
 
-  const { data, isLoading } = useSafeQuery<DailySummary>(
-    'daily-summary',
-    async ({ signal }) => {
-      const freshCache = getFreshSummaryCache();
-      if (freshCache) return freshCache.data;
-
-      try {
-        const fetchMaxDate = async (table: 'orders' | 'history_orders') => {
-          try {
-            let q = supabase.from(table).select('date').order('date', { ascending: false }).limit(1);
-            if (signal) q = q.abortSignal(signal);
-            const { data, error } = await q;
-            if (error) throw error;
-            return data?.[0]?.date ?? null;
-          } catch (err) {
-            if (isMissingTableError(err)) return null;
-            throw err;
-          }
-        };
-
-        const [ordersMax, historyMax] = await Promise.all([
-          fetchMaxDate('orders'),
-          fetchMaxDate('history_orders')
-        ]);
-
-        const maxDate =
-          ordersMax && historyMax ? (ordersMax > historyMax ? ordersMax : historyMax) : (ordersMax ?? historyMax);
-
-        if (!maxDate) return EMPTY_SUMMARY;
-
-        const maxDateObj = parseDateString(maxDate);
-        maxDateObj.setDate(maxDateObj.getDate() - 30);
-        const startStr = formatLocalDate(maxDateObj);
-
-        const cacheKey = `${maxDate}:${startStr}`;
-        const now = Date.now();
-        const cached = summaryCache.get(cacheKey);
-        if (cached && now - cached.cachedAt < SUMMARY_CACHE_TTL_MS) {
-          latestSummaryCacheKey = cacheKey;
-          return cached.data;
-        }
-
-        const selectColumns = `
-          date, order_type, tons, company,
-          breakdown_8mm, breakdown_10mm, breakdown_12mm, breakdown_14mm, breakdown_16mm,
-          breakdown_18mm, breakdown_20mm, breakdown_25mm, breakdown_32mm
-        `;
-
-        const fetchRows = async (table: 'orders' | 'history_orders') => {
-          try {
-            let q = supabase
-              .from(table)
-              .select(selectColumns)
-              .gte('date', startStr)
-              .lte('date', maxDate);
-
-            if (signal) q = q.abortSignal(signal);
-
-            const { data, error } = await q;
-            if (error) throw error;
-            return (data ?? []) as DailySummaryRow[];
-          } catch (err) {
-            if (isMissingTableError(err)) return [] as DailySummaryRow[];
-            throw err;
-          }
-        };
-
-        const [ordersRows, historyRows] = await Promise.all([
-          fetchRows('orders'),
-          fetchRows('history_orders')
-        ]);
-
-        const rows = [...ordersRows, ...historyRows];
-        const totalOrders = rows.length;
-
-        const dayCount = new Set(rows.map((r) => r.date).filter(Boolean)).size;
-
-        const cutAndBendTotal = rows
-          .filter((r) => r.order_type === 'cut-and-bend')
-          .reduce((sum, r) => sum + (Number(r.tons) || 0), 0);
-
-        const straightBarTotal = rows
-          .filter((r) => r.order_type === 'straight-bar')
-          .reduce((sum, r) => sum + (Number(r.tons) || 0), 0);
-
-        const diameterTotals = DIAMETER_FIELDS.map(({ key, label }) => ({
-          label,
-          tons: rows.reduce((sum, r) => sum + (Number((r as any)[key]) || 0), 0)
-        }));
-
-        const topDiameters = diameterTotals
-          .filter((d) => d.tons > 0)
-          .sort((a, b) => b.tons - a.tons)
-          .slice(0, 3);
-
-        const normalizeCompany = (name: string) => name.trim().replace(/\s+/g, ' ');
-
-        const clientTotals = rows.reduce<Record<string, number>>((acc, r) => {
-          const companyRaw = r.company ?? '';
-          const company = normalizeCompany(companyRaw);
-          if (!company) return acc;
-          acc[company] = (acc[company] || 0) + (Number(r.tons) || 0);
-          return acc;
-        }, {});
-
-        const topClients = Object.entries(clientTotals)
-          .map(([name, tons]) => ({ name, tons }))
-          .sort((a, b) => b.tons - a.tons)
-          .slice(0, 3);
-
-        const summary: DailySummary = {
-          avgCutAndBend: dayCount > 0 ? cutAndBendTotal / dayCount : 0,
-          avgStraightBar: dayCount > 0 ? straightBarTotal / dayCount : 0,
-          topDiameters,
-          topClients,
-          dayCount,
-          totalOrders,
-          maxDate
-        };
-
-        summaryCache.set(cacheKey, { data: summary, cachedAt: now });
-        latestSummaryCacheKey = cacheKey;
-
-        return summary;
-      } catch (err) {
-        if (signal?.aborted || isAbortError(err)) {
-          return getFreshSummaryCache()?.data ?? cachedData ?? EMPTY_SUMMARY;
-        }
-        console.error('[DailySummary] Failed to load summary', err);
-        return getFreshSummaryCache()?.data ?? cachedData ?? EMPTY_SUMMARY;
-      }
-    },
-    [],
-    {
-      refreshOnFocus: false,
-      refreshOnReconnect: false
+  const summaryData = useMemo<DailySummary>(() => {
+    if (!recentOrders.length && !historyOrders.length) {
+      return EMPTY_SUMMARY;
     }
-  );
 
-  const summaryData = data ?? cachedData;
-  const showLoading = isLoading && !summaryData;
+    const normalizedOrders: DailySummaryRow[] = [
+      ...recentOrders.map((order) => ({
+        date: order.date,
+        order_type: order.orderType,
+        tons: order.tons,
+        company: order.company,
+        breakdown_8mm: order.breakdown?.['8mm'],
+        breakdown_10mm: order.breakdown?.['10mm'],
+        breakdown_12mm: order.breakdown?.['12mm'],
+        breakdown_14mm: order.breakdown?.['14mm'],
+        breakdown_16mm: order.breakdown?.['16mm'],
+        breakdown_18mm: order.breakdown?.['18mm'],
+        breakdown_20mm: order.breakdown?.['20mm'],
+        breakdown_25mm: order.breakdown?.['25mm'],
+        breakdown_32mm: order.breakdown?.['32mm']
+      })),
+      ...historyOrders.map((order) => ({
+        date: order.date,
+        order_type: order.order_type,
+        tons: order.tons,
+        company: order.company,
+        breakdown_8mm: order.breakdown_8mm,
+        breakdown_10mm: order.breakdown_10mm,
+        breakdown_12mm: order.breakdown_12mm,
+        breakdown_14mm: order.breakdown_14mm,
+        breakdown_16mm: order.breakdown_16mm,
+        breakdown_18mm: order.breakdown_18mm,
+        breakdown_20mm: order.breakdown_20mm,
+        breakdown_25mm: order.breakdown_25mm,
+        breakdown_32mm: order.breakdown_32mm
+      }))
+    ];
+
+    const dates = normalizedOrders.map((row) => row.date).filter(Boolean) as string[];
+    const maxDate = getMaxDate(dates);
+    if (!maxDate) {
+      return EMPTY_SUMMARY;
+    }
+
+    const maxDateObj = parseDateString(maxDate);
+    maxDateObj.setDate(maxDateObj.getDate() - 30);
+    const startStr = formatLocalDate(maxDateObj);
+
+    const rows = normalizedOrders.filter((row) => row.date >= startStr && row.date <= maxDate);
+    const totalOrders = rows.length;
+    const dayCount = new Set(rows.map((r) => r.date).filter(Boolean)).size;
+
+    const cutAndBendTotal = rows
+      .filter((r) => r.order_type === 'cut-and-bend')
+      .reduce((sum, r) => sum + (Number(r.tons) || 0), 0);
+
+    const straightBarTotal = rows
+      .filter((r) => r.order_type === 'straight-bar')
+      .reduce((sum, r) => sum + (Number(r.tons) || 0), 0);
+
+    const diameterTotals = DIAMETER_FIELDS.map(({ key, label }) => ({
+      label,
+      tons: rows.reduce((sum, r) => sum + (Number((r as any)[key]) || 0), 0)
+    }));
+
+    const topDiameters = diameterTotals
+      .filter((d) => d.tons > 0)
+      .sort((a, b) => b.tons - a.tons)
+      .slice(0, 3);
+
+    const clientTotals = rows.reduce<Record<string, number>>((acc, r) => {
+      const companyRaw = r.company ?? '';
+      const company = normalizeCompany(companyRaw);
+      if (!company) return acc;
+      acc[company] = (acc[company] || 0) + (Number(r.tons) || 0);
+      return acc;
+    }, {});
+
+    const topClients = Object.entries(clientTotals)
+      .map(([name, tons]) => ({ name, tons }))
+      .sort((a, b) => b.tons - a.tons)
+      .slice(0, 3);
+
+    return {
+      avgCutAndBend: dayCount > 0 ? cutAndBendTotal / dayCount : 0,
+      avgStraightBar: dayCount > 0 ? straightBarTotal / dayCount : 0,
+      topDiameters,
+      topClients,
+      dayCount,
+      totalOrders,
+      maxDate
+    };
+  }, [historyOrders, recentOrders]);
+
+  const showLoading = loading && summaryData.totalOrders === 0;
 
   const content = useMemo(() => {
     if (!summaryData) {
