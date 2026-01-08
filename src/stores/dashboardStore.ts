@@ -811,11 +811,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 }));
 
 export const useSummaryOrders = () =>
-  useDashboardStore(
-    (state) => ({
-      orders: state.orders,
-      historyOrders: state.historyOrders,
-      loading: state.loading
-    }),
-    shallow
-  );
+  useDashboardStore((state) => ({
+    recentOrders: state.orders,
+    historyOrders: state.historyOrders
+  }));
