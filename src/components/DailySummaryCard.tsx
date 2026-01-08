@@ -31,6 +31,15 @@ type SummaryCacheEntry = {
 const SUMMARY_CACHE_TTL_MS = 60_000;
 const summaryCache = new Map<string, SummaryCacheEntry>();
 let latestSummaryCacheKey: string | null = null;
+const EMPTY_SUMMARY: DailySummary = {
+  avgCutAndBend: 0,
+  avgStraightBar: 0,
+  topDiameters: [],
+  topClients: [],
+  dayCount: 0,
+  totalOrders: 0,
+  maxDate: null
+};
 
 const DIAMETER_FIELDS: { key: keyof DiameterRow; label: string }[] = [
   { key: 'breakdown_8mm', label: '8mm' },
@@ -80,6 +89,13 @@ const formatTons = (value: number) =>
     maximumFractionDigits: 2,
     minimumFractionDigits: 2
   }).format(value);
+
+const isAbortError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const name = 'name' in error ? String(error.name) : '';
+  const message = 'message' in error ? String(error.message) : '';
+  return name === 'AbortError' || message.includes('AbortError');
+};
 
 const isMissingTableError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
@@ -156,17 +172,11 @@ export function DailySummaryCard() {
           totalOrders: 0,
           maxDate: null
         };
-      }
 
-      const maxDateValue = parseDateString(maxDate);
-      maxDateValue.setDate(maxDateValue.getDate() - 30);
-      const startStr = formatLocalDate(maxDateValue);
-      const cacheKey = `${maxDate}:${startStr}`;
-      const cached = summaryCache.get(cacheKey);
-      const now = Date.now();
-      if (cached && now - cached.cachedAt < SUMMARY_CACHE_TTL_MS) {
-        return cached.data;
-      }
+        const [ordersMax, historyMax] = await Promise.all([
+          fetchMaxDate('orders'),
+          fetchMaxDate('history_orders')
+        ]);
 
       const selectColumns = `
         date,
@@ -198,14 +208,29 @@ export function DailySummaryCard() {
           if (error) {
             throw error;
           }
-          return rows || [];
-        } catch (error) {
-          if (isMissingTableError(error)) {
-            return [];
-          }
-          throw error;
+        };
+
+        const [ordersRows, historyRows] = await Promise.all([
+          fetchRows('orders'),
+          fetchRows('history_orders')
+        ]);
+
+        const rows = [...ordersRows, ...historyRows] as DailySummaryRow[];
+        const totalOrders = rows.length;
+        debug(
+          'ordersRowsCount',
+          ordersRows.length,
+          'historyRowsCount',
+          historyRows.length,
+          'combinedCount',
+          totalOrders
+        );
+        if (ordersRows.length > 0) {
+          debug('ordersSample', ordersRows[0]);
         }
-      };
+        if (historyRows.length > 0) {
+          debug('historySample', historyRows[0]);
+        }
 
       const [orderRows, ordersRows, historyRows] = await Promise.all([
         fetchRows('order'),
@@ -348,9 +373,9 @@ export function DailySummaryCard() {
           </div>
         ) : content.isEmpty ? (
           <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-6 text-center">
-            <p className="text-sm font-medium text-foreground">No daily summary data yet</p>
+            <p className="text-sm font-medium text-foreground">No data available for the last 30 days of data</p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Add orders with recent dates to see averages, top diameters, and top clients here.
+              Add recent orders to see averages, top diameters, and top clients here.
             </p>
           </div>
         ) : (
