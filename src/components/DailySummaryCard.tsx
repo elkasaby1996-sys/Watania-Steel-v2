@@ -117,7 +117,7 @@ export function DailySummaryCard() {
       if (freshCache) {
         return freshCache.data;
       }
-      const fetchMaxDate = async (table: 'orders' | 'history_orders') => {
+      const fetchMaxDate = async (table: 'orders' | 'order' | 'history_orders') => {
         try {
           let maxQuery = supabase.from(table).select('date').order('date', { ascending: false }).limit(1);
           if (signal) {
@@ -136,13 +136,15 @@ export function DailySummaryCard() {
         }
       };
 
-      const [ordersMax, historyMax] = await Promise.all([
+      const [orderMax, ordersMax, historyMax] = await Promise.all([
+        fetchMaxDate('order'),
         fetchMaxDate('orders'),
         fetchMaxDate('history_orders')
       ]);
 
+      const orderLikeMax = orderMax || ordersMax;
       const maxDate =
-        ordersMax && historyMax ? (ordersMax > historyMax ? ordersMax : historyMax) : ordersMax || historyMax;
+        orderLikeMax && historyMax ? (orderLikeMax > historyMax ? orderLikeMax : historyMax) : orderLikeMax || historyMax;
 
       if (!maxDate) {
         return {
@@ -182,7 +184,7 @@ export function DailySummaryCard() {
         breakdown_32mm
       `;
 
-      const fetchRows = async (table: 'orders' | 'history_orders') => {
+      const fetchRows = async (table: 'orders' | 'order' | 'history_orders') => {
         try {
           let query = supabase
             .from(table)
@@ -205,12 +207,13 @@ export function DailySummaryCard() {
         }
       };
 
-      const [ordersRows, historyRows] = await Promise.all([
+      const [orderRows, ordersRows, historyRows] = await Promise.all([
+        fetchRows('order'),
         fetchRows('orders'),
         fetchRows('history_orders')
       ]);
 
-      const rows = [...ordersRows, ...historyRows] as DailySummaryRow[];
+      const rows = [...orderRows, ...ordersRows, ...historyRows] as DailySummaryRow[];
       const totalOrders = rows.length;
       const daySet = new Set(rows.map((row) => row.date).filter(Boolean));
       const dayCount = daySet.size || 0;
