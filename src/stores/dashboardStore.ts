@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { shallow } from 'zustand/shallow';
 import { orderService, activityService, historyService, supabase, type Order as DBOrder, type Activity as DBActivity, type HistoryOrder } from '../lib/supabase';
 import { roundTo3Decimals } from '../lib/utils';
 
@@ -808,3 +809,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   }
 }));
+
+export const useSummaryOrders = () =>
+  useDashboardStore(
+    (state) => ({
+      orders: state.orders,
+      historyOrders: state.historyOrders,
+      loading: state.loading
+    }),
+    shallow
+  );
