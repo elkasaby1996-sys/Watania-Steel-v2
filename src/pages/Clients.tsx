@@ -1,33 +1,44 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Search, Building2, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useNavigate } from 'react-router-dom';
-import { slugifyCompany, formatNumber } from '@/lib/utils';
-import { useClientsStore } from '@/stores/clientsStore';
+import { formatNumber } from '@/lib/utils';
+import { clientsService, type ClientSummary } from '@/services/clientsService';
 
 export function Clients() {
   const navigate = useNavigate();
-  const {
-    loading,
-    error,
-    searchQuery,
-    setSearchQuery,
-    loadClients,
-    getFilteredClients,
-  } = useClientsStore();
+  const [clients, setClients] = useState<ClientSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    loadClients();
+  const fetchClients = useCallback(async (searchText?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await clientsService.getClientsSummary(searchText);
+      setClients(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load clients');
+      setClients([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const filteredClients = getFilteredClients();
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      fetchClients(searchQuery);
+    }, searchQuery ? 300 : 0);
 
-  const handleClientClick = (company: string) => {
-    const slug = slugifyCompany(company);
-    navigate(`/clients/${slug}`);
+    return () => clearTimeout(timeout);
+  }, [fetchClients, searchQuery]);
+
+  const handleClientClick = (clientId: string) => {
+    navigate(`/clients/${clientId}`);
   };
 
   // Loading State
@@ -104,7 +115,7 @@ export function Clients() {
               </div>
               <Button
                 variant="outline"
-                onClick={() => loadClients()}
+                onClick={() => fetchClients(searchQuery)}
               >
                 Try Again
               </Button>
@@ -133,7 +144,7 @@ export function Clients() {
             Clients Database
           </h1>
           <p className="text-muted-foreground">
-            Manage and analyze client relationships derived from order history (last 180 days)
+            Manage and analyze client relationships across all orders
           </p>
         </div>
       </div>
@@ -154,7 +165,7 @@ export function Clients() {
               />
             </div>
             <p className="text-sm text-muted-foreground">
-              {filteredClients.length} clients total
+              {clients.length} clients total
             </p>
           </div>
         </div>
@@ -181,27 +192,27 @@ export function Clients() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.length > 0 ? (
-                  filteredClients.map((client) => (
+                {clients.length > 0 ? (
+                  clients.map((client) => (
                     <TableRow
-                      key={client.company}
+                      key={client.id}
                       className="border-border hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => handleClientClick(client.company)}
+                      onClick={() => handleClientClick(client.id)}
                     >
                       <TableCell className="font-medium text-foreground">
-                        {client.company}
+                        {client.name}
                       </TableCell>
                       <TableCell className="text-foreground text-right">
-                        {client.totalOrders.toLocaleString()}
+                        {client.total_orders.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-foreground text-right">
-                        {formatNumber(client.totalTons)}
+                        {formatNumber(client.total_tons)}
                       </TableCell>
                       <TableCell className="text-foreground text-right">
-                        {client.uniqueSitesCount}
+                        {client.unique_sites}
                       </TableCell>
                       <TableCell className="text-foreground">
-                        {client.lastOrderDate || 'N/A'}
+                        {client.last_order_date || 'N/A'}
                       </TableCell>
                     </TableRow>
                   ))

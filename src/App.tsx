@@ -9,7 +9,7 @@ import { Drivers } from './pages/Drivers';
 import { DriverDetail } from './pages/DriverDetail';
 import { SteelAnalytics } from './pages/SteelAnalytics';
 import { Clients } from './pages/Clients';
-import { ClientDetail } from './pages/ClientDetail';
+import { ClientProfilePage } from './pages/ClientProfile';
 import { Inventory } from './pages/Inventory';
 import { OffcutUsage } from './pages/OffcutUsage';
 import { ImageAssets } from './components/ImageAssets';
@@ -60,7 +60,7 @@ function App() {
                     <Route path="/drivers" element={<Drivers />} />
                     <Route path="/drivers/:driverId" element={<DriverDetail />} />
                     <Route path="/clients" element={<Clients />} />
-                    <Route path="/clients/:clientSlug" element={<ClientDetail />} />
+                    <Route path="/clients/:clientId" element={<ClientProfilePage />} />
                     <Route path="/inventory" element={<Inventory />} />
                     <Route path="/offcut-usage" element={<OffcutUsage />} />
                     <Route path="/steel-analytics" element={<SteelAnalytics />} />

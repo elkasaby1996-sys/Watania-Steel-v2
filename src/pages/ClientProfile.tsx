@@ -1,288 +1,213 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft,
-  Building2,
-  Package,
-  MapPin,
-  FileText,
-  BarChart3,
-  Loader2,
   AlertCircle,
+  ArrowLeft,
+  BarChart3,
+  Building2,
   Calendar,
-  Weight,
   ChevronLeft,
   ChevronRight,
+  FileText,
+  Loader2,
+  MapPin,
+  Package,
+  Weight,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { useClientsStore } from '@/stores/clientsStore';
+import { useAuthStore } from '@/stores/authStore';
 import { formatNumber, roundTo3Decimals } from '@/lib/utils';
+import {
+  clientsService,
+  type ClientAnalytics,
+  type ClientOrderRow,
+  type ClientProfile,
+  type ClientSitesPerformanceRow,
+  type ClientStats,
+} from '@/services/clientsService';
 
-const PAGE_SIZE = 200;
+const PAGE_SIZE = 50;
 
-export function ClientDetail() {
-  const { clientSlug } = useParams<{ clientSlug: string }>();
+export function ClientProfilePage() {
+  const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const { user } = useAuthStore();
 
-  const {
-    selectedClient,
-    clientOrders,
-    clientOrdersTotal,
-    clientOrdersPage,
-    clientOrdersLoading,
-    loadClientBySlug,
-    loadClientOrders,
-    setClientOrdersPage,
-    clearClientDetail,
-  } = useClientsStore();
+  const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const [stats, setStats] = useState<ClientStats | null>(null);
+  const [analytics, setAnalytics] = useState<ClientAnalytics | null>(null);
+  const [sitesPerformance, setSitesPerformance] = useState<ClientSitesPerformanceRow[]>([]);
+  const [orders, setOrders] = useState<ClientOrderRow[]>([]);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const [ordersPage, setOrdersPage] = useState(1);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [formState, setFormState] = useState<Partial<ClientProfile>>({});
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const canEdit = user?.profile?.role === 'admin' || user?.profile?.role === 'editor';
+
+  const fetchCoreData = useCallback(async () => {
+    if (!clientId) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [profileData, statsData, sitesData] = await Promise.all([
+        clientsService.getClientProfile(clientId),
+        clientsService.getClientStats(clientId),
+        clientsService.getClientSitesPerformance(clientId),
+      ]);
+
+      setProfile(profileData);
+      setStats(statsData);
+      setSitesPerformance(sitesData);
+      setFormState({
+        contact_name: profileData.contact_name,
+        contact_email: profileData.contact_email,
+        contact_phone: profileData.contact_phone,
+        address: profileData.address,
+        notes: profileData.notes,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load client profile');
+      setProfile(null);
+      setStats(null);
+      setSitesPerformance([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId]);
+
+  const fetchOrders = useCallback(async () => {
+    if (!clientId) return;
+
+    setOrdersLoading(true);
+    setOrdersError(null);
+
+    try {
+      const offset = (ordersPage - 1) * PAGE_SIZE;
+      const { orders: orderRows, total } = await clientsService.getClientOrdersPage(
+        clientId,
+        PAGE_SIZE,
+        offset
+      );
+
+      setOrders(orderRows);
+      setOrdersTotal(total);
+    } catch (err) {
+      setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
+      setOrders([]);
+      setOrdersTotal(0);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [clientId, ordersPage]);
+
+  const fetchAnalytics = useCallback(async () => {
+    if (!clientId) return;
+
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+
+    try {
+      const analyticsData = await clientsService.getClientAnalytics(clientId);
+      setAnalytics(analyticsData);
+    } catch (err) {
+      setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
+      setAnalytics(null);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [clientId]);
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!clientSlug) return;
+    fetchCoreData();
+  }, [fetchCoreData]);
 
-      setIsInitialLoading(true);
-      const client = await loadClientBySlug(clientSlug);
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
-      if (client) {
-        await loadClientOrders(client.company, 1);
-      }
-      setIsInitialLoading(false);
-    };
-
-    loadData();
-
-    return () => {
-      clearClientDetail();
-    };
-  }, [clientSlug]);
-
-  const client = selectedClient;
-
-  // KPI data
-  const kpis = {
-    totalOrders: client?.totalOrders ?? 0,
-    totalTons: client?.totalTons ?? 0,
-    totalAmount: client?.totalAmount ?? 0,
-    sites: client?.uniqueSitesCount ?? 0,
-    lastOrderDate: client?.lastOrderDate ?? 'N/A',
-  };
-
-  // Pagination calculations
-  const totalPages = Math.ceil(clientOrdersTotal / PAGE_SIZE);
-  const startRecord = clientOrdersTotal > 0 ? (clientOrdersPage - 1) * PAGE_SIZE + 1 : 0;
-  const endRecord = Math.min(clientOrdersPage * PAGE_SIZE, clientOrdersTotal);
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   const handlePreviousPage = () => {
-    if (clientOrdersPage > 1 && client) {
-      loadClientOrders(client.company, clientOrdersPage - 1);
-    }
+    setOrdersPage((prev) => Math.max(1, prev - 1));
   };
 
   const handleNextPage = () => {
-    if (clientOrdersPage < totalPages && client) {
-      loadClientOrders(client.company, clientOrdersPage + 1);
+    const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
+    setOrdersPage((prev) => Math.min(totalPages, prev + 1));
+  };
+
+  const handleInputChange = (field: keyof ClientProfile) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormState((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const handleSave = async () => {
+    if (!clientId) return;
+
+    setSaveLoading(true);
+    setSaveError(null);
+
+    try {
+      const updated = await clientsService.updateClientProfile(clientId, formState);
+      setProfile(updated);
+      setIsEditing(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save updates');
+    } finally {
+      setSaveLoading(false);
     }
   };
 
-  // Status badge styling
-  const getStatusBadge = (status: string) => {
+  const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
+  const startRecord = ordersTotal > 0 ? (ordersPage - 1) * PAGE_SIZE + 1 : 0;
+  const endRecord = Math.min(ordersPage * PAGE_SIZE, ordersTotal);
+
+  const kpis = {
+    totalOrders: stats?.total_orders ?? 0,
+    totalTons: stats?.total_tons ?? 0,
+    totalAmount: stats?.total_amount ?? 0,
+    sites: stats?.unique_sites ?? 0,
+    lastOrderDate: stats?.last_order_date ?? 'N/A',
+  };
+
+  const statusBreakdown = useMemo(() => analytics?.status_breakdown || [], [analytics]);
+  const orderTypeBreakdown = useMemo(() => analytics?.order_type_breakdown || [], [analytics]);
+  const shiftBreakdown = useMemo(() => analytics?.shift_breakdown || [], [analytics]);
+  const diameterBreakdown = useMemo(() => analytics?.diameter_breakdown || [], [analytics]);
+  const diameterTotals = useMemo(() => analytics?.diameter_totals, [analytics]);
+
+  const getStatusBadge = (status: string | null) => {
     const statusStyles: Record<string, string> = {
-      'pending': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
       'in-progress': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      'completed': 'bg-green-500/20 text-green-400 border-green-500/30',
-      'delivered': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      'delayed': 'bg-red-500/20 text-red-400 border-red-500/30',
+      completed: 'bg-green-500/20 text-green-400 border-green-500/30',
+      delivered: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      delayed: 'bg-red-500/20 text-red-400 border-red-500/30',
     };
-    return statusStyles[status] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    return statusStyles[status || ''] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   };
 
-  // Compute monthly analytics from clientOrders
-  const monthlyAnalytics = useMemo(() => {
-    if (!clientOrders || clientOrders.length === 0) {
-      return { monthlyTons: [], monthlyAmount: [] };
-    }
-
-    const monthMap: Record<string, { tons: number; amount: number }> = {};
-
-    clientOrders.forEach((order) => {
-      if (!order.date) return;
-      const d = new Date(order.date);
-      if (isNaN(d.getTime())) return;
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (!monthMap[key]) {
-        monthMap[key] = { tons: 0, amount: 0 };
-      }
-      monthMap[key].tons += order.tons || 0;
-      monthMap[key].amount += order.amount || 0;
-    });
-
-    const sortedMonths = Object.keys(monthMap).sort();
-    const monthlyTons = sortedMonths.map((m) => {
-      const [year, month] = m.split('-');
-      const label = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-      return { month: label, tons: roundTo3Decimals(monthMap[m].tons) };
-    });
-    const monthlyAmount = sortedMonths.map((m) => {
-      const [year, month] = m.split('-');
-      const label = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-      return { month: label, amount: roundTo3Decimals(monthMap[m].amount) };
-    });
-
-    return { monthlyTons, monthlyAmount };
-  }, [clientOrders]);
-
-  // Compute Status Breakdown from clientOrders
-  const statusBreakdown = useMemo(() => {
-    if (!clientOrders || clientOrders.length === 0) {
-      return [];
-    }
-
-    const totalOrders = clientOrders.length;
-    const statusMap: Record<string, number> = {};
-
-    clientOrders.forEach((order) => {
-      const status = order.status?.trim() || 'N/A';
-      statusMap[status] = (statusMap[status] || 0) + 1;
-    });
-
-    return Object.entries(statusMap)
-      .map(([status, count]) => ({
-        status,
-        count,
-        percentage: totalOrders > 0 ? roundTo3Decimals((count / totalOrders) * 100) : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [clientOrders]);
-
-  // Compute Order Type Breakdown from clientOrders
-  const orderTypeBreakdown = useMemo(() => {
-    if (!clientOrders || clientOrders.length === 0) {
-      return [];
-    }
-
-    const typeMap: Record<string, { count: number; tons: number; amount: number }> = {};
-
-    clientOrders.forEach((order) => {
-      const orderType = order.order_type?.trim() || 'N/A';
-      if (!typeMap[orderType]) {
-        typeMap[orderType] = { count: 0, tons: 0, amount: 0 };
-      }
-      typeMap[orderType].count += 1;
-      typeMap[orderType].tons += order.tons || 0;
-      typeMap[orderType].amount += order.amount || 0;
-    });
-
-    return Object.entries(typeMap)
-      .map(([orderType, data]) => ({
-        orderType,
-        count: data.count,
-        tons: roundTo3Decimals(data.tons),
-        amount: roundTo3Decimals(data.amount),
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [clientOrders]);
-
-  // Compute Shift Breakdown from clientOrders
-  const shiftBreakdown = useMemo(() => {
-    if (!clientOrders || clientOrders.length === 0) {
-      return [];
-    }
-
-    const shiftMap: Record<string, { count: number; tons: number; amount: number }> = {};
-
-    clientOrders.forEach((order) => {
-      const shift = order.shift?.trim() || 'N/A';
-      if (!shiftMap[shift]) {
-        shiftMap[shift] = { count: 0, tons: 0, amount: 0 };
-      }
-      shiftMap[shift].count += 1;
-      shiftMap[shift].tons += order.tons || 0;
-      shiftMap[shift].amount += order.amount || 0;
-    });
-
-    return Object.entries(shiftMap)
-      .map(([shift, data]) => ({
-        shift,
-        count: data.count,
-        tons: roundTo3Decimals(data.tons),
-        amount: roundTo3Decimals(data.amount),
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [clientOrders]);
-
-  // Compute Diameter Breakdown from clientOrders
-  const diameterBreakdown = useMemo(() => {
-    if (!clientOrders || clientOrders.length === 0) {
-      return { data: [], totalBreakdownTons: 0, totalOrderTons: 0, hasMismatch: false };
-    }
-
-    const diameters = ['8mm', '10mm', '12mm', '14mm', '16mm', '18mm', '20mm', '25mm', '32mm'] as const;
-    const breakdownSums: Record<string, number> = {};
-    diameters.forEach((d) => (breakdownSums[d] = 0));
-
-    let totalOrderTons = 0;
-
-    clientOrders.forEach((order) => {
-      totalOrderTons += order.tons || 0;
-      breakdownSums['8mm'] += Number(order.breakdown_8mm) || 0;
-      breakdownSums['10mm'] += Number(order.breakdown_10mm) || 0;
-      breakdownSums['12mm'] += Number(order.breakdown_12mm) || 0;
-      breakdownSums['14mm'] += Number(order.breakdown_14mm) || 0;
-      breakdownSums['16mm'] += Number(order.breakdown_16mm) || 0;
-      breakdownSums['18mm'] += Number(order.breakdown_18mm) || 0;
-      breakdownSums['20mm'] += Number(order.breakdown_20mm) || 0;
-      breakdownSums['25mm'] += Number(order.breakdown_25mm) || 0;
-      breakdownSums['32mm'] += Number(order.breakdown_32mm) || 0;
-    });
-
-    const totalBreakdownTons = Object.values(breakdownSums).reduce((sum, v) => sum + v, 0);
-    const hasMismatch = Math.abs(totalBreakdownTons - totalOrderTons) > 0.01;
-
-    const data = diameters.map((diameter) => ({
-      diameter,
-      tons: roundTo3Decimals(breakdownSums[diameter]),
-      percentage: totalBreakdownTons > 0 ? roundTo3Decimals((breakdownSums[diameter] / totalBreakdownTons) * 100) : 0,
-    }));
-
-    return { data, totalBreakdownTons: roundTo3Decimals(totalBreakdownTons), totalOrderTons: roundTo3Decimals(totalOrderTons), hasMismatch };
-  }, [clientOrders]);
-
-  // Compute Sites Performance data from clientOrders
-  const sitesPerformance = useMemo(() => {
-    if (!clientOrders || clientOrders.length === 0) {
-      return [];
-    }
-
-    const siteMap: Record<string, { count: number; tons: number; amount: number }> = {};
-
-    clientOrders.forEach((order) => {
-      const site = order.site?.trim() || 'Unknown';
-      if (!siteMap[site]) {
-        siteMap[site] = { count: 0, tons: 0, amount: 0 };
-      }
-      siteMap[site].count += 1;
-      siteMap[site].tons += order.tons || 0;
-      siteMap[site].amount += order.amount || 0;
-    });
-
-    return Object.entries(siteMap)
-      .map(([site, data]) => ({
-        site,
-        count: data.count,
-        tons: roundTo3Decimals(data.tons),
-        amount: roundTo3Decimals(data.amount),
-      }))
-      .sort((a, b) => b.tons - a.tons);
-  }, [clientOrders]);
-
-  // Loading State
-  if (isInitialLoading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -311,8 +236,7 @@ export function ClientDetail() {
     );
   }
 
-  // Not Found State
-  if (!client) {
+  if (error || !profile) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -335,14 +259,14 @@ export function ClientDetail() {
           </div>
         </div>
 
-        <Card>
+        <Card className="border-destructive">
           <CardContent className="py-10">
             <div className="text-center space-y-4">
-              <Building2 className="h-12 w-12 mx-auto text-muted-foreground/50" />
+              <AlertCircle className="h-12 w-12 mx-auto text-destructive" />
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Client Not Found</h3>
+                <h3 className="text-lg font-semibold text-foreground">Unable to Load Client</h3>
                 <p className="text-muted-foreground mt-1">
-                  No client matching "{clientSlug}" was found in the database.
+                  {error || 'Please confirm the client exists and try again.'}
                 </p>
               </div>
               <Button onClick={() => navigate('/clients')}>
@@ -357,7 +281,6 @@ export function ClientDetail() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -370,15 +293,12 @@ export function ClientDetail() {
         </Button>
         <div className="flex-1">
           <h1 className="text-3xl font-headline font-bold text-foreground">
-            {client.company}
+            {profile.name}
           </h1>
-          <p className="text-muted-foreground">
-            Client profile and order history
-          </p>
+          <p className="text-muted-foreground">Client profile and order history</p>
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
@@ -421,7 +341,6 @@ export function ClientDetail() {
         </Card>
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="orders" className="space-y-4">
         <TabsList>
           <TabsTrigger value="orders" className="gap-2">
@@ -438,7 +357,6 @@ export function ClientDetail() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Orders Tab - Primary Focus */}
         <TabsContent value="orders" className="space-y-4">
           <Card>
             <CardHeader>
@@ -447,16 +365,25 @@ export function ClientDetail() {
                 Order History
               </CardTitle>
               <CardDescription>
-                Unified order history from active orders and history (showing {startRecord}-{endRecord} of {clientOrdersTotal})
+                Unified order history from active and archived orders (showing {startRecord}-{endRecord} of {ordersTotal})
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {clientOrdersLoading ? (
+              {ordersLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center space-y-4">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                     <p className="text-muted-foreground text-sm">Loading orders...</p>
                   </div>
+                </div>
+              ) : ordersError ? (
+                <div className="text-center py-12 space-y-3">
+                  <AlertCircle className="h-10 w-10 mx-auto text-destructive" />
+                  <div>
+                    <p className="font-medium text-foreground">Unable to load orders</p>
+                    <p className="text-sm text-muted-foreground">{ordersError}</p>
+                  </div>
+                  <Button variant="outline" onClick={fetchOrders}>Retry</Button>
                 </div>
               ) : (
                 <>
@@ -477,8 +404,8 @@ export function ClientDetail() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {clientOrders.length > 0 ? (
-                          clientOrders.map((order) => (
+                        {orders.length > 0 ? (
+                          orders.map((order) => (
                             <TableRow key={`${order.source}-${order.id}`} className="border-border">
                               <TableCell className="font-mono text-sm">
                                 {order.delivery_number || order.id}
@@ -493,13 +420,13 @@ export function ClientDetail() {
                                 {order.order_type?.replace('-', ' ') || 'N/A'}
                               </TableCell>
                               <TableCell className="capitalize">{order.shift || 'N/A'}</TableCell>
-                              <TableCell className="max-w-[150px] truncate" title={order.site}>
+                              <TableCell className="max-w-[150px] truncate" title={order.site || ''}>
                                 {order.site || 'N/A'}
                               </TableCell>
                               <TableCell className="text-right">
                                 {formatNumber(order.tons || 0)}
                               </TableCell>
-                              <TableCell className="max-w-[120px] truncate" title={order.driver_name}>
+                              <TableCell className="max-w-[120px] truncate" title={order.driver_name || ''}>
                                 {order.driver_name || 'N/A'}
                               </TableCell>
                               <TableCell>
@@ -519,9 +446,7 @@ export function ClientDetail() {
                                 <FileText className="h-12 w-12 mx-auto text-muted-foreground/50" />
                                 <div>
                                   <p className="font-medium">No Orders Found</p>
-                                  <p className="text-sm">
-                                    No orders found for this client.
-                                  </p>
+                                  <p className="text-sm">No orders found for this client.</p>
                                 </div>
                               </div>
                             </TableCell>
@@ -531,18 +456,17 @@ export function ClientDetail() {
                     </Table>
                   </div>
 
-                  {/* Pagination Controls */}
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
                       <p className="text-sm text-muted-foreground">
-                        Page {clientOrdersPage} of {totalPages}
+                        Page {ordersPage} of {totalPages}
                       </p>
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={handlePreviousPage}
-                          disabled={clientOrdersPage <= 1 || clientOrdersLoading}
+                          disabled={ordersPage <= 1 || ordersLoading}
                         >
                           <ChevronLeft className="h-4 w-4 mr-1" />
                           Previous
@@ -551,7 +475,7 @@ export function ClientDetail() {
                           variant="outline"
                           size="sm"
                           onClick={handleNextPage}
-                          disabled={clientOrdersPage >= totalPages || clientOrdersLoading}
+                          disabled={ordersPage >= totalPages || ordersLoading}
                         >
                           Next
                           <ChevronRight className="h-4 w-4 ml-1" />
@@ -565,55 +489,112 @@ export function ClientDetail() {
           </Card>
         </TabsContent>
 
-        {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
-            {/* Client Info */}
             <Card>
               <CardHeader>
                 <CardTitle>Client Information</CardTitle>
-                <CardDescription>Basic client details</CardDescription>
+                <CardDescription>Basic details tied to this client profile</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Company Name</span>
-                  <span className="font-medium text-foreground">{client.company}</span>
+                  <span className="font-medium text-foreground">{profile.name}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Total Orders</span>
-                  <span className="font-medium text-foreground">{client.totalOrders.toLocaleString()}</span>
+                  <span className="font-medium text-foreground">{kpis.totalOrders.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center py-2">
                   <span className="text-muted-foreground">Total Tons</span>
-                  <span className="font-medium text-foreground">{formatNumber(client.totalTons)}</span>
+                  <span className="font-medium text-foreground">{formatNumber(kpis.totalTons)}</span>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Summary Stats */}
             <Card>
               <CardHeader>
-                <CardTitle>Summary</CardTitle>
-                <CardDescription>Key metrics for this client</CardDescription>
+                <CardTitle>Contact Details</CardTitle>
+                <CardDescription>
+                  {canEdit ? 'Update client contacts and notes.' : 'Contact info (read-only)'}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Unique Sites</span>
-                  <span className="font-medium text-foreground">{client.uniqueSitesCount}</span>
+                {saveError && (
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    {saveError}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Contact Name</label>
+                  <Input
+                    value={formState.contact_name || ''}
+                    onChange={handleInputChange('contact_name')}
+                    disabled={!canEdit || !isEditing}
+                    placeholder="Primary contact"
+                  />
                 </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-muted-foreground">Last Order Date</span>
-                  <span className="font-medium text-foreground">{client.lastOrderDate || 'N/A'}</span>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Contact Email</label>
+                  <Input
+                    value={formState.contact_email || ''}
+                    onChange={handleInputChange('contact_email')}
+                    disabled={!canEdit || !isEditing}
+                    placeholder="email@example.com"
+                  />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Contact Phone</label>
+                  <Input
+                    value={formState.contact_phone || ''}
+                    onChange={handleInputChange('contact_phone')}
+                    disabled={!canEdit || !isEditing}
+                    placeholder="+974 ..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Address</label>
+                  <Input
+                    value={formState.address || ''}
+                    onChange={handleInputChange('address')}
+                    disabled={!canEdit || !isEditing}
+                    placeholder="Client address"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Notes</label>
+                  <textarea
+                    value={formState.notes || ''}
+                    onChange={handleInputChange('notes')}
+                    disabled={!canEdit || !isEditing}
+                    placeholder="Additional notes"
+                    className="min-h-[100px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+                {canEdit && (
+                  <div className="flex justify-end gap-2 pt-2">
+                    {isEditing ? (
+                      <>
+                        <Button variant="outline" onClick={() => setIsEditing(false)} disabled={saveLoading}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSave} disabled={saveLoading}>
+                          {saveLoading ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={() => setIsEditing(true)}>Edit Details</Button>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        {/* Analytics Tab */}
         <TabsContent value="analytics" className="space-y-4">
-          {clientOrdersLoading ? (
-            // Skeleton loaders
+          {analyticsLoading ? (
             <Card>
               <CardHeader>
                 <div className="h-5 w-32 bg-muted animate-pulse rounded" />
@@ -623,17 +604,27 @@ export function ClientDetail() {
                 <div className="h-64 bg-muted animate-pulse rounded" />
               </CardContent>
             </Card>
-          ) : monthlyAnalytics.monthlyTons.length === 0 ? (
-            // Empty state
+          ) : analyticsError ? (
+            <Card className="border-destructive">
+              <CardContent className="py-10">
+                <div className="text-center space-y-4">
+                  <AlertCircle className="h-12 w-12 mx-auto text-destructive" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Analytics Unavailable</h3>
+                    <p className="text-muted-foreground mt-1">{analyticsError}</p>
+                  </div>
+                  <Button variant="outline" onClick={fetchAnalytics}>Retry</Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : !analytics || analytics.monthly_tons.length === 0 ? (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" />
                   Analytics
                 </CardTitle>
-                <CardDescription>
-                  Charts and breakdowns for this client
-                </CardDescription>
+                <CardDescription>Charts and breakdowns for this client</CardDescription>
               </CardHeader>
               <CardContent className="py-12">
                 <div className="text-center space-y-3">
@@ -648,48 +639,66 @@ export function ClientDetail() {
               </CardContent>
             </Card>
           ) : (
-            // Charts
             <>
-              {/* Monthly Tons Chart */}
               <Card>
                 <CardHeader>
                   <CardTitle>Monthly Tons</CardTitle>
                   <CardDescription>Sum of tons grouped by month</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {monthlyAnalytics.monthlyTons.length > 0 ? (
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={monthlyAnalytics.monthlyTons}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 4%, 80%)" />
-                          <XAxis dataKey="month" stroke="hsl(240, 4%, 52%)" fontSize={12} />
-                          <YAxis stroke="hsl(240, 4%, 52%)" fontSize={12} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'hsl(0, 0%, 100%)',
-                              border: '1px solid hsl(240, 4%, 80%)',
-                              borderRadius: '8px',
-                              color: 'hsl(0, 0%, 12%)'
-                            }}
-                            formatter={(value: number) => [`${formatNumber(value)} tons`, 'Tons']}
-                          />
-                          <Bar dataKey="tons" fill="hsl(232, 90%, 62%)" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-64 flex items-center justify-center text-muted-foreground">
-                      N/A
-                    </div>
-                  )}
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={analytics.monthly_tons}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 4%, 80%)" />
+                        <XAxis dataKey="month" stroke="hsl(240, 4%, 52%)" fontSize={12} />
+                        <YAxis stroke="hsl(240, 4%, 52%)" fontSize={12} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(0, 0%, 100%)',
+                            border: '1px solid hsl(240, 4%, 80%)',
+                            borderRadius: '8px',
+                            color: 'hsl(0, 0%, 12%)',
+                          }}
+                          formatter={(value: number) => [`${formatNumber(value)} tons`, 'Tons']}
+                        />
+                        <Bar dataKey="tons" fill="hsl(232, 90%, 62%)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Monthly Amount</CardTitle>
+                  <CardDescription>Revenue totals grouped by month</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={analytics.monthly_amount}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 4%, 80%)" />
+                        <XAxis dataKey="month" stroke="hsl(240, 4%, 52%)" fontSize={12} />
+                        <YAxis stroke="hsl(240, 4%, 52%)" fontSize={12} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(0, 0%, 100%)',
+                            border: '1px solid hsl(240, 4%, 80%)',
+                            borderRadius: '8px',
+                            color: 'hsl(0, 0%, 12%)',
+                          }}
+                          formatter={(value: number) => [`QAR ${formatNumber(value)}`, 'Amount']}
+                        />
+                        <Bar dataKey="amount" fill="hsl(160, 60%, 45%)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </CardContent>
               </Card>
             </>
           )}
 
-          {/* Breakdown Tables */}
           <div className="grid md:grid-cols-3 gap-4 mt-4">
-            {/* Status Breakdown */}
             <Card>
               <CardHeader>
                 <CardTitle>Status Breakdown</CardTitle>
@@ -714,20 +723,17 @@ export function ClientDetail() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">{row.count.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{row.percentage.toFixed(3)}%</TableCell>
+                          <TableCell className="text-right">{roundTo3Decimals(row.percentage).toFixed(3)}%</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    N/A
-                  </div>
+                  <div className="text-center py-8 text-muted-foreground">N/A</div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Order Type Breakdown */}
             <Card>
               <CardHeader>
                 <CardTitle>Order Type Breakdown</CardTitle>
@@ -745,8 +751,8 @@ export function ClientDetail() {
                     </TableHeader>
                     <TableBody>
                       {orderTypeBreakdown.map((row) => (
-                        <TableRow key={row.orderType} className="border-border">
-                          <TableCell className="capitalize">{row.orderType.replace('-', ' ')}</TableCell>
+                        <TableRow key={row.order_type} className="border-border">
+                          <TableCell className="capitalize">{row.order_type.replace('-', ' ')}</TableCell>
                           <TableCell className="text-right">{row.count.toLocaleString()}</TableCell>
                           <TableCell className="text-right">{formatNumber(row.tons)}</TableCell>
                         </TableRow>
@@ -754,14 +760,11 @@ export function ClientDetail() {
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    N/A
-                  </div>
+                  <div className="text-center py-8 text-muted-foreground">N/A</div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Shift Breakdown */}
             <Card>
               <CardHeader>
                 <CardTitle>Shift Breakdown</CardTitle>
@@ -788,28 +791,24 @@ export function ClientDetail() {
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    N/A
-                  </div>
+                  <div className="text-center py-8 text-muted-foreground">N/A</div>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Diameter Breakdown Section */}
           <div className="grid md:grid-cols-2 gap-4 mt-4">
-            {/* Diameter Breakdown Chart */}
             <Card>
               <CardHeader>
                 <CardTitle>Diameter Breakdown</CardTitle>
                 <CardDescription>Tonnage distribution by bar diameter</CardDescription>
               </CardHeader>
               <CardContent>
-                {diameterBreakdown.data.length > 0 && diameterBreakdown.totalBreakdownTons > 0 ? (
+                {diameterBreakdown.length > 0 && diameterTotals ? (
                   <>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={diameterBreakdown.data}>
+                        <BarChart data={diameterBreakdown}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 4%, 80%)" />
                           <XAxis dataKey="diameter" stroke="hsl(240, 4%, 52%)" fontSize={12} />
                           <YAxis stroke="hsl(240, 4%, 52%)" fontSize={12} />
@@ -818,18 +817,15 @@ export function ClientDetail() {
                               backgroundColor: 'hsl(0, 0%, 100%)',
                               border: '1px solid hsl(240, 4%, 80%)',
                               borderRadius: '8px',
-                              color: 'hsl(0, 0%, 12%)'
+                              color: 'hsl(0, 0%, 12%)',
                             }}
-                            formatter={(value: number, name: string) => [
-                              `${formatNumber(value)} tons`,
-                              'Tons'
-                            ]}
+                            formatter={(value: number) => [`${formatNumber(value)} tons`, 'Tons']}
                           />
                           <Bar dataKey="tons" fill="hsl(160, 60%, 45%)" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
-                    {diameterBreakdown.hasMismatch && (
+                    {diameterTotals.has_mismatch && (
                       <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
                         Diameter breakdown may not fully match total tons due to rounding or data entry.
@@ -844,14 +840,13 @@ export function ClientDetail() {
               </CardContent>
             </Card>
 
-            {/* Diameter Breakdown Table */}
             <Card>
               <CardHeader>
                 <CardTitle>Diameter Details</CardTitle>
                 <CardDescription>Breakdown by bar diameter (% of total tons)</CardDescription>
               </CardHeader>
               <CardContent>
-                {diameterBreakdown.data.length > 0 && diameterBreakdown.totalBreakdownTons > 0 ? (
+                {diameterBreakdown.length > 0 && diameterTotals ? (
                   <>
                     <Table>
                       <TableHeader>
@@ -862,16 +857,16 @@ export function ClientDetail() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {diameterBreakdown.data.map((row) => (
+                        {diameterBreakdown.map((row) => (
                           <TableRow key={row.diameter} className="border-border">
                             <TableCell className="font-medium">{row.diameter}</TableCell>
                             <TableCell className="text-right">{formatNumber(row.tons)}</TableCell>
-                            <TableCell className="text-right">{row.percentage.toFixed(3)}%</TableCell>
+                            <TableCell className="text-right">{roundTo3Decimals(row.percentage).toFixed(3)}%</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                    {diameterBreakdown.hasMismatch && (
+                    {diameterTotals.has_mismatch && (
                       <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
                         Diameter breakdown may not fully match total tons due to rounding or data entry.
@@ -879,22 +874,19 @@ export function ClientDetail() {
                     )}
                   </>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No diameter breakdown data
-                  </div>
+                  <div className="text-center py-8 text-muted-foreground">No diameter breakdown data</div>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Sites Performance Section */}
           <Card className="mt-4">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
                 Sites Performance
               </CardTitle>
-              <CardDescription>Performance metrics for construction sites associated with this client</CardDescription>
+              <CardDescription>Performance metrics for delivery sites</CardDescription>
             </CardHeader>
             <CardContent>
               {sitesPerformance.length > 0 ? (
@@ -905,26 +897,28 @@ export function ClientDetail() {
                       <TableHead className="text-foreground text-right">Tons</TableHead>
                       <TableHead className="text-foreground text-right">Amount</TableHead>
                       <TableHead className="text-foreground text-right">Orders</TableHead>
+                      <TableHead className="text-foreground">Last Order</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sitesPerformance.map((row, index) => (
-                      <TableRow key={row.site} className="border-border">
+                      <TableRow key={row.site_id} className="border-border">
                         <TableCell className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground font-mono">{index + 1}.</span>
-                          <span className="font-medium max-w-[300px] truncate" title={row.site}>{row.site}</span>
+                          <span className="font-medium max-w-[300px] truncate" title={row.site_name}>
+                            {row.site_name}
+                          </span>
                         </TableCell>
-                        <TableCell className="text-right">{formatNumber(row.tons)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(row.amount)}</TableCell>
-                        <TableCell className="text-right">{row.count.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{formatNumber(row.total_tons)}</TableCell>
+                        <TableCell className="text-right">{formatNumber(row.total_amount)}</TableCell>
+                        <TableCell className="text-right">{row.total_orders.toLocaleString()}</TableCell>
+                        <TableCell>{row.last_order_date || 'N/A'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No site data available
-                </div>
+                <div className="text-center py-8 text-muted-foreground">No site data available</div>
               )}
             </CardContent>
           </Card>
