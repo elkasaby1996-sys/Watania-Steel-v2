@@ -129,35 +129,48 @@ export function DailySummaryCard() {
   const { data, isLoading } = useSafeQuery<DailySummary>(
     'daily-summary',
     async ({ signal }) => {
-      const isDebug = import.meta.env.DEV;
-      const debug = (...args: unknown[]) => {
-        if (isDebug) {
-          console.debug('[DailySummary]', ...args);
+      const freshCache = getFreshSummaryCache();
+      if (freshCache) {
+        return freshCache.data;
+      }
+      const fetchMaxDate = async (table: 'orders' | 'order' | 'history_orders') => {
+        try {
+          let maxQuery = supabase.from(table).select('date').order('date', { ascending: false }).limit(1);
+          if (signal) {
+            maxQuery = maxQuery.abortSignal(signal);
+          }
+          const { data: maxData, error: maxError } = await maxQuery;
+          if (maxError) {
+            throw maxError;
+          }
+          return maxData?.[0]?.date || null;
+        } catch (error) {
+          if (isMissingTableError(error)) {
+            return null;
+          }
+          throw error;
         }
       };
 
-      try {
-        const freshCache = getFreshSummaryCache();
-        if (freshCache) {
-          return freshCache.data;
-        }
-        const fetchMaxDate = async (table: 'orders' | 'history_orders') => {
-          try {
-            let maxQuery = supabase.from(table).select('date').order('date', { ascending: false }).limit(1);
-            if (signal) {
-              maxQuery = maxQuery.abortSignal(signal);
-            }
-            const { data: maxData, error: maxError } = await maxQuery;
-            if (maxError) {
-              throw maxError;
-            }
-            return maxData?.[0]?.date || null;
-          } catch (error) {
-            if (isMissingTableError(error)) {
-              return null;
-            }
-            throw error;
-          }
+      const [orderMax, ordersMax, historyMax] = await Promise.all([
+        fetchMaxDate('order'),
+        fetchMaxDate('orders'),
+        fetchMaxDate('history_orders')
+      ]);
+
+      const orderLikeMax = orderMax || ordersMax;
+      const maxDate =
+        orderLikeMax && historyMax ? (orderLikeMax > historyMax ? orderLikeMax : historyMax) : orderLikeMax || historyMax;
+
+      if (!maxDate) {
+        return {
+          avgCutAndBend: 0,
+          avgStraightBar: 0,
+          topDiameters: [],
+          topClients: [],
+          dayCount: 0,
+          totalOrders: 0,
+          maxDate: null
         };
 
         const [ordersMax, historyMax] = await Promise.all([
@@ -165,61 +178,34 @@ export function DailySummaryCard() {
           fetchMaxDate('history_orders')
         ]);
 
-        const maxDate =
-          ordersMax && historyMax ? (ordersMax > historyMax ? ordersMax : historyMax) : ordersMax || historyMax;
-        debug('maxDateOrders', ordersMax, 'maxDateHistory', historyMax, 'chosenMaxDate', maxDate);
+      const selectColumns = `
+        date,
+        order_type,
+        tons,
+        company,
+        breakdown_8mm,
+        breakdown_10mm,
+        breakdown_12mm,
+        breakdown_14mm,
+        breakdown_16mm,
+        breakdown_18mm,
+        breakdown_20mm,
+        breakdown_25mm,
+        breakdown_32mm
+      `;
 
-        if (!maxDate) {
-          return EMPTY_SUMMARY;
-        }
-
-        const maxDateValue = parseDateString(maxDate);
-        maxDateValue.setDate(maxDateValue.getDate() - 30);
-        const startStr = formatLocalDate(maxDateValue);
-        debug('startDate', startStr);
-
-        const cacheKey = `${maxDate}:${startStr}`;
-        const cached = summaryCache.get(cacheKey);
-        const now = Date.now();
-        if (cached && now - cached.cachedAt < SUMMARY_CACHE_TTL_MS) {
-          return cached.data;
-        }
-
-        const selectColumns = `
-          date,
-          order_type,
-          tons,
-          company,
-          breakdown_8mm,
-          breakdown_10mm,
-          breakdown_12mm,
-          breakdown_14mm,
-          breakdown_16mm,
-          breakdown_18mm,
-          breakdown_20mm,
-          breakdown_25mm,
-          breakdown_32mm
-        `;
-
-        const fetchRows = async (table: 'orders' | 'history_orders') => {
-          try {
-            let query = supabase
-              .from(table)
-              .select(selectColumns)
-              .gte('date', startStr)
-              .lte('date', maxDate);
-            if (signal) {
-              query = query.abortSignal(signal);
-            }
-            const { data: rows, error } = await query;
-            if (error) {
-              throw error;
-            }
-            return rows || [];
-          } catch (error) {
-            if (isMissingTableError(error)) {
-              return [];
-            }
+      const fetchRows = async (table: 'orders' | 'order' | 'history_orders') => {
+        try {
+          let query = supabase
+            .from(table)
+            .select(selectColumns)
+            .gte('date', startStr)
+            .lte('date', maxDate);
+          if (signal) {
+            query = query.abortSignal(signal);
+          }
+          const { data: rows, error } = await query;
+          if (error) {
             throw error;
           }
         };
@@ -246,65 +232,58 @@ export function DailySummaryCard() {
           debug('historySample', historyRows[0]);
         }
 
-        const daySet = new Set(rows.map((row) => row.date).filter(Boolean));
-        const dayCount = daySet.size || 0;
+      const [orderRows, ordersRows, historyRows] = await Promise.all([
+        fetchRows('order'),
+        fetchRows('orders'),
+        fetchRows('history_orders')
+      ]);
 
-        const cutAndBendTotal = rows
-          .filter((row) => row.order_type === 'cut-and-bend')
-          .reduce((sum, row) => sum + (Number(row.tons) || 0), 0);
-        const straightBarTotal = rows
-          .filter((row) => row.order_type === 'straight-bar')
-          .reduce((sum, row) => sum + (Number(row.tons) || 0), 0);
+      const rows = [...orderRows, ...ordersRows, ...historyRows] as DailySummaryRow[];
+      const totalOrders = rows.length;
+      const daySet = new Set(rows.map((row) => row.date).filter(Boolean));
+      const dayCount = daySet.size || 0;
 
-        const diameterTotals = DIAMETER_FIELDS.map(({ key, label }) => ({
-          label,
-          tons: rows.reduce((sum, row) => sum + (Number(row[key]) || 0), 0)
-        }));
+      const cutAndBendTotal = rows
+        .filter((row) => row.order_type === 'cut-and-bend')
+        .reduce((sum, row) => sum + (Number(row.tons) || 0), 0);
+      const straightBarTotal = rows
+        .filter((row) => row.order_type === 'straight-bar')
+        .reduce((sum, row) => sum + (Number(row.tons) || 0), 0);
 
-        const topDiameters = diameterTotals
-          .filter((item) => item.tons > 0)
-          .sort((a, b) => b.tons - a.tons)
-          .slice(0, 3);
+      const diameterTotals = DIAMETER_FIELDS.map(({ key, label }) => ({
+        label,
+        tons: rows.reduce((sum, row) => sum + (Number(row[key]) || 0), 0)
+      }));
 
-        const clientTotals = rows.reduce<Record<string, number>>((acc, row) => {
-          const company = row.company?.trim();
-          if (!company) return acc;
-          acc[company] = (acc[company] || 0) + (Number(row.tons) || 0);
-          return acc;
-        }, {});
+      const topDiameters = diameterTotals
+        .filter((item) => item.tons > 0)
+        .sort((a, b) => b.tons - a.tons)
+        .slice(0, 3);
 
-        const topClients = Object.entries(clientTotals)
-          .map(([name, tons]) => ({ name, tons }))
-          .sort((a, b) => b.tons - a.tons)
-          .slice(0, 3);
+      const clientTotals = rows.reduce<Record<string, number>>((acc, row) => {
+        const company = row.company?.trim();
+        if (!company) return acc;
+        acc[company] = (acc[company] || 0) + (Number(row.tons) || 0);
+        return acc;
+      }, {});
 
-        const avgCutAndBend = dayCount > 0 ? cutAndBendTotal / dayCount : 0;
-        const avgStraightBar = dayCount > 0 ? straightBarTotal / dayCount : 0;
-        debug('computedOutputs', {
-          avgCutAndBend,
-          avgStraightBar,
-          topDiameters,
-          topClients
-        });
+      const topClients = Object.entries(clientTotals)
+        .map(([name, tons]) => ({ name, tons }))
+        .sort((a, b) => b.tons - a.tons)
+        .slice(0, 3);
 
-        const summaryResult = {
-          avgCutAndBend,
-          avgStraightBar,
-          topDiameters,
-          topClients,
-          dayCount,
-          totalOrders,
-          maxDate
-        };
-        summaryCache.set(cacheKey, { data: summaryResult, cachedAt: now });
-        latestSummaryCacheKey = cacheKey;
-        return summaryResult;
-      } catch (error) {
-        if (signal?.aborted || isAbortError(error)) {
-          return getFreshSummaryCache()?.data ?? cachedData ?? EMPTY_SUMMARY;
-        }
-        throw error;
-      }
+      const summaryResult = {
+        avgCutAndBend: dayCount > 0 ? cutAndBendTotal / dayCount : 0,
+        avgStraightBar: dayCount > 0 ? straightBarTotal / dayCount : 0,
+        topDiameters,
+        topClients,
+        dayCount,
+        totalOrders,
+        maxDate
+      };
+      summaryCache.set(cacheKey, { data: summaryResult, cachedAt: now });
+      latestSummaryCacheKey = cacheKey;
+      return summaryResult;
     },
     [],
     {
