@@ -374,7 +374,8 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
   INSERT INTO public.clients (name, name_normalized, created_at, updated_at)
-  SELECT DISTINCT trim(company) AS name,
+  SELECT DISTINCT ON (public.normalize_client_value(company))
+    trim(company) AS name,
     public.normalize_client_value(company) AS name_normalized,
     now(),
     now()
@@ -384,6 +385,7 @@ BEGIN
     SELECT company FROM public.history_orders
   ) AS combined
   WHERE public.normalize_client_value(company) IS NOT NULL
+  ORDER BY public.normalize_client_value(company), trim(company)
   ON CONFLICT (name_normalized) DO UPDATE
     SET name = EXCLUDED.name,
         updated_at = now();
