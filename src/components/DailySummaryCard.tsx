@@ -96,7 +96,14 @@ const getMaxDate = (dates: string[]) => {
   return dates.reduce((max, value) => (value > max ? value : max), dates[0]);
 };
 
-const normalizeCompany = (name: string) => name.trim().replace(/\s+/g, ' ');
+const normalizeCompany = (value: string) => {
+  return value
+    .toUpperCase()
+    .replace(/[.,()&/-]/g, ' ')
+    .replace(/\b(WLL|W L L|W\.L\.L|LLC|L L C|CO|COMPANY)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
 
 const isMissingTableError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
@@ -261,11 +268,12 @@ export function DailySummaryCard() {
       .sort((a, b) => b.tons - a.tons)
       .slice(0, 3);
 
-    const clientTotals = rows.reduce<Record<string, number>>((acc, r) => {
-      const companyRaw = r.company ?? '';
-      const company = normalizeCompany(companyRaw);
-      if (!company) return acc;
-      acc[company] = (acc[company] || 0) + (Number(r.tons) || 0);
+    const clientTotals = rows.reduce<Record<string, number>>((acc, row) => {
+      const raw = row.company?.trim();
+      if (!raw) return acc;
+
+      const normalized = normalizeCompany(raw);
+      acc[normalized] = (acc[normalized] || 0) + (Number(row.tons) || 0);
       return acc;
     }, {});
 
