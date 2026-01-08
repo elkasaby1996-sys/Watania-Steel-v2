@@ -256,7 +256,7 @@ export function SteelAnalytics() {
           </div>
 
           <Tabs value={filterMode} onValueChange={(value) => setFilterMode(value as FilterMode)}>
-            <TabsList className="grid grid-cols-3 w-full md:w-[480px]">
+            <TabsList className="flex flex-wrap gap-2 w-full md:w-auto">
               <TabsTrigger value="all">Total (Cut & Bend + Straight Bar)</TabsTrigger>
               <TabsTrigger value="straight-bar">Straight Bar Only</TabsTrigger>
               <TabsTrigger value="cut-and-bend">Cut-and-Bend Only</TabsTrigger>
