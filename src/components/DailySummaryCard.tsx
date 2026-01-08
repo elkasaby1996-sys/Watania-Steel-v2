@@ -31,6 +31,15 @@ type SummaryCacheEntry = {
 const SUMMARY_CACHE_TTL_MS = 60_000;
 const summaryCache = new Map<string, SummaryCacheEntry>();
 let latestSummaryCacheKey: string | null = null;
+const EMPTY_SUMMARY: DailySummary = {
+  avgCutAndBend: 0,
+  avgStraightBar: 0,
+  topDiameters: [],
+  topClients: [],
+  dayCount: 0,
+  totalOrders: 0,
+  maxDate: null
+};
 
 const EMPTY_SUMMARY: DailySummary = {
   avgCutAndBend: 0,
