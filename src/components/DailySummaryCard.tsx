@@ -96,7 +96,40 @@ const getMaxDate = (dates: string[]) => {
   return dates.reduce((max, value) => (value > max ? value : max), dates[0]);
 };
 
-const normalizeCompany = (name: string) => name.trim().replace(/\s+/g, ' ');
+const normalizeCompany = (name: string) => {
+  const sanitized = name
+    .trim()
+    .toUpperCase()
+    .replace(/[.,()&\-\/]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!sanitized) return '';
+
+  const tokens = sanitized.split(' ').filter(Boolean);
+  const stripSuffixes = (values: string[]) => {
+    const suffixTokens = new Set(['WLL', 'LLC', 'CO', 'COMPANY']);
+
+    while (values.length > 0) {
+      const last = values[values.length - 1];
+      const lastThree = values.slice(-3).join(' ');
+      if (lastThree === 'W L L' || lastThree === 'L L C') {
+        values.splice(-3, 3);
+        continue;
+      }
+      if (suffixTokens.has(last)) {
+        values.pop();
+        continue;
+      }
+      break;
+    }
+
+    return values;
+  };
+
+  const stripped = stripSuffixes(tokens).join(' ').trim();
+  return stripped;
+};
 
 const isMissingTableError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
@@ -263,14 +296,24 @@ export function DailySummaryCard() {
 
     const clientTotals = rows.reduce<Record<string, number>>((acc, r) => {
       const companyRaw = r.company ?? '';
-      const company = normalizeCompany(companyRaw);
+      const displayName = companyRaw.trim();
+      const company = normalizeCompany(displayName);
       if (!company) return acc;
       acc[company] = (acc[company] || 0) + (Number(r.tons) || 0);
       return acc;
     }, {});
 
+    const clientLabels = rows.reduce<Record<string, string>>((acc, r) => {
+      const companyRaw = r.company ?? '';
+      const displayName = companyRaw.trim();
+      const company = normalizeCompany(displayName);
+      if (!company || acc[company]) return acc;
+      acc[company] = displayName;
+      return acc;
+    }, {});
+
     const topClients = Object.entries(clientTotals)
-      .map(([name, tons]) => ({ name, tons }))
+      .map(([name, tons]) => ({ name: clientLabels[name] ?? name, tons }))
       .sort((a, b) => b.tons - a.tons)
       .slice(0, 3);
 
