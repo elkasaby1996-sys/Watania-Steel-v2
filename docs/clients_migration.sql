@@ -414,9 +414,13 @@ BEGIN
   SET client_id = c.id,
       site_id = s.id
   FROM public.clients c
-  LEFT JOIN public.client_sites s
-    ON s.client_id = c.id
-   AND s.name_normalized = public.normalize_client_value(o.site)
+  LEFT JOIN LATERAL (
+    SELECT id
+    FROM public.client_sites s
+    WHERE s.client_id = c.id
+      AND s.name_normalized = public.normalize_client_value(o.site)
+    LIMIT 1
+  ) s ON true
   WHERE o.client_id IS NULL
     AND public.normalize_client_value(o.company) = c.name_normalized;
 
@@ -424,9 +428,13 @@ BEGIN
   SET client_id = c.id,
       site_id = s.id
   FROM public.clients c
-  LEFT JOIN public.client_sites s
-    ON s.client_id = c.id
-   AND s.name_normalized = public.normalize_client_value(ho.site)
+  LEFT JOIN LATERAL (
+    SELECT id
+    FROM public.client_sites s
+    WHERE s.client_id = c.id
+      AND s.name_normalized = public.normalize_client_value(ho.site)
+    LIMIT 1
+  ) s ON true
   WHERE ho.client_id IS NULL
     AND public.normalize_client_value(ho.company) = c.name_normalized;
 END;
