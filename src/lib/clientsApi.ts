@@ -76,7 +76,7 @@ export interface ClientSiteSummary {
 
 export const clientsApi = {
   async getClientsSummary(searchText?: string): Promise<ClientSummary[]> {
-    const { data, error } = await supabase.rpc('get_clients_summary', {
+    const { data, error } = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
       search_text: searchText?.trim() || null,
     });
 
@@ -88,7 +88,7 @@ export const clientsApi = {
   },
 
   async getClientSummary(clientId: string): Promise<ClientSummaryDetail> {
-    const { data, error } = await supabase.rpc('get_client_summary', {
+    const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
       client_id: clientId,
     });
 
@@ -103,7 +103,7 @@ export const clientsApi = {
   },
 
   async getClientOrdersPage(clientId: string, limit = 50, offset = 0): Promise<ClientOrdersPage> {
-    const { data, error } = await supabase.rpc('get_client_orders_page', {
+    const { data, error } = await rpcWithRetry<ClientOrderRow[]>('get_client_orders_page', {
       client_id: clientId,
       limit_count: limit,
       offset_count: offset,
@@ -120,7 +120,7 @@ export const clientsApi = {
   },
 
   async getClientAnalytics(clientId: string): Promise<ClientAnalytics> {
-    const { data, error } = await supabase.rpc('get_client_analytics', {
+    const { data, error } = await rpcWithRetry<ClientAnalytics>('get_client_analytics', {
       client_id: clientId,
     });
 
@@ -135,7 +135,7 @@ export const clientsApi = {
   },
 
   async getClientSitesPerformance(clientId: string): Promise<ClientSitesPerformanceRow[]> {
-    const { data, error } = await supabase.rpc('get_client_sites_performance', {
+    const { data, error } = await rpcWithRetry<ClientSitesPerformanceRow[]>('get_client_sites_performance', {
       client_id: clientId,
     });
 

@@ -136,6 +136,17 @@ export function ClientSiteDetailsPage() {
     setOrdersPage(1);
   }, [siteId, clientId]);
 
+  useEffect(() => {
+    if (!editDialogOpen || !siteSummary) return;
+    setContactName(siteSummary.contact_name ?? '');
+    setContactPhone(siteSummary.contact_phone ?? '');
+    setContactEmail(siteSummary.contact_email ?? '');
+    setAddress(siteSummary.address ?? '');
+    setLocationText(siteSummary.location_text ?? '');
+    setGoogleMapsUrl(siteSummary.google_maps_url ?? '');
+    setNotes(siteSummary.notes ?? '');
+  }, [editDialogOpen, siteSummary]);
+
   const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
   const startRecord = ordersTotal > 0 ? (ordersPage - 1) * PAGE_SIZE + 1 : 0;
   const endRecord = Math.min(ordersPage * PAGE_SIZE, ordersTotal);
