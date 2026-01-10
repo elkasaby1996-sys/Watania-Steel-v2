@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useNavigate } from 'react-router-dom';
 import { formatNumber } from '@/lib/utils';
-import { clientsService, type ClientSummary } from '@/services/clientsService';
+import { clientsApi, type ClientSummary } from '@/lib/clientsApi';
 
 export function Clients() {
   const navigate = useNavigate();
@@ -14,13 +14,15 @@ export function Clients() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchClients = useCallback(async (searchText?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await clientsService.getClientsSummary(searchText);
+      const data = await clientsApi.getClientsSummary(searchText);
       setClients(data);
+      setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load clients');
       setClients([]);
@@ -40,6 +42,8 @@ export function Clients() {
   const handleClientClick = (clientId: string) => {
     navigate(`/clients/${clientId}`);
   };
+
+  const lastUpdatedLabel = lastUpdated ? lastUpdated.toLocaleString() : '—';
 
   // Loading State
   if (loading) {
@@ -146,6 +150,7 @@ export function Clients() {
           <p className="text-muted-foreground">
             Manage and analyze client relationships across all orders
           </p>
+          <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
         </div>
       </div>
 
