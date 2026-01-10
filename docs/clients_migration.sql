@@ -516,7 +516,7 @@ CREATE OR REPLACE FUNCTION public.get_client_orders_page(
   offset_count integer DEFAULT 0
 )
 RETURNS TABLE (
-  id uuid,
+  id text,
   date date,
   status text,
   amount numeric,
@@ -538,13 +538,14 @@ LANGUAGE sql
 STABLE
 AS $$
   WITH unified AS (
-    SELECT id, date, status, amount, tons, company, site, order_type, shift, delivered_at,
+    SELECT id::text AS id, date, status, amount, tons, company, site, order_type, shift, delivered_at,
       signed_delivery_note, delivery_number, driver_name, phone_number, customer_name,
+      -- Mixed id types across orders/history_orders require a text identifier.
       'orders'::text AS source
     FROM public.orders
     WHERE client_id = get_client_orders_page.client_id
     UNION ALL
-    SELECT id, date, status, amount, tons, company, site, order_type, shift, delivered_at,
+    SELECT id::text AS id, date, status, amount, tons, company, site, order_type, shift, delivered_at,
       signed_delivery_note, delivery_number, driver_name, phone_number, customer_name,
       'history_orders'::text AS source
     FROM public.history_orders
