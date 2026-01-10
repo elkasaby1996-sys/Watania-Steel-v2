@@ -66,8 +66,6 @@ export interface ClientSiteSummary {
   client_name: string;
   contact_name: string | null;
   contact_phone: string | null;
-  contact_email: string | null;
-  address: string | null;
   location_text: string | null;
   google_maps_url: string | null;
   notes: string | null;
@@ -75,34 +73,6 @@ export interface ClientSiteSummary {
   total_tons: number;
   last_order_date: string | null;
 }
-
-const rpcWithRetry = async <T>(
-  rpcName: string,
-  params: Record<string, unknown>,
-  retries = 2,
-  delayMs = 300
-): Promise<{ data: T | null; error: Error | null }> => {
-  let attempt = 0;
-  let lastError: Error | null = null;
-
-  while (attempt <= retries) {
-    const { data, error } = await supabase.rpc(rpcName, params);
-
-    if (!error) {
-      return { data: data as T, error: null };
-    }
-
-    lastError = error;
-
-    if (attempt < retries) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs * 2 ** attempt));
-    }
-
-    attempt += 1;
-  }
-
-  return { data: null, error: lastError };
-};
 
 export const clientsApi = {
   async getClientsSummary(searchText?: string): Promise<ClientSummary[]> {
@@ -177,7 +147,7 @@ export const clientsApi = {
   },
 
   async getClientSiteSummary(clientId: string, siteId: string): Promise<ClientSiteSummary> {
-    const { data, error } = await rpcWithRetry<ClientSiteSummary[]>('get_client_site_summary', {
+    const { data, error } = await supabase.rpc('get_client_site_summary', {
       client_id: clientId,
       site_id: siteId,
     });

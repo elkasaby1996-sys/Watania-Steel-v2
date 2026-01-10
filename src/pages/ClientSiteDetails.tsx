@@ -18,14 +18,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { clientsApi, type ClientOrderRow, type ClientSiteSummary } from '@/lib/clientsApi';
 import { hasPermission } from '@/lib/auth';
@@ -55,12 +47,9 @@ export function ClientSiteDetailsPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [address, setAddress] = useState('');
   const [locationText, setLocationText] = useState('');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
   const [notes, setNotes] = useState('');
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const fetchSiteSummary = useCallback(async () => {
     if (!clientId || !siteId) return;
@@ -74,8 +63,6 @@ export function ClientSiteDetailsPage() {
       setOrdersTotal(siteData.total_orders);
       setContactName(siteData.contact_name ?? '');
       setContactPhone(siteData.contact_phone ?? '');
-      setContactEmail(siteData.contact_email ?? '');
-      setAddress(siteData.address ?? '');
       setLocationText(siteData.location_text ?? '');
       setGoogleMapsUrl(siteData.google_maps_url ?? '');
       setNotes(siteData.notes ?? '');
@@ -207,8 +194,6 @@ export function ClientSiteDetailsPage() {
         .update({
           contact_name: contactName.trim() || null,
           contact_phone: contactPhone.trim() || null,
-          contact_email: contactEmail.trim() || null,
-          address: address.trim() || null,
           location_text: locationText.trim() || null,
           google_maps_url: googleMapsUrl.trim() || null,
           notes: notes.trim() || null,
@@ -226,8 +211,6 @@ export function ClientSiteDetailsPage() {
               ...prev,
               contact_name: contactName.trim() || null,
               contact_phone: contactPhone.trim() || null,
-              contact_email: contactEmail.trim() || null,
-              address: address.trim() || null,
               location_text: locationText.trim() || null,
               google_maps_url: googleMapsUrl.trim() || null,
               notes: notes.trim() || null,
@@ -235,7 +218,6 @@ export function ClientSiteDetailsPage() {
           : prev
       );
       setLastUpdated(new Date());
-      setEditDialogOpen(false);
       toast({
         title: 'Site details updated',
         description: 'Contact and location information saved successfully.',
@@ -373,154 +355,74 @@ export function ClientSiteDetailsPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle>Site Details</CardTitle>
-              <CardDescription>Contact and location information</CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => setEditDialogOpen(true)}
-              disabled={!canEdit}
-              title={!canEdit ? 'Editors or admins can edit site details.' : undefined}
-            >
-              Edit Site Details
-            </Button>
-          </div>
+          <CardTitle>Site Details</CardTitle>
+          <CardDescription>Update site contact and location information</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
+          <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <p className="text-muted-foreground">Contact Name</p>
-              <p className="font-medium text-foreground">{siteSummary.contact_name || 'N/A'}</p>
+              <Label htmlFor="contactName">Contact Name</Label>
+              <Input
+                id="contactName"
+                value={contactName}
+                onChange={(event) => setContactName(event.target.value)}
+                placeholder="Site contact name"
+                disabled={!canEdit || saving}
+              />
             </div>
             <div className="space-y-2">
-              <p className="text-muted-foreground">Contact Phone</p>
-              <p className="font-medium text-foreground">{siteSummary.contact_phone || 'N/A'}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-muted-foreground">Contact Email</p>
-              <p className="font-medium text-foreground">{siteSummary.contact_email || 'N/A'}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-muted-foreground">Address</p>
-              <p className="font-medium text-foreground">{siteSummary.address || 'N/A'}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-muted-foreground">Location Notes</p>
-              <p className="font-medium text-foreground">{siteSummary.location_text || 'N/A'}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-muted-foreground">Google Maps</p>
-              {siteSummary.google_maps_url ? (
-                <Button variant="link" className="h-auto p-0" asChild>
-                  <a href={siteSummary.google_maps_url} target="_blank" rel="noreferrer">
-                    Open in Google Maps
-                  </a>
-                </Button>
-              ) : (
-                <p className="font-medium text-foreground">N/A</p>
-              )}
+              <Label htmlFor="contactPhone">Contact Phone</Label>
+              <Input
+                id="contactPhone"
+                value={contactPhone}
+                onChange={(event) => setContactPhone(event.target.value)}
+                placeholder="Contact phone number"
+                disabled={!canEdit || saving}
+              />
             </div>
           </div>
           <div className="space-y-2">
-            <p className="text-muted-foreground text-sm">Notes</p>
-            <p className="text-sm text-foreground">{siteSummary.notes || 'N/A'}</p>
+            <Label htmlFor="locationText">Location Description</Label>
+            <Input
+              id="locationText"
+              value={locationText}
+              onChange={(event) => setLocationText(event.target.value)}
+              placeholder="Street, landmark, or directions"
+              disabled={!canEdit || saving}
+            />
           </div>
-        </CardContent>
-      </Card>
-
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Site Details</DialogTitle>
-            <DialogDescription>Update contact and location details for this site.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="contactName">Contact Name</Label>
-                <Input
-                  id="contactName"
-                  value={contactName}
-                  onChange={(event) => setContactName(event.target.value)}
-                  placeholder="Site contact name"
-                  disabled={!canEdit || saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="contactPhone">Contact Phone</Label>
-                <Input
-                  id="contactPhone"
-                  value={contactPhone}
-                  onChange={(event) => setContactPhone(event.target.value)}
-                  placeholder="Contact phone number"
-                  disabled={!canEdit || saving}
-                />
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="contactEmail">Contact Email</Label>
-                <Input
-                  id="contactEmail"
-                  value={contactEmail}
-                  onChange={(event) => setContactEmail(event.target.value)}
-                  placeholder="contact@example.com"
-                  disabled={!canEdit || saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  value={address}
-                  onChange={(event) => setAddress(event.target.value)}
-                  placeholder="Street address"
-                  disabled={!canEdit || saving}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="locationText">Location Description</Label>
-              <Input
-                id="locationText"
-                value={locationText}
-                onChange={(event) => setLocationText(event.target.value)}
-                placeholder="Street, landmark, or directions"
-                disabled={!canEdit || saving}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="googleMapsUrl">Google Maps URL</Label>
-              <Input
-                id="googleMapsUrl"
-                value={googleMapsUrl}
-                onChange={(event) => setGoogleMapsUrl(event.target.value)}
-                placeholder="https://maps.google.com/..."
-                disabled={!canEdit || saving}
-              />
-              {googleMapsUrl && (
-                <Button variant="link" className="h-auto p-0" asChild>
-                  <a href={googleMapsUrl} target="_blank" rel="noreferrer">
-                    Open in Google Maps
-                  </a>
-                </Button>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <textarea
-                id="notes"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Additional site notes"
-                disabled={!canEdit || saving}
-                className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="googleMapsUrl">Google Maps URL</Label>
+            <Input
+              id="googleMapsUrl"
+              value={googleMapsUrl}
+              onChange={(event) => setGoogleMapsUrl(event.target.value)}
+              placeholder="https://maps.google.com/..."
+              disabled={!canEdit || saving}
+            />
+            {googleMapsUrl && (
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm text-primary hover:underline"
+              >
+                Open Google Maps
+              </a>
+            )}
           </div>
-          <DialogFooter className="flex flex-wrap justify-between gap-2">
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <textarea
+              id="notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Additional site notes"
+              disabled={!canEdit || saving}
+              className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+          <div className="flex items-center justify-between flex-wrap gap-2">
             {!canEdit && (
               <p className="text-sm text-muted-foreground">
                 You need editor or admin access to update site details.
@@ -529,9 +431,9 @@ export function ClientSiteDetailsPage() {
             <Button onClick={handleSaveDetails} disabled={!canEdit || saving}>
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
