@@ -10,20 +10,13 @@ import {
   Loader2,
   MapPin,
   Package,
-  Save,
   Weight,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  clientsApi,
-  type ClientOrderRow,
-  type ClientSiteSummary,
-  type ClientSiteUpdate,
-} from '@/lib/clientsApi';
+import { clientsApi, type ClientOrderRow, type ClientSitesPerformanceRow, type ClientSummaryDetail } from '@/lib/clientsApi';
 import { formatNumber } from '@/lib/utils';
 
 const PAGE_SIZE = 25;
@@ -32,7 +25,8 @@ export function ClientSiteDetailsPage() {
   const { clientId, siteId } = useParams<{ clientId: string; siteId: string }>();
   const navigate = useNavigate();
 
-  const [siteSummary, setSiteSummary] = useState<ClientSiteSummary | null>(null);
+  const [clientSummary, setClientSummary] = useState<ClientSummaryDetail | null>(null);
+  const [sitePerformance, setSitePerformance] = useState<ClientSitesPerformanceRow | null>(null);
   const [orders, setOrders] = useState<ClientOrderRow[]>([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersPage, setOrdersPage] = useState(1);
@@ -42,9 +36,6 @@ export function ClientSiteDetailsPage() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [formState, setFormState] = useState<ClientSiteUpdate>({});
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   const fetchSiteSummary = useCallback(async () => {
     if (!clientId || !siteId) return;
@@ -53,20 +44,25 @@ export function ClientSiteDetailsPage() {
     setError(null);
 
     try {
-      const data = await clientsApi.getClientSiteSummary(clientId, siteId);
-      setSiteSummary(data);
-      setOrdersTotal(data.total_orders);
-      setFormState({
-        contact_name: data.contact_name,
-        contact_phone: data.contact_phone,
-        location_text: data.location_text,
-        google_maps_url: data.google_maps_url,
-        notes: data.notes,
-      });
+      const [summaryData, siteRows] = await Promise.all([
+        clientsApi.getClientSummary(clientId),
+        clientsApi.getClientSitesPerformance(clientId),
+      ]);
+
+      const siteRow = siteRows.find((row) => row.site_id === siteId) || null;
+
+      if (!siteRow) {
+        throw new Error('Site not found for this client');
+      }
+
+      setClientSummary(summaryData);
+      setSitePerformance(siteRow);
+      setOrdersTotal(siteRow.total_orders);
       setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load site details');
-      setSiteSummary(null);
+      setClientSummary(null);
+      setSitePerformance(null);
       setOrdersTotal(0);
     } finally {
       setLoading(false);
@@ -74,12 +70,12 @@ export function ClientSiteDetailsPage() {
   }, [clientId, siteId]);
 
   const fetchSiteOrders = useCallback(async () => {
-    if (!clientId || !siteSummary) return;
+    if (!clientId || !sitePerformance) return;
 
     setOrdersLoading(true);
     setOrdersError(null);
 
-    if (siteSummary.total_orders === 0) {
+    if (sitePerformance.total_orders === 0) {
       setOrders([]);
       setOrdersLoading(false);
       return;
@@ -102,7 +98,7 @@ export function ClientSiteDetailsPage() {
           break;
         }
 
-        collected.push(...pageRows.filter((row) => row.site === siteSummary.site_name));
+        collected.push(...pageRows.filter((row) => row.site === sitePerformance.site_name));
         offset += PAGE_SIZE;
         attempts += 1;
 
@@ -112,14 +108,14 @@ export function ClientSiteDetailsPage() {
       }
 
       setOrders(collected.slice(targetOffset, targetEnd));
-      setOrdersTotal(siteSummary.total_orders);
+      setOrdersTotal(sitePerformance.total_orders);
     } catch (err) {
       setOrdersError(err instanceof Error ? err.message : 'Failed to load site orders');
       setOrders([]);
     } finally {
       setOrdersLoading(false);
     }
-  }, [clientId, ordersPage, siteSummary]);
+  }, [clientId, ordersPage, sitePerformance]);
 
   useEffect(() => {
     fetchSiteSummary();
@@ -160,26 +156,6 @@ export function ClientSiteDetailsPage() {
     setOrdersPage((prev) => Math.min(totalPages, prev + 1));
   };
 
-  const handleInputChange = (field: keyof ClientSiteUpdate) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormState((prev) => ({ ...prev, [field]: event.target.value }));
-  };
-
-  const handleSave = async () => {
-    if (!siteId) return;
-
-    setSaving(true);
-    setSaveError(null);
-
-    try {
-      const updated = await clientsApi.updateClientSite(siteId, formState);
-      setSiteSummary((prev) => (prev ? { ...prev, ...updated } : prev));
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save updates');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -209,7 +185,7 @@ export function ClientSiteDetailsPage() {
     );
   }
 
-  if (error || !siteSummary) {
+  if (error || !sitePerformance || !clientSummary) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -252,17 +228,17 @@ export function ClientSiteDetailsPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(`/clients/${siteSummary.client_id}`)}
+          onClick={() => navigate(`/clients/${clientSummary.client_id}`)}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />
           Back to Client
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">{siteSummary.site_name}</h1>
+          <h1 className="text-3xl font-headline font-bold text-foreground">{sitePerformance.site_name}</h1>
           <p className="text-muted-foreground flex items-center gap-2">
             <Building2 className="h-4 w-4" />
-            {siteSummary.client_name}
+            {clientSummary.client_name}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
         </div>
@@ -273,7 +249,7 @@ export function ClientSiteDetailsPage() {
           <CardContent className="pt-4">
             <div className="text-center">
               <Package className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{siteSummary.total_orders.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-foreground">{sitePerformance.total_orders.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground">Total Orders</p>
             </div>
           </CardContent>
@@ -283,7 +259,7 @@ export function ClientSiteDetailsPage() {
           <CardContent className="pt-4">
             <div className="text-center">
               <Weight className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{formatNumber(siteSummary.total_tons)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatNumber(sitePerformance.total_tons)}</p>
               <p className="text-xs text-muted-foreground">Total Tons</p>
             </div>
           </CardContent>
@@ -293,81 +269,12 @@ export function ClientSiteDetailsPage() {
           <CardContent className="pt-4">
             <div className="text-center">
               <MapPin className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-lg font-bold text-foreground">{siteSummary.last_order_date || 'N/A'}</p>
+              <p className="text-lg font-bold text-foreground">{sitePerformance.last_order_date || 'N/A'}</p>
               <p className="text-xs text-muted-foreground">Last Order</p>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Site Information</CardTitle>
-          <CardDescription>Update contact and location details for this site</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {saveError && (
-            <div className="flex items-center gap-2 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4" />
-              {saveError}
-            </div>
-          )}
-          <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">Contact Name</label>
-            <Input
-              value={formState.contact_name ?? ''}
-              onChange={handleInputChange('contact_name')}
-              placeholder="Site contact"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">Contact Phone</label>
-            <Input
-              value={formState.contact_phone ?? ''}
-              onChange={handleInputChange('contact_phone')}
-              placeholder="+974 ..."
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">Location</label>
-            <Input
-              value={formState.location_text ?? ''}
-              onChange={handleInputChange('location_text')}
-              placeholder="Site address or notes"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">Google Maps URL</label>
-            <Input
-              value={formState.google_maps_url ?? ''}
-              onChange={handleInputChange('google_maps_url')}
-              placeholder="https://maps.google.com/..."
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">Notes</label>
-            <textarea
-              value={formState.notes ?? ''}
-              onChange={handleInputChange('notes')}
-              placeholder="Additional notes"
-              className="min-h-[120px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {formState.google_maps_url ? (
-              <Button variant="outline" asChild>
-                <a href={formState.google_maps_url} target="_blank" rel="noreferrer">
-                  Open in Google Maps
-                </a>
-              </Button>
-            ) : null}
-            <Button onClick={handleSave} disabled={saving}>
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -488,7 +395,6 @@ export function ClientSiteDetailsPage() {
           )}
         </CardContent>
       </Card>
-
     </div>
   );
 }

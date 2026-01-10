@@ -148,6 +148,7 @@ export function ClientProfilePage() {
   const kpis = {
     totalOrders: summary?.total_orders ?? 0,
     totalTons: summary?.total_tons ?? 0,
+    totalAmount: summary?.total_amount ?? 0,
     sites: summary?.unique_sites ?? 0,
     lastOrderDate: summary?.last_order_date ?? 'N/A',
   };
@@ -484,6 +485,10 @@ export function ClientProfilePage() {
                   <span className="font-medium text-foreground">{formatNumber(kpis.totalTons)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Total Amount</span>
+                  <span className="font-medium text-foreground">QAR {formatNumber(kpis.totalAmount)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Sites</span>
                   <span className="font-medium text-foreground">{kpis.sites}</span>
                 </div>
@@ -508,10 +513,6 @@ export function ClientProfilePage() {
                     <TableHeader>
                       <TableRow className="border-border">
                         <TableHead className="text-foreground">Site</TableHead>
-                        <TableHead className="text-foreground">Contact</TableHead>
-                        <TableHead className="text-foreground">Phone</TableHead>
-                        <TableHead className="text-foreground">Location</TableHead>
-                        <TableHead className="text-foreground">Maps</TableHead>
                         <TableHead className="text-foreground text-right">Orders</TableHead>
                         <TableHead className="text-foreground text-right">Tons</TableHead>
                         <TableHead className="text-foreground">Last Order</TableHead>
@@ -529,22 +530,6 @@ export function ClientProfilePage() {
                             <span className="font-medium max-w-[300px] truncate" title={row.site_name}>
                               {row.site_name}
                             </span>
-                          </TableCell>
-                          <TableCell className="max-w-[160px] truncate" title={row.contact_name || ''}>
-                            {row.contact_name || '—'}
-                          </TableCell>
-                          <TableCell className="max-w-[140px] truncate" title={row.contact_phone || ''}>
-                            {row.contact_phone || '—'}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate" title={row.location_text || ''}>
-                            {row.location_text || '—'}
-                          </TableCell>
-                          <TableCell>
-                            {row.google_maps_url ? (
-                              <span className="text-primary underline">Map</span>
-                            ) : (
-                              '—'
-                            )}
                           </TableCell>
                           <TableCell className="text-right">{row.total_orders.toLocaleString()}</TableCell>
                           <TableCell className="text-right">{formatNumber(row.total_tons)}</TableCell>
