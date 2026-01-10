@@ -36,7 +36,6 @@ export function ClientSiteDetailsPage() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const displayValue = (value?: string | null) => (value && value.trim() ? value : '—');
 
   const fetchSiteSummary = useCallback(async () => {
     if (!clientId || !siteId) return;
@@ -276,39 +275,6 @@ export function ClientSiteDetailsPage() {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Site Information</CardTitle>
-          <CardDescription>Contact and delivery details for this site</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-between items-center py-2 border-b border-border">
-            <span className="text-muted-foreground">Address</span>
-            <span className="font-medium text-foreground text-right max-w-[60%]">
-              {displayValue(sitePerformance.address)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-border">
-            <span className="text-muted-foreground">Contact Name</span>
-            <span className="font-medium text-foreground">{displayValue(sitePerformance.contact_name)}</span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-border">
-            <span className="text-muted-foreground">Contact Phone</span>
-            <span className="font-medium text-foreground">{displayValue(sitePerformance.contact_phone)}</span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-border">
-            <span className="text-muted-foreground">Contact Email</span>
-            <span className="font-medium text-foreground">{displayValue(sitePerformance.contact_email)}</span>
-          </div>
-          <div className="flex justify-between items-start py-2">
-            <span className="text-muted-foreground">Notes</span>
-            <span className="font-medium text-foreground text-right max-w-[60%] whitespace-pre-wrap">
-              {displayValue(sitePerformance.notes)}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>

@@ -148,6 +148,7 @@ export function ClientProfilePage() {
   const kpis = {
     totalOrders: summary?.total_orders ?? 0,
     totalTons: summary?.total_tons ?? 0,
+    totalAmount: summary?.total_amount ?? 0,
     sites: summary?.unique_sites ?? 0,
     lastOrderDate: summary?.last_order_date ?? 'N/A',
   };
@@ -482,6 +483,10 @@ export function ClientProfilePage() {
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Total Tons</span>
                   <span className="font-medium text-foreground">{formatNumber(kpis.totalTons)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Total Amount</span>
+                  <span className="font-medium text-foreground">QAR {formatNumber(kpis.totalAmount)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Sites</span>

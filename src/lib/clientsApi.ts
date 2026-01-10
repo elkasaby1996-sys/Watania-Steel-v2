@@ -14,6 +14,7 @@ export interface ClientSummaryDetail {
   client_name: string;
   total_orders: number;
   total_tons: number;
+  total_amount: number;
   unique_sites: number;
   last_order_date: string | null;
 }
@@ -22,6 +23,7 @@ export interface ClientOrderRow {
   id: string;
   date: string | null;
   status: string | null;
+  amount: number | null;
   tons: number | null;
   company: string | null;
   site: string | null;
@@ -45,11 +47,6 @@ export interface ClientOrdersPage {
 export interface ClientSitesPerformanceRow {
   site_id: string;
   site_name: string;
-  contact_name: string | null;
-  contact_phone: string | null;
-  contact_email: string | null;
-  address: string | null;
-  notes: string | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
@@ -57,6 +54,7 @@ export interface ClientSitesPerformanceRow {
 
 export interface ClientAnalytics {
   monthly_tons: { month: string; tons: number }[];
+  monthly_amount: { month: string; amount: number }[];
   status_breakdown: { status: string; count: number; percentage: number }[];
   order_type_breakdown: { order_type: string; count: number; tons: number }[];
   shift_breakdown: { shift: string; count: number; tons: number }[];
