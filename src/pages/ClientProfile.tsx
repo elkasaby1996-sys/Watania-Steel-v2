@@ -109,6 +109,9 @@ export function ClientProfilePage() {
       const analyticsData = await clientsApi.getClientAnalytics(clientId);
       setAnalytics(analyticsData);
     } catch (err) {
+      if (err instanceof Error) {
+        console.error('Failed to load client analytics:', err.message);
+      }
       setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
       setAnalytics(null);
     } finally {
@@ -148,12 +151,23 @@ export function ClientProfilePage() {
   const kpis = {
     totalOrders: summary?.total_orders ?? 0,
     totalTons: summary?.total_tons ?? 0,
-    totalAmount: summary?.total_amount ?? 0,
     sites: summary?.unique_sites ?? 0,
     lastOrderDate: summary?.last_order_date ?? 'N/A',
   };
 
   const statusBreakdown = useMemo(() => analytics?.status_breakdown || [], [analytics]);
+  const statusTotal = useMemo(
+    () => statusBreakdown.reduce((total, row) => total + row.count, 0),
+    [statusBreakdown]
+  );
+  const statusBreakdownWithPercentage = useMemo(
+    () =>
+      statusBreakdown.map((row) => ({
+        ...row,
+        percentage: statusTotal > 0 ? (row.count / statusTotal) * 100 : 0,
+      })),
+    [statusBreakdown, statusTotal]
+  );
   const orderTypeBreakdown = useMemo(() => analytics?.order_type_breakdown || [], [analytics]);
   const shiftBreakdown = useMemo(() => analytics?.shift_breakdown || [], [analytics]);
   const diameterBreakdown = useMemo(() => analytics?.diameter_breakdown || [], [analytics]);
@@ -485,10 +499,6 @@ export function ClientProfilePage() {
                   <span className="font-medium text-foreground">{formatNumber(kpis.totalTons)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Total Amount</span>
-                  <span className="font-medium text-foreground">QAR {formatNumber(kpis.totalAmount)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Sites</span>
                   <span className="font-medium text-foreground">{kpis.sites}</span>
                 </div>
@@ -631,7 +641,7 @@ export function ClientProfilePage() {
                 <CardDescription>Order count per status</CardDescription>
               </CardHeader>
               <CardContent>
-                {statusBreakdown.length > 0 ? (
+                {statusBreakdownWithPercentage.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow className="border-border">
@@ -641,7 +651,7 @@ export function ClientProfilePage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {statusBreakdown.map((row) => (
+                      {statusBreakdownWithPercentage.map((row) => (
                         <TableRow key={row.status} className="border-border">
                           <TableCell>
                             <Badge className={`${getStatusBadge(row.status)} border`}>
