@@ -125,8 +125,6 @@ AS $$
   ORDER BY total_tons DESC, site_name ASC;
 $$;
 
-DROP FUNCTION IF EXISTS public.get_client_orders_page(uuid, integer, integer);
-
 CREATE OR REPLACE FUNCTION public.get_client_orders_page(
   client_id uuid,
   limit_count integer DEFAULT 50,
