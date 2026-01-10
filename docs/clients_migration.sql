@@ -391,7 +391,8 @@ BEGIN
         updated_at = now();
 
   INSERT INTO public.client_sites (client_id, name, name_normalized, created_at, updated_at)
-  SELECT DISTINCT c.id,
+  SELECT DISTINCT ON (c.id, public.normalize_client_value(combined.site))
+    c.id,
     trim(combined.site) AS name,
     public.normalize_client_value(combined.site) AS name_normalized,
     now(),
@@ -404,6 +405,7 @@ BEGIN
   JOIN public.clients c
     ON c.name_normalized = public.normalize_client_value(combined.company)
   WHERE public.normalize_client_value(combined.site) IS NOT NULL
+  ORDER BY c.id, public.normalize_client_value(combined.site), trim(combined.site)
   ON CONFLICT (client_id, name_normalized) DO UPDATE
     SET name = EXCLUDED.name,
         updated_at = now();
