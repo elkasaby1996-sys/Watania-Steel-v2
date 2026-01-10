@@ -14,7 +14,6 @@ export interface ClientSummaryDetail {
   client_name: string;
   total_orders: number;
   total_tons: number;
-  total_amount: number;
   unique_sites: number;
   last_order_date: string | null;
 }
@@ -23,7 +22,6 @@ export interface ClientOrderRow {
   id: string;
   date: string | null;
   status: string | null;
-  amount: number | null;
   tons: number | null;
   company: string | null;
   site: string | null;
@@ -54,17 +52,61 @@ export interface ClientSitesPerformanceRow {
 
 export interface ClientAnalytics {
   monthly_tons: { month: string; tons: number }[];
-  monthly_amount: { month: string; amount: number }[];
-  status_breakdown: { status: string; count: number; percentage: number }[];
+  status_breakdown: { status: string; count: number }[];
   order_type_breakdown: { order_type: string; count: number; tons: number }[];
   shift_breakdown: { shift: string; count: number; tons: number }[];
   diameter_breakdown: { diameter: string; tons: number; percentage: number }[];
   diameter_totals: { total_breakdown_tons: number; total_order_tons: number; has_mismatch: boolean };
 }
 
+export interface ClientSiteSummary {
+  site_id: string;
+  site_name: string;
+  client_id: string;
+  client_name: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
+  location_text: string | null;
+  google_maps_url: string | null;
+  notes: string | null;
+  total_orders: number;
+  total_tons: number;
+  last_order_date: string | null;
+}
+
+const rpcWithRetry = async <T>(
+  rpcName: string,
+  params: Record<string, unknown>,
+  retries = 2,
+  delayMs = 300
+): Promise<{ data: T | null; error: Error | null }> => {
+  let attempt = 0;
+  let lastError: Error | null = null;
+
+  while (attempt <= retries) {
+    const { data, error } = await supabase.rpc(rpcName, params);
+
+    if (!error) {
+      return { data: data as T, error: null };
+    }
+
+    lastError = error;
+
+    if (attempt < retries) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs * 2 ** attempt));
+    }
+
+    attempt += 1;
+  }
+
+  return { data: null, error: lastError };
+};
+
 export const clientsApi = {
   async getClientsSummary(searchText?: string): Promise<ClientSummary[]> {
-    const { data, error } = await supabase.rpc('get_clients_summary', {
+    const { data, error } = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
       search_text: searchText?.trim() || null,
     });
 
@@ -76,7 +118,7 @@ export const clientsApi = {
   },
 
   async getClientSummary(clientId: string): Promise<ClientSummaryDetail> {
-    const { data, error } = await supabase.rpc('get_client_summary', {
+    const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
       client_id: clientId,
     });
 
@@ -91,7 +133,7 @@ export const clientsApi = {
   },
 
   async getClientOrdersPage(clientId: string, limit = 50, offset = 0): Promise<ClientOrdersPage> {
-    const { data, error } = await supabase.rpc('get_client_orders_page', {
+    const { data, error } = await rpcWithRetry<ClientOrderRow[]>('get_client_orders_page', {
       client_id: clientId,
       limit_count: limit,
       offset_count: offset,
@@ -108,11 +150,14 @@ export const clientsApi = {
   },
 
   async getClientAnalytics(clientId: string): Promise<ClientAnalytics> {
-    const { data, error } = await supabase.rpc('get_client_analytics', {
+    const { data, error } = await rpcWithRetry<ClientAnalytics>('get_client_analytics', {
       client_id: clientId,
     });
 
     if (error || !data) {
+      if (error) {
+        console.error('get_client_analytics error:', error.message);
+      }
       throw error || new Error('Unable to load analytics');
     }
 
@@ -120,7 +165,7 @@ export const clientsApi = {
   },
 
   async getClientSitesPerformance(clientId: string): Promise<ClientSitesPerformanceRow[]> {
-    const { data, error } = await supabase.rpc('get_client_sites_performance', {
+    const { data, error } = await rpcWithRetry<ClientSitesPerformanceRow[]>('get_client_sites_performance', {
       client_id: clientId,
     });
 
@@ -129,5 +174,21 @@ export const clientsApi = {
     }
 
     return (data || []) as ClientSitesPerformanceRow[];
+  },
+
+  async getClientSiteSummary(clientId: string, siteId: string): Promise<ClientSiteSummary> {
+    const { data, error } = await rpcWithRetry<ClientSiteSummary[]>('get_client_site_summary', {
+      client_id: clientId,
+      site_id: siteId,
+    });
+
+    const rows = (data || []) as ClientSiteSummary[];
+    const row = rows[0];
+
+    if (error || !row) {
+      throw error || new Error('Unable to load site summary');
+    }
+
+    return row;
   },
 };

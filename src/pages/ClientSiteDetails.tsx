@@ -15,18 +15,34 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { clientsApi, type ClientOrderRow, type ClientSitesPerformanceRow, type ClientSummaryDetail } from '@/lib/clientsApi';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { clientsApi, type ClientOrderRow, type ClientSiteSummary } from '@/lib/clientsApi';
+import { hasPermission } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { formatNumber } from '@/lib/utils';
+import { useAuthStore } from '@/stores/authStore';
 
 const PAGE_SIZE = 25;
 
 export function ClientSiteDetailsPage() {
   const { clientId, siteId } = useParams<{ clientId: string; siteId: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuthStore();
+  const canEdit = hasPermission(user?.profile?.role, 'edit');
 
-  const [clientSummary, setClientSummary] = useState<ClientSummaryDetail | null>(null);
-  const [sitePerformance, setSitePerformance] = useState<ClientSitesPerformanceRow | null>(null);
+  const [siteSummary, setSiteSummary] = useState<ClientSiteSummary | null>(null);
   const [orders, setOrders] = useState<ClientOrderRow[]>([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersPage, setOrdersPage] = useState(1);
@@ -35,7 +51,16 @@ export function ClientSiteDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [address, setAddress] = useState('');
+  const [locationText, setLocationText] = useState('');
+  const [googleMapsUrl, setGoogleMapsUrl] = useState('');
+  const [notes, setNotes] = useState('');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const fetchSiteSummary = useCallback(async () => {
     if (!clientId || !siteId) return;
@@ -44,25 +69,20 @@ export function ClientSiteDetailsPage() {
     setError(null);
 
     try {
-      const [summaryData, siteRows] = await Promise.all([
-        clientsApi.getClientSummary(clientId),
-        clientsApi.getClientSitesPerformance(clientId),
-      ]);
-
-      const siteRow = siteRows.find((row) => row.site_id === siteId) || null;
-
-      if (!siteRow) {
-        throw new Error('Site not found for this client');
-      }
-
-      setClientSummary(summaryData);
-      setSitePerformance(siteRow);
-      setOrdersTotal(siteRow.total_orders);
+      const siteData = await clientsApi.getClientSiteSummary(clientId, siteId);
+      setSiteSummary(siteData);
+      setOrdersTotal(siteData.total_orders);
+      setContactName(siteData.contact_name ?? '');
+      setContactPhone(siteData.contact_phone ?? '');
+      setContactEmail(siteData.contact_email ?? '');
+      setAddress(siteData.address ?? '');
+      setLocationText(siteData.location_text ?? '');
+      setGoogleMapsUrl(siteData.google_maps_url ?? '');
+      setNotes(siteData.notes ?? '');
       setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load site details');
-      setClientSummary(null);
-      setSitePerformance(null);
+      setSiteSummary(null);
       setOrdersTotal(0);
     } finally {
       setLoading(false);
@@ -70,12 +90,12 @@ export function ClientSiteDetailsPage() {
   }, [clientId, siteId]);
 
   const fetchSiteOrders = useCallback(async () => {
-    if (!clientId || !sitePerformance) return;
+    if (!clientId || !siteSummary) return;
 
     setOrdersLoading(true);
     setOrdersError(null);
 
-    if (sitePerformance.total_orders === 0) {
+    if (siteSummary.total_orders === 0) {
       setOrders([]);
       setOrdersLoading(false);
       return;
@@ -98,7 +118,7 @@ export function ClientSiteDetailsPage() {
           break;
         }
 
-        collected.push(...pageRows.filter((row) => row.site === sitePerformance.site_name));
+        collected.push(...pageRows.filter((row) => row.site === siteSummary.site_name));
         offset += PAGE_SIZE;
         attempts += 1;
 
@@ -108,14 +128,14 @@ export function ClientSiteDetailsPage() {
       }
 
       setOrders(collected.slice(targetOffset, targetEnd));
-      setOrdersTotal(sitePerformance.total_orders);
+      setOrdersTotal(siteSummary.total_orders);
     } catch (err) {
       setOrdersError(err instanceof Error ? err.message : 'Failed to load site orders');
       setOrders([]);
     } finally {
       setOrdersLoading(false);
     }
-  }, [clientId, ordersPage, sitePerformance]);
+  }, [clientId, ordersPage, siteSummary]);
 
   useEffect(() => {
     fetchSiteSummary();
@@ -128,6 +148,17 @@ export function ClientSiteDetailsPage() {
   useEffect(() => {
     setOrdersPage(1);
   }, [siteId, clientId]);
+
+  useEffect(() => {
+    if (!editDialogOpen || !siteSummary) return;
+    setContactName(siteSummary.contact_name ?? '');
+    setContactPhone(siteSummary.contact_phone ?? '');
+    setContactEmail(siteSummary.contact_email ?? '');
+    setAddress(siteSummary.address ?? '');
+    setLocationText(siteSummary.location_text ?? '');
+    setGoogleMapsUrl(siteSummary.google_maps_url ?? '');
+    setNotes(siteSummary.notes ?? '');
+  }, [editDialogOpen, siteSummary]);
 
   const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
   const startRecord = ordersTotal > 0 ? (ordersPage - 1) * PAGE_SIZE + 1 : 0;
@@ -154,6 +185,70 @@ export function ClientSiteDetailsPage() {
 
   const handleNextPage = () => {
     setOrdersPage((prev) => Math.min(totalPages, prev + 1));
+  };
+
+  const handleSaveDetails = async () => {
+    if (!siteSummary) return;
+
+    if (!canEdit) {
+      toast({
+        title: 'Permission denied',
+        description: 'You need editor or admin access to update site details.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const { error: updateError } = await supabase
+        .from('client_sites')
+        .update({
+          contact_name: contactName.trim() || null,
+          contact_phone: contactPhone.trim() || null,
+          contact_email: contactEmail.trim() || null,
+          address: address.trim() || null,
+          location_text: locationText.trim() || null,
+          google_maps_url: googleMapsUrl.trim() || null,
+          notes: notes.trim() || null,
+        })
+        .eq('id', siteSummary.site_id)
+        .eq('client_id', siteSummary.client_id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setSiteSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              contact_name: contactName.trim() || null,
+              contact_phone: contactPhone.trim() || null,
+              contact_email: contactEmail.trim() || null,
+              address: address.trim() || null,
+              location_text: locationText.trim() || null,
+              google_maps_url: googleMapsUrl.trim() || null,
+              notes: notes.trim() || null,
+            }
+          : prev
+      );
+      setLastUpdated(new Date());
+      setEditDialogOpen(false);
+      toast({
+        title: 'Site details updated',
+        description: 'Contact and location information saved successfully.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Failed to save',
+        description: err instanceof Error ? err.message : 'Unable to update site details.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -185,7 +280,7 @@ export function ClientSiteDetailsPage() {
     );
   }
 
-  if (error || !sitePerformance || !clientSummary) {
+  if (error || !siteSummary) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -228,17 +323,17 @@ export function ClientSiteDetailsPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(`/clients/${clientSummary.client_id}`)}
+          onClick={() => navigate(`/clients/${siteSummary.client_id}`)}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />
           Back to Client
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">{sitePerformance.site_name}</h1>
+          <h1 className="text-3xl font-headline font-bold text-foreground">{siteSummary.site_name}</h1>
           <p className="text-muted-foreground flex items-center gap-2">
             <Building2 className="h-4 w-4" />
-            {clientSummary.client_name}
+            {siteSummary.client_name}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
         </div>
@@ -249,7 +344,7 @@ export function ClientSiteDetailsPage() {
           <CardContent className="pt-4">
             <div className="text-center">
               <Package className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{sitePerformance.total_orders.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-foreground">{siteSummary.total_orders.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground">Total Orders</p>
             </div>
           </CardContent>
@@ -259,7 +354,7 @@ export function ClientSiteDetailsPage() {
           <CardContent className="pt-4">
             <div className="text-center">
               <Weight className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{formatNumber(sitePerformance.total_tons)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatNumber(siteSummary.total_tons)}</p>
               <p className="text-xs text-muted-foreground">Total Tons</p>
             </div>
           </CardContent>
@@ -269,12 +364,174 @@ export function ClientSiteDetailsPage() {
           <CardContent className="pt-4">
             <div className="text-center">
               <MapPin className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-lg font-bold text-foreground">{sitePerformance.last_order_date || 'N/A'}</p>
+              <p className="text-lg font-bold text-foreground">{siteSummary.last_order_date || 'N/A'}</p>
               <p className="text-xs text-muted-foreground">Last Order</p>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>Site Details</CardTitle>
+              <CardDescription>Contact and location information</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(true)}
+              disabled={!canEdit}
+              title={!canEdit ? 'Editors or admins can edit site details.' : undefined}
+            >
+              Edit Site Details
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-2">
+              <p className="text-muted-foreground">Contact Name</p>
+              <p className="font-medium text-foreground">{siteSummary.contact_name || 'N/A'}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-muted-foreground">Contact Phone</p>
+              <p className="font-medium text-foreground">{siteSummary.contact_phone || 'N/A'}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-muted-foreground">Contact Email</p>
+              <p className="font-medium text-foreground">{siteSummary.contact_email || 'N/A'}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-muted-foreground">Address</p>
+              <p className="font-medium text-foreground">{siteSummary.address || 'N/A'}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-muted-foreground">Location Notes</p>
+              <p className="font-medium text-foreground">{siteSummary.location_text || 'N/A'}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-muted-foreground">Google Maps</p>
+              {siteSummary.google_maps_url ? (
+                <Button variant="link" className="h-auto p-0" asChild>
+                  <a href={siteSummary.google_maps_url} target="_blank" rel="noreferrer">
+                    Open in Google Maps
+                  </a>
+                </Button>
+              ) : (
+                <p className="font-medium text-foreground">N/A</p>
+              )}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-sm">Notes</p>
+            <p className="text-sm text-foreground">{siteSummary.notes || 'N/A'}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Site Details</DialogTitle>
+            <DialogDescription>Update contact and location details for this site.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contactName">Contact Name</Label>
+                <Input
+                  id="contactName"
+                  value={contactName}
+                  onChange={(event) => setContactName(event.target.value)}
+                  placeholder="Site contact name"
+                  disabled={!canEdit || saving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contactPhone">Contact Phone</Label>
+                <Input
+                  id="contactPhone"
+                  value={contactPhone}
+                  onChange={(event) => setContactPhone(event.target.value)}
+                  placeholder="Contact phone number"
+                  disabled={!canEdit || saving}
+                />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contactEmail">Contact Email</Label>
+                <Input
+                  id="contactEmail"
+                  value={contactEmail}
+                  onChange={(event) => setContactEmail(event.target.value)}
+                  placeholder="contact@example.com"
+                  disabled={!canEdit || saving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Input
+                  id="address"
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  placeholder="Street address"
+                  disabled={!canEdit || saving}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="locationText">Location Description</Label>
+              <Input
+                id="locationText"
+                value={locationText}
+                onChange={(event) => setLocationText(event.target.value)}
+                placeholder="Street, landmark, or directions"
+                disabled={!canEdit || saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="googleMapsUrl">Google Maps URL</Label>
+              <Input
+                id="googleMapsUrl"
+                value={googleMapsUrl}
+                onChange={(event) => setGoogleMapsUrl(event.target.value)}
+                placeholder="https://maps.google.com/..."
+                disabled={!canEdit || saving}
+              />
+              {googleMapsUrl && (
+                <Button variant="link" className="h-auto p-0" asChild>
+                  <a href={googleMapsUrl} target="_blank" rel="noreferrer">
+                    Open in Google Maps
+                  </a>
+                </Button>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Additional site notes"
+                disabled={!canEdit || saving}
+                className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex flex-wrap justify-between gap-2">
+            {!canEdit && (
+              <p className="text-sm text-muted-foreground">
+                You need editor or admin access to update site details.
+              </p>
+            )}
+            <Button onClick={handleSaveDetails} disabled={!canEdit || saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
