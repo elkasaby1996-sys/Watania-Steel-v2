@@ -20,6 +20,11 @@ CREATE TABLE IF NOT EXISTS public.client_sites (
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
   name text NOT NULL,
   name_normalized text NOT NULL,
+  contact_name text,
+  contact_phone text,
+  location_text text,
+  google_maps_url text,
+  notes text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT client_sites_unique_name UNIQUE (client_id, name_normalized)
@@ -516,7 +521,7 @@ CREATE OR REPLACE FUNCTION public.get_client_orders_page(
   offset_count integer DEFAULT 0
 )
 RETURNS TABLE (
-  id uuid,
+  id text,
   date date,
   status text,
   amount numeric,
@@ -538,13 +543,14 @@ LANGUAGE sql
 STABLE
 AS $$
   WITH unified AS (
-    SELECT id, date, status, amount, tons, company, site, order_type, shift, delivered_at,
+    SELECT id::text AS id, date, status, amount, tons, company, site, order_type, shift, delivered_at,
       signed_delivery_note, delivery_number, driver_name, phone_number, customer_name,
+      -- Mixed id types across orders/history_orders require a text identifier.
       'orders'::text AS source
     FROM public.orders
     WHERE client_id = get_client_orders_page.client_id
     UNION ALL
-    SELECT id, date, status, amount, tons, company, site, order_type, shift, delivered_at,
+    SELECT id::text AS id, date, status, amount, tons, company, site, order_type, shift, delivered_at,
       signed_delivery_note, delivery_number, driver_name, phone_number, customer_name,
       'history_orders'::text AS source
     FROM public.history_orders
@@ -562,19 +568,18 @@ RETURNS TABLE (
   site_name text,
   total_orders bigint,
   total_tons numeric,
-  total_amount numeric,
   last_order_date date
 )
 LANGUAGE sql
 STABLE
 AS $$
   WITH combined AS (
-    SELECT site_id, date, tons, amount
+    SELECT site_id, date, tons
     FROM public.orders
     WHERE client_id = get_client_sites_performance.client_id
       AND site_id IS NOT NULL
     UNION ALL
-    SELECT site_id, date, tons, amount
+    SELECT site_id, date, tons
     FROM public.history_orders
     WHERE client_id = get_client_sites_performance.client_id
       AND site_id IS NOT NULL
@@ -583,7 +588,6 @@ AS $$
     s.name AS site_name,
     COUNT(*)::bigint AS total_orders,
     COALESCE(SUM(combined.tons), 0)::numeric AS total_tons,
-    COALESCE(SUM(combined.amount), 0)::numeric AS total_amount,
     MAX(combined.date) AS last_order_date
   FROM combined
   JOIN public.client_sites s ON s.id = combined.site_id

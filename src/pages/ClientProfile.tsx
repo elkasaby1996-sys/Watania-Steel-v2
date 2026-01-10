@@ -18,6 +18,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -54,12 +62,13 @@ export function ClientProfilePage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [formState, setFormState] = useState<Partial<ClientProfile>>({});
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const canEdit = user?.profile?.role === 'admin' || user?.profile?.role === 'editor';
+  const displayValue = (value?: string | null) => (value && value.trim() ? value : '—');
 
   const fetchCoreData = useCallback(async () => {
     if (!clientId) return;
@@ -161,6 +170,20 @@ export function ClientProfilePage() {
     setFormState((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
+  const handleDetailsOpenChange = (open: boolean) => {
+    setDetailsOpen(open);
+    if (open && profile) {
+      setFormState({
+        contact_name: profile.contact_name,
+        contact_email: profile.contact_email,
+        contact_phone: profile.contact_phone,
+        address: profile.address,
+        notes: profile.notes,
+      });
+      setSaveError(null);
+    }
+  };
+
   const handleSave = async () => {
     if (!clientId) return;
 
@@ -170,7 +193,7 @@ export function ClientProfilePage() {
     try {
       const updated = await clientsService.updateClientProfile(clientId, formState);
       setProfile(updated);
-      setIsEditing(false);
+      setDetailsOpen(false);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save updates');
     } finally {
@@ -195,6 +218,11 @@ export function ClientProfilePage() {
   const shiftBreakdown = useMemo(() => analytics?.shift_breakdown || [], [analytics]);
   const diameterBreakdown = useMemo(() => analytics?.diameter_breakdown || [], [analytics]);
   const diameterTotals = useMemo(() => analytics?.diameter_totals, [analytics]);
+
+  const handleSiteClick = (siteId: string) => {
+    if (!clientId) return;
+    navigate(`/clients/${clientId}/sites/${siteId}`);
+  };
 
   const getStatusBadge = (status: string | null) => {
     const statusStyles: Record<string, string> = {
@@ -499,7 +527,31 @@ export function ClientProfilePage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Company Name</span>
-                  <span className="font-medium text-foreground">{profile.name}</span>
+                  <span className="font-medium text-foreground">{displayValue(profile.name)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Contact Name</span>
+                  <span className="font-medium text-foreground">{displayValue(profile.contact_name)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Contact Email</span>
+                  <span className="font-medium text-foreground">{displayValue(profile.contact_email)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Contact Phone</span>
+                  <span className="font-medium text-foreground">{displayValue(profile.contact_phone)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Address</span>
+                  <span className="font-medium text-foreground text-right max-w-[60%]">
+                    {displayValue(profile.address)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-start py-2 border-b border-border">
+                  <span className="text-muted-foreground">Notes</span>
+                  <span className="font-medium text-foreground text-right max-w-[60%] whitespace-pre-wrap">
+                    {displayValue(profile.notes)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Total Orders</span>
@@ -520,6 +572,46 @@ export function ClientProfilePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Contact Name</span>
+                  <span className="font-medium text-foreground">{displayValue(profile.contact_name)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Contact Email</span>
+                  <span className="font-medium text-foreground">{displayValue(profile.contact_email)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Contact Phone</span>
+                  <span className="font-medium text-foreground">{displayValue(profile.contact_phone)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Address</span>
+                  <span className="font-medium text-foreground text-right max-w-[60%]">
+                    {displayValue(profile.address)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-start py-2">
+                  <span className="text-muted-foreground">Notes</span>
+                  <span className="font-medium text-foreground text-right max-w-[60%] whitespace-pre-wrap">
+                    {displayValue(profile.notes)}
+                  </span>
+                </div>
+                {canEdit && (
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button onClick={() => handleDetailsOpenChange(true)}>Edit Details</Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Dialog open={detailsOpen} onOpenChange={handleDetailsOpenChange}>
+            <DialogContent className="sm:max-w-[560px]">
+              <DialogHeader>
+                <DialogTitle>Edit Client Details</DialogTitle>
+                <DialogDescription>Update client contacts and notes.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
                 {saveError && (
                   <div className="flex items-center gap-2 text-sm text-destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -529,68 +621,60 @@ export function ClientProfilePage() {
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Contact Name</label>
                   <Input
-                    value={formState.contact_name || ''}
+                    value={formState.contact_name ?? ''}
                     onChange={handleInputChange('contact_name')}
-                    disabled={!canEdit || !isEditing}
+                    disabled={!canEdit}
                     placeholder="Primary contact"
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Contact Email</label>
                   <Input
-                    value={formState.contact_email || ''}
+                    value={formState.contact_email ?? ''}
                     onChange={handleInputChange('contact_email')}
-                    disabled={!canEdit || !isEditing}
+                    disabled={!canEdit}
                     placeholder="email@example.com"
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Contact Phone</label>
                   <Input
-                    value={formState.contact_phone || ''}
+                    value={formState.contact_phone ?? ''}
                     onChange={handleInputChange('contact_phone')}
-                    disabled={!canEdit || !isEditing}
+                    disabled={!canEdit}
                     placeholder="+974 ..."
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Address</label>
                   <Input
-                    value={formState.address || ''}
+                    value={formState.address ?? ''}
                     onChange={handleInputChange('address')}
-                    disabled={!canEdit || !isEditing}
+                    disabled={!canEdit}
                     placeholder="Client address"
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Notes</label>
                   <textarea
-                    value={formState.notes || ''}
+                    value={formState.notes ?? ''}
                     onChange={handleInputChange('notes')}
-                    disabled={!canEdit || !isEditing}
+                    disabled={!canEdit}
                     placeholder="Additional notes"
-                    className="min-h-[100px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-[120px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
-                {canEdit && (
-                  <div className="flex justify-end gap-2 pt-2">
-                    {isEditing ? (
-                      <>
-                        <Button variant="outline" onClick={() => setIsEditing(false)} disabled={saveLoading}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleSave} disabled={saveLoading}>
-                          {saveLoading ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                      </>
-                    ) : (
-                      <Button onClick={() => setIsEditing(true)}>Edit Details</Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDetailsOpen(false)} disabled={saveLoading}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} disabled={saveLoading}>
+                  {saveLoading ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
@@ -894,24 +978,26 @@ export function ClientProfilePage() {
                   <TableHeader>
                     <TableRow className="border-border">
                       <TableHead className="text-foreground">Site</TableHead>
-                      <TableHead className="text-foreground text-right">Tons</TableHead>
-                      <TableHead className="text-foreground text-right">Amount</TableHead>
                       <TableHead className="text-foreground text-right">Orders</TableHead>
+                      <TableHead className="text-foreground text-right">Tons</TableHead>
                       <TableHead className="text-foreground">Last Order</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sitesPerformance.map((row, index) => (
-                      <TableRow key={row.site_id} className="border-border">
+                      <TableRow
+                        key={row.site_id}
+                        className="border-border hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => handleSiteClick(row.site_id)}
+                      >
                         <TableCell className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground font-mono">{index + 1}.</span>
                           <span className="font-medium max-w-[300px] truncate" title={row.site_name}>
                             {row.site_name}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">{formatNumber(row.total_tons)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(row.total_amount)}</TableCell>
                         <TableCell className="text-right">{row.total_orders.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{formatNumber(row.total_tons)}</TableCell>
                         <TableCell>{row.last_order_date || 'N/A'}</TableCell>
                       </TableRow>
                     ))}
