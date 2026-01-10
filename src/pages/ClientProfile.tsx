@@ -621,33 +621,6 @@ export function ClientProfilePage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Monthly Amount</CardTitle>
-                  <CardDescription>Revenue totals grouped by month</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analytics.monthly_amount}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 4%, 80%)" />
-                        <XAxis dataKey="month" stroke="hsl(240, 4%, 52%)" fontSize={12} />
-                        <YAxis stroke="hsl(240, 4%, 52%)" fontSize={12} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'hsl(0, 0%, 100%)',
-                            border: '1px solid hsl(240, 4%, 80%)',
-                            borderRadius: '8px',
-                            color: 'hsl(0, 0%, 12%)',
-                          }}
-                          formatter={(value: number) => [`QAR ${formatNumber(value)}`, 'Amount']}
-                        />
-                        <Bar dataKey="amount" fill="hsl(160, 60%, 45%)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
             </>
           )}
 
