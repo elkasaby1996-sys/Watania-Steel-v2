@@ -59,7 +59,6 @@ export interface ClientSitesPerformanceRow {
   site_name: string;
   total_orders: number;
   total_tons: number;
-  total_amount: number;
   last_order_date: string | null;
 }
 
@@ -71,6 +70,29 @@ export interface ClientAnalytics {
   shift_breakdown: { shift: string; count: number; tons: number; amount: number }[];
   diameter_breakdown: { diameter: string; tons: number; percentage: number }[];
   diameter_totals: { total_breakdown_tons: number; total_order_tons: number; has_mismatch: boolean };
+}
+
+export interface ClientSiteSummary {
+  site_id: string;
+  site_name: string;
+  client_id: string;
+  client_name: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  location_text: string | null;
+  google_maps_url: string | null;
+  notes: string | null;
+  total_orders: number;
+  total_tons: number;
+  last_order_date: string | null;
+}
+
+export interface ClientSiteUpdate {
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  location_text?: string | null;
+  google_maps_url?: string | null;
+  notes?: string | null;
 }
 
 export const clientsService = {
@@ -126,12 +148,15 @@ export const clientsService = {
       client_id: clientId,
     });
 
-    if (error || !data) {
+    const rows = (data || []) as ClientStats[];
+    const row = rows[0];
+
+    if (error || !row) {
       console.error('Failed to load client stats:', error);
       throw error || new Error('Unable to load stats');
     }
 
-    return data as ClientStats;
+    return row;
   },
 
   async getClientOrdersPage(clientId: string, limit = 50, offset = 0): Promise<ClientOrdersPage> {
@@ -176,5 +201,41 @@ export const clientsService = {
     }
 
     return (data || []) as ClientSitesPerformanceRow[];
+  },
+
+  async getClientSiteSummary(clientId: string, siteId: string): Promise<ClientSiteSummary> {
+    const { data, error } = await supabase.rpc('get_client_site_summary', {
+      client_id: clientId,
+      site_id: siteId,
+    });
+
+    const rows = (data || []) as ClientSiteSummary[];
+    const row = rows[0];
+
+    if (error || !row) {
+      console.error('Failed to load client site summary:', error);
+      throw error || new Error('Unable to load site summary');
+    }
+
+    return row;
+  },
+
+  async updateClientSite(siteId: string, updates: ClientSiteUpdate): Promise<ClientSiteUpdate> {
+    const { data, error } = await supabase
+      .from('client_sites')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', siteId)
+      .select('contact_name, contact_phone, location_text, google_maps_url, notes')
+      .single();
+
+    if (error || !data) {
+      console.error('Failed to update client site:', error);
+      throw error || new Error('Unable to update site details');
+    }
+
+    return data as ClientSiteUpdate;
   },
 };
