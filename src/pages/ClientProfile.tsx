@@ -18,37 +18,24 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useAuthStore } from '@/stores/authStore';
 import { formatNumber, roundTo3Decimals } from '@/lib/utils';
 import {
-  clientsService,
+  clientsApi,
   type ClientAnalytics,
   type ClientOrderRow,
-  type ClientProfile,
   type ClientSitesPerformanceRow,
-  type ClientStats,
-} from '@/services/clientsService';
+  type ClientSummaryDetail,
+} from '@/lib/clientsApi';
 
 const PAGE_SIZE = 50;
 
 export function ClientProfilePage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
 
-  const [profile, setProfile] = useState<ClientProfile | null>(null);
-  const [stats, setStats] = useState<ClientStats | null>(null);
+  const [summary, setSummary] = useState<ClientSummaryDetail | null>(null);
   const [analytics, setAnalytics] = useState<ClientAnalytics | null>(null);
   const [sitesPerformance, setSitesPerformance] = useState<ClientSitesPerformanceRow[]>([]);
   const [orders, setOrders] = useState<ClientOrderRow[]>([]);
@@ -61,14 +48,7 @@ export function ClientProfilePage() {
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
-
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [formState, setFormState] = useState<Partial<ClientProfile>>({});
-  const [saveLoading, setSaveLoading] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  const canEdit = user?.profile?.role === 'admin' || user?.profile?.role === 'editor';
-  const displayValue = (value?: string | null) => (value && value.trim() ? value : '—');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchCoreData = useCallback(async () => {
     if (!clientId) return;
@@ -77,26 +57,17 @@ export function ClientProfilePage() {
     setError(null);
 
     try {
-      const [profileData, statsData, sitesData] = await Promise.all([
-        clientsService.getClientProfile(clientId),
-        clientsService.getClientStats(clientId),
-        clientsService.getClientSitesPerformance(clientId),
+      const [summaryData, sitesData] = await Promise.all([
+        clientsApi.getClientSummary(clientId),
+        clientsApi.getClientSitesPerformance(clientId),
       ]);
 
-      setProfile(profileData);
-      setStats(statsData);
+      setSummary(summaryData);
       setSitesPerformance(sitesData);
-      setFormState({
-        contact_name: profileData.contact_name,
-        contact_email: profileData.contact_email,
-        contact_phone: profileData.contact_phone,
-        address: profileData.address,
-        notes: profileData.notes,
-      });
+      setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load client profile');
-      setProfile(null);
-      setStats(null);
+      setSummary(null);
       setSitesPerformance([]);
     } finally {
       setLoading(false);
@@ -111,7 +82,7 @@ export function ClientProfilePage() {
 
     try {
       const offset = (ordersPage - 1) * PAGE_SIZE;
-      const { orders: orderRows, total } = await clientsService.getClientOrdersPage(
+      const { orders: orderRows, total } = await clientsApi.getClientOrdersPage(
         clientId,
         PAGE_SIZE,
         offset
@@ -135,7 +106,7 @@ export function ClientProfilePage() {
     setAnalyticsError(null);
 
     try {
-      const analyticsData = await clientsService.getClientAnalytics(clientId);
+      const analyticsData = await clientsApi.getClientAnalytics(clientId);
       setAnalytics(analyticsData);
     } catch (err) {
       setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
@@ -157,6 +128,10 @@ export function ClientProfilePage() {
     fetchAnalytics();
   }, [fetchAnalytics]);
 
+  useEffect(() => {
+    setOrdersPage(1);
+  }, [clientId]);
+
   const handlePreviousPage = () => {
     setOrdersPage((prev) => Math.max(1, prev - 1));
   };
@@ -166,51 +141,15 @@ export function ClientProfilePage() {
     setOrdersPage((prev) => Math.min(totalPages, prev + 1));
   };
 
-  const handleInputChange = (field: keyof ClientProfile) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormState((prev) => ({ ...prev, [field]: event.target.value }));
-  };
-
-  const handleDetailsOpenChange = (open: boolean) => {
-    setDetailsOpen(open);
-    if (open && profile) {
-      setFormState({
-        contact_name: profile.contact_name,
-        contact_email: profile.contact_email,
-        contact_phone: profile.contact_phone,
-        address: profile.address,
-        notes: profile.notes,
-      });
-      setSaveError(null);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!clientId) return;
-
-    setSaveLoading(true);
-    setSaveError(null);
-
-    try {
-      const updated = await clientsService.updateClientProfile(clientId, formState);
-      setProfile(updated);
-      setDetailsOpen(false);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save updates');
-    } finally {
-      setSaveLoading(false);
-    }
-  };
-
   const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
   const startRecord = ordersTotal > 0 ? (ordersPage - 1) * PAGE_SIZE + 1 : 0;
   const endRecord = Math.min(ordersPage * PAGE_SIZE, ordersTotal);
 
   const kpis = {
-    totalOrders: stats?.total_orders ?? 0,
-    totalTons: stats?.total_tons ?? 0,
-    totalAmount: stats?.total_amount ?? 0,
-    sites: stats?.unique_sites ?? 0,
-    lastOrderDate: stats?.last_order_date ?? 'N/A',
+    totalOrders: summary?.total_orders ?? 0,
+    totalTons: summary?.total_tons ?? 0,
+    sites: summary?.unique_sites ?? 0,
+    lastOrderDate: summary?.last_order_date ?? 'N/A',
   };
 
   const statusBreakdown = useMemo(() => analytics?.status_breakdown || [], [analytics]);
@@ -234,6 +173,8 @@ export function ClientProfilePage() {
     };
     return statusStyles[status || ''] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   };
+
+  const lastUpdatedLabel = lastUpdated ? lastUpdated.toLocaleString() : '—';
 
   if (loading) {
     return (
@@ -264,7 +205,7 @@ export function ClientProfilePage() {
     );
   }
 
-  if (error || !profile) {
+  if (error || !summary) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -321,9 +262,10 @@ export function ClientProfilePage() {
         </Button>
         <div className="flex-1">
           <h1 className="text-3xl font-headline font-bold text-foreground">
-            {profile.name}
+            {summary.client_name}
           </h1>
           <p className="text-muted-foreground">Client profile and order history</p>
+          <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
         </div>
       </div>
 
@@ -521,160 +463,82 @@ export function ClientProfilePage() {
           <div className="grid md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle>Client Information</CardTitle>
-                <CardDescription>Basic details tied to this client profile</CardDescription>
+                <CardTitle>Client Overview</CardTitle>
+                <CardDescription>Key client details and totals</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Company Name</span>
-                  <span className="font-medium text-foreground">{displayValue(profile.name)}</span>
+                  <span className="text-muted-foreground">Client Name</span>
+                  <span className="font-medium text-foreground">{summary.client_name}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Contact Name</span>
-                  <span className="font-medium text-foreground">{displayValue(profile.contact_name)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Contact Email</span>
-                  <span className="font-medium text-foreground">{displayValue(profile.contact_email)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Contact Phone</span>
-                  <span className="font-medium text-foreground">{displayValue(profile.contact_phone)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Address</span>
-                  <span className="font-medium text-foreground text-right max-w-[60%]">
-                    {displayValue(profile.address)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-start py-2 border-b border-border">
-                  <span className="text-muted-foreground">Notes</span>
-                  <span className="font-medium text-foreground text-right max-w-[60%] whitespace-pre-wrap">
-                    {displayValue(profile.notes)}
-                  </span>
+                  <span className="text-muted-foreground">Client ID</span>
+                  <span className="font-mono text-sm text-foreground">{summary.client_id}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Total Orders</span>
                   <span className="font-medium text-foreground">{kpis.totalOrders.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between items-center py-2">
+                <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Total Tons</span>
                   <span className="font-medium text-foreground">{formatNumber(kpis.totalTons)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Sites</span>
+                  <span className="font-medium text-foreground">{kpis.sites}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-muted-foreground">Last Order</span>
+                  <span className="font-medium text-foreground">{kpis.lastOrderDate}</span>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Contact Details</CardTitle>
-                <CardDescription>
-                  {canEdit ? 'Update client contacts and notes.' : 'Contact info (read-only)'}
-                </CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Sites Performance
+                </CardTitle>
+                <CardDescription>Performance metrics for delivery sites</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Contact Name</span>
-                  <span className="font-medium text-foreground">{displayValue(profile.contact_name)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Contact Email</span>
-                  <span className="font-medium text-foreground">{displayValue(profile.contact_email)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Contact Phone</span>
-                  <span className="font-medium text-foreground">{displayValue(profile.contact_phone)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Address</span>
-                  <span className="font-medium text-foreground text-right max-w-[60%]">
-                    {displayValue(profile.address)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-start py-2">
-                  <span className="text-muted-foreground">Notes</span>
-                  <span className="font-medium text-foreground text-right max-w-[60%] whitespace-pre-wrap">
-                    {displayValue(profile.notes)}
-                  </span>
-                </div>
-                {canEdit && (
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button onClick={() => handleDetailsOpenChange(true)}>Edit Details</Button>
-                  </div>
+              <CardContent>
+                {sitesPerformance.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border">
+                        <TableHead className="text-foreground">Site</TableHead>
+                        <TableHead className="text-foreground text-right">Orders</TableHead>
+                        <TableHead className="text-foreground text-right">Tons</TableHead>
+                        <TableHead className="text-foreground">Last Order</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sitesPerformance.map((row, index) => (
+                        <TableRow
+                          key={row.site_id}
+                          className="border-border hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => handleSiteClick(row.site_id)}
+                        >
+                          <TableCell className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground font-mono">{index + 1}.</span>
+                            <span className="font-medium max-w-[300px] truncate" title={row.site_name}>
+                              {row.site_name}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">{row.total_orders.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{formatNumber(row.total_tons)}</TableCell>
+                          <TableCell>{row.last_order_date || 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">No site data available</div>
                 )}
               </CardContent>
             </Card>
           </div>
-
-          <Dialog open={detailsOpen} onOpenChange={handleDetailsOpenChange}>
-            <DialogContent className="sm:max-w-[560px]">
-              <DialogHeader>
-                <DialogTitle>Edit Client Details</DialogTitle>
-                <DialogDescription>Update client contacts and notes.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                {saveError && (
-                  <div className="flex items-center gap-2 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    {saveError}
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Contact Name</label>
-                  <Input
-                    value={formState.contact_name ?? ''}
-                    onChange={handleInputChange('contact_name')}
-                    disabled={!canEdit}
-                    placeholder="Primary contact"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Contact Email</label>
-                  <Input
-                    value={formState.contact_email ?? ''}
-                    onChange={handleInputChange('contact_email')}
-                    disabled={!canEdit}
-                    placeholder="email@example.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Contact Phone</label>
-                  <Input
-                    value={formState.contact_phone ?? ''}
-                    onChange={handleInputChange('contact_phone')}
-                    disabled={!canEdit}
-                    placeholder="+974 ..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Address</label>
-                  <Input
-                    value={formState.address ?? ''}
-                    onChange={handleInputChange('address')}
-                    disabled={!canEdit}
-                    placeholder="Client address"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Notes</label>
-                  <textarea
-                    value={formState.notes ?? ''}
-                    onChange={handleInputChange('notes')}
-                    disabled={!canEdit}
-                    placeholder="Additional notes"
-                    className="min-h-[120px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDetailsOpen(false)} disabled={saveLoading}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={saveLoading}>
-                  {saveLoading ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
@@ -752,33 +616,6 @@ export function ClientProfilePage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Monthly Amount</CardTitle>
-                  <CardDescription>Revenue totals grouped by month</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analytics.monthly_amount}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 4%, 80%)" />
-                        <XAxis dataKey="month" stroke="hsl(240, 4%, 52%)" fontSize={12} />
-                        <YAxis stroke="hsl(240, 4%, 52%)" fontSize={12} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'hsl(0, 0%, 100%)',
-                            border: '1px solid hsl(240, 4%, 80%)',
-                            borderRadius: '8px',
-                            color: 'hsl(0, 0%, 12%)',
-                          }}
-                          formatter={(value: number) => [`QAR ${formatNumber(value)}`, 'Amount']}
-                        />
-                        <Bar dataKey="amount" fill="hsl(160, 60%, 45%)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
             </>
           )}
 
@@ -963,51 +800,6 @@ export function ClientProfilePage() {
               </CardContent>
             </Card>
           </div>
-
-          <Card className="mt-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Sites Performance
-              </CardTitle>
-              <CardDescription>Performance metrics for delivery sites</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {sitesPerformance.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border">
-                      <TableHead className="text-foreground">Site</TableHead>
-                      <TableHead className="text-foreground text-right">Orders</TableHead>
-                      <TableHead className="text-foreground text-right">Tons</TableHead>
-                      <TableHead className="text-foreground">Last Order</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sitesPerformance.map((row, index) => (
-                      <TableRow
-                        key={row.site_id}
-                        className="border-border hover:bg-muted/50 cursor-pointer transition-colors"
-                        onClick={() => handleSiteClick(row.site_id)}
-                      >
-                        <TableCell className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground font-mono">{index + 1}.</span>
-                          <span className="font-medium max-w-[300px] truncate" title={row.site_name}>
-                            {row.site_name}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">{row.total_orders.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">{formatNumber(row.total_tons)}</TableCell>
-                        <TableCell>{row.last_order_date || 'N/A'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">No site data available</div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>
