@@ -1,100 +1,46 @@
-// src/lib/clientsApi.ts
+import { rpcWithRetry } from '@/lib/rpcWithRetry';
 import { supabase } from '@/lib/supabase';
 
-type RpcResult<T> = { data: T | null; error: any };
-
-const isAbortError = (err: unknown) => {
-  if (!err || typeof err !== 'object') return false;
-  const name = 'name' in err ? String((err as any).name) : '';
-  const message = 'message' in err ? String((err as any).message) : '';
-  return name === 'AbortError' || message.includes('AbortError');
+// Supabase returns numeric columns as string sometimes, so we normalize safely.
+const toNumber = (v: unknown): number => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/**
- * Small retry wrapper for Supabase RPC calls.
- * Retries only on transient/network-ish failures; does NOT retry on abort.
- */
-export async function rpcWithRetry<T>(
-  fnName: string,
-  args: Record<string, any> = {},
-  opts?: { signal?: AbortSignal; retries?: number }
-): Promise<T> {
-  const retries = opts?.retries ?? 2;
-
-  let attempt = 0;
-  let lastError: any = null;
-
-  while (attempt <= retries) {
-    if (opts?.signal?.aborted) {
-      throw new DOMException('Aborted', 'AbortError');
-    }
-
-    try {
-      // supabase-js v2: you can pass { signal } in options in some methods,
-      // but rpc doesn't consistently support it across all builds.
-      // We'll still respect AbortSignal before/after the request.
-      const res: RpcResult<T> = await supabase.rpc(fnName as any, args as any);
-
-      if (opts?.signal?.aborted) {
-        throw new DOMException('Aborted', 'AbortError');
-      }
-
-      if (res.error) throw res.error;
-      return res.data as T;
-    } catch (err: any) {
-      if (isAbortError(err)) throw err;
-
-      lastError = err;
-
-      // Don't spam retries on obvious "function not found" / SQL errors
-      const msg = String(err?.message ?? '');
-      const code = String(err?.code ?? '');
-      const status = Number(err?.status ?? 0);
-
-      const isPermanent =
-        msg.includes('does not exist') ||
-        msg.includes('function') && msg.includes('does not exist') ||
-        code === '42883' || // undefined_function
-        code === '42P01' || // undefined_table
-        status === 400 ||
-        status === 401 ||
-        status === 403;
-
-      if (isPermanent || attempt === retries) {
-        throw err;
-      }
-
-      // backoff: 250ms, 500ms, 1000ms...
-      await sleep(250 * Math.pow(2, attempt));
-      attempt += 1;
-    }
-  }
-
-  throw lastError ?? new Error(`RPC ${fnName} failed`);
-}
-
-/** Types matching your RPC “tons-only” returns */
-export type ClientSummaryRow = {
-  id: string; // uuid
+export interface ClientSummary {
+  id: string;
   name: string;
   total_orders: number;
   total_tons: number;
   unique_sites: number;
-  last_order_date: string | null; // date
-};
+  last_order_date: string | null;
+}
 
-export type ClientTopCardSummary = {
+export interface ClientSummaryDetail {
+  // Your RPC get_client_summary returns metrics.
+  // We enrich with client info (name/contact/etc) by querying public.clients.
+  id: string;
+  name: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
+  notes: string | null;
+
   total_orders: number;
   total_tons: number;
   unique_sites: number;
   last_order_date: string | null;
-};
+}
 
-export type ClientOrdersPageRow = {
-  id: string; // your unified RPC returns id as text
-  date: string | null; // date
+export interface ClientOrderRow {
+  id: string;
+  date: string | null;
   status: string | null;
   tons: number | null;
   company: string | null;
@@ -107,103 +53,328 @@ export type ClientOrdersPageRow = {
   driver_name: string | null;
   phone_number: string | null;
   customer_name: string | null;
-  source: 'orders' | 'history_orders' | string;
-  total_count: number; // window count
-};
+  source: 'orders' | 'history_orders';
+  total_count: number;
+}
 
-export type SitePerformanceRow = {
-  site_id: string; // uuid
+export interface ClientOrdersPage {
+  rows: ClientOrderRow[];
+  totalCount: number;
+}
+
+export interface ClientSitesPerformanceRow {
+  site_id: string;
   site_name: string;
   contact_name: string | null;
   contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
   location_text: string | null;
   google_maps_url: string | null;
   notes: string | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
-};
+}
 
-export type SiteDetailsRow = {
+export interface ClientAnalytics {
+  monthly_tons: { month: string; tons: number }[];
+  status_breakdown: { status: string; count: number; percentage?: number }[];
+  order_type_breakdown: { order_type: string; count: number; tons: number }[];
+  shift_breakdown: { shift: string; count: number; tons: number }[];
+  diameter_breakdown: { diameter: string; tons: number; percentage: number }[];
+  diameter_totals: {
+    total_breakdown_tons: number;
+    total_order_tons: number;
+    has_mismatch: boolean;
+  };
+}
+
+export interface ClientSiteSummary {
   site_id: string;
   site_name: string;
   client_id: string;
   client_name: string;
   contact_name: string | null;
   contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
   location_text: string | null;
   google_maps_url: string | null;
   notes: string | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
-};
-
-export async function fetchClientsSummary(searchText?: string, signal?: AbortSignal) {
-  const data = await rpcWithRetry<ClientSummaryRow[]>(
-    'get_clients_summary',
-    { search_text: searchText ?? null },
-    { signal }
-  );
-  return data ?? [];
 }
 
-export async function fetchClientSummary(clientId: string, signal?: AbortSignal) {
-  const rows = await rpcWithRetry<ClientTopCardSummary[]>(
+/**
+ * 1) Clients list (search)
+ */
+export const fetchClientsSummary = async (
+  searchText?: string,
+  signal?: AbortSignal
+): Promise<ClientSummary[]> => {
+  const { data, error } = await rpcWithRetry<any[]>(
+    'get_clients_summary',
+    { search_text: searchText?.trim() || null },
+    { signal }
+  );
+
+  if (error) throw error;
+
+  const rows = (data || []) as any[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    name: String(r.name ?? ''),
+    total_orders: Number(r.total_orders ?? 0),
+    total_tons: toNumber(r.total_tons),
+    unique_sites: Number(r.unique_sites ?? 0),
+    last_order_date: r.last_order_date ? String(r.last_order_date) : null,
+  }));
+};
+
+/**
+ * 2) Client profile header metrics + client info from public.clients
+ */
+export const fetchClientSummary = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientSummaryDetail> => {
+  // metrics from RPC
+  const { data: metricsData, error: metricsError } = await rpcWithRetry<any[]>(
     'get_client_summary',
     { client_id: clientId },
     { signal }
   );
-  return rows?.[0] ?? null;
-}
+  if (metricsError) throw metricsError;
 
-export async function fetchClientSitesPerformance(clientId: string, signal?: AbortSignal) {
-  const data = await rpcWithRetry<SitePerformanceRow[]>(
-    'get_client_sites_performance',
-    { client_id: clientId },
-    { signal }
-  );
-  return data ?? [];
-}
+  const metricsRow = (metricsData || [])[0] as any | undefined;
 
-export async function fetchClientSiteSummary(clientId: string, siteId: string, signal?: AbortSignal) {
-  const rows = await rpcWithRetry<SiteDetailsRow[]>(
-    'get_client_site_summary',
-    { client_id: clientId, site_id: siteId },
-    { signal }
-  );
-  return rows?.[0] ?? null;
-}
+  // client info from table (name/contact/address/notes)
+  let clientInfo: any = null;
+  {
+    const q = supabase
+      .from('clients')
+      .select('id,name,contact_name,contact_phone,contact_email,address,notes')
+      .eq('id', clientId)
+      .limit(1);
 
-export async function fetchClientOrdersPage(
+    const { data, error } = await (signal ? q.abortSignal(signal) : q);
+    if (error) throw error;
+    clientInfo = (data || [])[0] ?? null;
+  }
+
+  if (!clientInfo) {
+    // If somehow client row missing, still return metrics so UI doesn’t die
+    return {
+      id: clientId,
+      name: 'Unknown Client',
+      contact_name: null,
+      contact_phone: null,
+      contact_email: null,
+      address: null,
+      notes: null,
+      total_orders: Number(metricsRow?.total_orders ?? 0),
+      total_tons: toNumber(metricsRow?.total_tons),
+      unique_sites: Number(metricsRow?.unique_sites ?? 0),
+      last_order_date: metricsRow?.last_order_date ? String(metricsRow.last_order_date) : null,
+    };
+  }
+
+  return {
+    id: String(clientInfo.id),
+    name: String(clientInfo.name ?? ''),
+    contact_name: clientInfo.contact_name ?? null,
+    contact_phone: clientInfo.contact_phone ?? null,
+    contact_email: clientInfo.contact_email ?? null,
+    address: clientInfo.address ?? null,
+    notes: clientInfo.notes ?? null,
+    total_orders: Number(metricsRow?.total_orders ?? 0),
+    total_tons: toNumber(metricsRow?.total_tons),
+    unique_sites: Number(metricsRow?.unique_sites ?? 0),
+    last_order_date: metricsRow?.last_order_date ? String(metricsRow.last_order_date) : null,
+  };
+};
+
+/**
+ * 3) Client orders table (paged) from RPC (unified orders + history_orders)
+ */
+export const fetchClientOrdersPage = async (
   clientId: string,
   limit = 50,
   offset = 0,
   signal?: AbortSignal
-) {
-  const data = await rpcWithRetry<ClientOrdersPageRow[]>(
+): Promise<ClientOrdersPage> => {
+  const { data, error } = await rpcWithRetry<any[]>(
     'get_client_orders_page',
     {
       client_id: clientId,
       limit_count: limit,
-      offset_count: offset
+      offset_count: offset,
     },
     { signal }
   );
-  return data ?? [];
-}
+  if (error) throw error;
+
+  const rows = (data || []) as any[];
+  const totalCount = rows.length > 0 ? Number(rows[0]?.total_count ?? 0) : 0;
+
+  return {
+    rows: rows.map((r) => ({
+      id: String(r.id),
+      date: r.date ? String(r.date) : null,
+      status: r.status ? String(r.status) : null,
+      tons: r.tons === null || r.tons === undefined ? null : toNumber(r.tons),
+      company: r.company ? String(r.company) : null,
+      site: r.site ? String(r.site) : null,
+      order_type: r.order_type ? String(r.order_type) : null,
+      shift: r.shift ? String(r.shift) : null,
+      delivered_at: r.delivered_at ? String(r.delivered_at) : null,
+      signed_delivery_note: r.signed_delivery_note ?? null,
+      delivery_number: r.delivery_number ? String(r.delivery_number) : null,
+      driver_name: r.driver_name ? String(r.driver_name) : null,
+      phone_number: r.phone_number ? String(r.phone_number) : null,
+      customer_name: r.customer_name ? String(r.customer_name) : null,
+      source: (r.source === 'orders' ? 'orders' : 'history_orders') as 'orders' | 'history_orders',
+      total_count: Number(r.total_count ?? totalCount),
+    })),
+    totalCount,
+  };
+};
 
 /**
- * Convenience object export so components can do:
- *   import { clientsApi } from '@/lib/clientsApi';
+ * 4) Sites performance list (tons only) from RPC
+ */
+export const fetchClientSitesPerformance = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientSitesPerformanceRow[]> => {
+  const { data, error } = await rpcWithRetry<any[]>(
+    'get_client_sites_performance',
+    { client_id: clientId },
+    { signal }
+  );
+  if (error) throw error;
+
+  const rows = (data || []) as any[];
+  return rows.map((r) => ({
+    site_id: String(r.site_id),
+    site_name: String(r.site_name ?? ''),
+    contact_name: r.contact_name ?? null,
+    contact_phone: r.contact_phone ?? null,
+    contact_email: r.contact_email ?? null,
+    address: r.address ?? null,
+    location_text: r.location_text ?? null,
+    google_maps_url: r.google_maps_url ?? null,
+    notes: r.notes ?? null,
+    total_orders: Number(r.total_orders ?? 0),
+    total_tons: toNumber(r.total_tons),
+    last_order_date: r.last_order_date ? String(r.last_order_date) : null,
+  }));
+};
+
+/**
+ * 5) Single site details (click a site -> show profile)
+ */
+export const fetchClientSiteSummary = async (
+  clientId: string,
+  siteId: string,
+  signal?: AbortSignal
+): Promise<ClientSiteSummary> => {
+  const { data, error } = await rpcWithRetry<any[]>(
+    'get_client_site_summary',
+    { client_id: clientId, site_id: siteId },
+    { signal }
+  );
+  if (error) throw error;
+
+  const row = (data || [])[0] as any | undefined;
+  if (!row) throw new Error('Unable to load site details');
+
+  return {
+    site_id: String(row.site_id),
+    site_name: String(row.site_name ?? ''),
+    client_id: String(row.client_id),
+    client_name: String(row.client_name ?? ''),
+    contact_name: row.contact_name ?? null,
+    contact_phone: row.contact_phone ?? null,
+    contact_email: row.contact_email ?? null,
+    address: row.address ?? null,
+    location_text: row.location_text ?? null,
+    google_maps_url: row.google_maps_url ?? null,
+    notes: row.notes ?? null,
+    total_orders: Number(row.total_orders ?? 0),
+    total_tons: toNumber(row.total_tons),
+    last_order_date: row.last_order_date ? String(row.last_order_date) : null,
+  };
+};
+
+/**
+ * 6) Client analytics (tons-based)
+ */
+export const fetchClientAnalytics = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientAnalytics> => {
+  const { data, error } = await rpcWithRetry<any>(
+    'get_client_analytics',
+    { client_id: clientId },
+    { signal }
+  );
+  if (error || !data) throw error || new Error('Unable to load analytics');
+
+  // normalize numeric fields inside JSON
+  const normalized: ClientAnalytics = {
+    monthly_tons: (data.monthly_tons || []).map((x: any) => ({
+      month: String(x.month),
+      tons: toNumber(x.tons),
+    })),
+    status_breakdown: (data.status_breakdown || []).map((x: any) => ({
+      status: String(x.status),
+      count: Number(x.count ?? 0),
+      percentage: x.percentage !== undefined ? toNumber(x.percentage) : undefined,
+    })),
+    order_type_breakdown: (data.order_type_breakdown || []).map((x: any) => ({
+      order_type: String(x.order_type),
+      count: Number(x.count ?? 0),
+      tons: toNumber(x.tons),
+    })),
+    shift_breakdown: (data.shift_breakdown || []).map((x: any) => ({
+      shift: String(x.shift),
+      count: Number(x.count ?? 0),
+      tons: toNumber(x.tons),
+    })),
+    diameter_breakdown: (data.diameter_breakdown || []).map((x: any) => ({
+      diameter: String(x.diameter),
+      tons: toNumber(x.tons),
+      percentage: toNumber(x.percentage),
+    })),
+    diameter_totals: {
+      total_breakdown_tons: toNumber(data?.diameter_totals?.total_breakdown_tons),
+      total_order_tons: toNumber(data?.diameter_totals?.total_order_tons),
+      has_mismatch: Boolean(data?.diameter_totals?.has_mismatch),
+    },
+  };
+
+  return normalized;
+};
+
+/**
+ * Convenience object (some components import clientsApi.*)
  */
 export const clientsApi = {
-  rpcWithRetry,
-  fetchClientsSummary,
-  fetchClientSummary,
-  fetchClientSitesPerformance,
-  fetchClientSiteSummary,
-  fetchClientOrdersPage
+  getClientsSummary: (searchText?: string, signal?: AbortSignal) =>
+    fetchClientsSummary(searchText, signal),
+  getClientSummary: (clientId: string, signal?: AbortSignal) =>
+    fetchClientSummary(clientId, signal),
+  getClientOrdersPage: (clientId: string, limit = 50, offset = 0, signal?: AbortSignal) =>
+    fetchClientOrdersPage(clientId, limit, offset, signal),
+  getClientSitesPerformance: (clientId: string, signal?: AbortSignal) =>
+    fetchClientSitesPerformance(clientId, signal),
+  getClientSiteSummary: (clientId: string, siteId: string, signal?: AbortSignal) =>
+    fetchClientSiteSummary(clientId, siteId, signal),
+  getClientAnalytics: (clientId: string, signal?: AbortSignal) =>
+    fetchClientAnalytics(clientId, signal),
 };
 
 
