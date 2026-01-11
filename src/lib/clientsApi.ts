@@ -1,31 +1,100 @@
-import { rpcWithRetry } from '@/lib/rpcWithRetry';
+// src/lib/clientsApi.ts
+import { supabase } from '@/lib/supabase';
 
-export interface ClientSummary {
-  id: string;
+type RpcResult<T> = { data: T | null; error: any };
+
+const isAbortError = (err: unknown) => {
+  if (!err || typeof err !== 'object') return false;
+  const name = 'name' in err ? String((err as any).name) : '';
+  const message = 'message' in err ? String((err as any).message) : '';
+  return name === 'AbortError' || message.includes('AbortError');
+};
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Small retry wrapper for Supabase RPC calls.
+ * Retries only on transient/network-ish failures; does NOT retry on abort.
+ */
+export async function rpcWithRetry<T>(
+  fnName: string,
+  args: Record<string, any> = {},
+  opts?: { signal?: AbortSignal; retries?: number }
+): Promise<T> {
+  const retries = opts?.retries ?? 2;
+
+  let attempt = 0;
+  let lastError: any = null;
+
+  while (attempt <= retries) {
+    if (opts?.signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+
+    try {
+      // supabase-js v2: you can pass { signal } in options in some methods,
+      // but rpc doesn't consistently support it across all builds.
+      // We'll still respect AbortSignal before/after the request.
+      const res: RpcResult<T> = await supabase.rpc(fnName as any, args as any);
+
+      if (opts?.signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+
+      if (res.error) throw res.error;
+      return res.data as T;
+    } catch (err: any) {
+      if (isAbortError(err)) throw err;
+
+      lastError = err;
+
+      // Don't spam retries on obvious "function not found" / SQL errors
+      const msg = String(err?.message ?? '');
+      const code = String(err?.code ?? '');
+      const status = Number(err?.status ?? 0);
+
+      const isPermanent =
+        msg.includes('does not exist') ||
+        msg.includes('function') && msg.includes('does not exist') ||
+        code === '42883' || // undefined_function
+        code === '42P01' || // undefined_table
+        status === 400 ||
+        status === 401 ||
+        status === 403;
+
+      if (isPermanent || attempt === retries) {
+        throw err;
+      }
+
+      // backoff: 250ms, 500ms, 1000ms...
+      await sleep(250 * Math.pow(2, attempt));
+      attempt += 1;
+    }
+  }
+
+  throw lastError ?? new Error(`RPC ${fnName} failed`);
+}
+
+/** Types matching your RPC “tons-only” returns */
+export type ClientSummaryRow = {
+  id: string; // uuid
   name: string;
   total_orders: number;
   total_tons: number;
   unique_sites: number;
-  last_order_date: string | null;
-}
+  last_order_date: string | null; // date
+};
 
-export interface ClientSummaryDetail {
-  client_id: string;
-  client_name: string;
-  contact_name: string | null;
-  contact_phone: string | null;
-  contact_email: string | null;
-  address: string | null;
-  notes: string | null;
+export type ClientTopCardSummary = {
   total_orders: number;
   total_tons: number;
   unique_sites: number;
   last_order_date: string | null;
-}
+};
 
-export interface ClientOrderRow {
-  id: string;
-  date: string | null;
+export type ClientOrdersPageRow = {
+  id: string; // your unified RPC returns id as text
+  date: string | null; // date
   status: string | null;
   tons: number | null;
   company: string | null;
@@ -38,208 +107,103 @@ export interface ClientOrderRow {
   driver_name: string | null;
   phone_number: string | null;
   customer_name: string | null;
-  source: 'orders' | 'history_orders';
-  total_count: number;
-}
+  source: 'orders' | 'history_orders' | string;
+  total_count: number; // window count
+};
 
-export interface ClientOrdersPage {
-  rows: ClientOrderRow[];
-  totalCount: number;
-}
-
-export interface ClientSitesPerformanceRow {
-  site_id: string;
+export type SitePerformanceRow = {
+  site_id: string; // uuid
   site_name: string;
   contact_name: string | null;
   contact_phone: string | null;
-  contact_email: string | null;
-  address: string | null;
   location_text: string | null;
   google_maps_url: string | null;
   notes: string | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
-}
+};
 
-export interface ClientAnalytics {
-  monthly_tons: { month: string; tons: number }[];
-  status_breakdown: { status: string; count: number }[];
-  order_type_breakdown: { order_type: string; count: number; tons: number }[];
-  shift_breakdown: { shift: string; count: number; tons: number }[];
-  diameter_breakdown: { diameter: string; tons: number; percentage: number }[];
-  diameter_totals: { total_breakdown_tons: number; total_order_tons: number; has_mismatch: boolean };
-}
-
-export interface ClientSiteSummary {
+export type SiteDetailsRow = {
   site_id: string;
   site_name: string;
   client_id: string;
   client_name: string;
   contact_name: string | null;
   contact_phone: string | null;
-  contact_email: string | null;
-  address: string | null;
   location_text: string | null;
   google_maps_url: string | null;
   notes: string | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
-}
-
-export interface ClientSiteOrdersPage {
-  rows: ClientOrderRow[];
-  totalCount: number;
-}
-
-export const fetchClientsSummary = async (
-  searchText?: string,
-  signal?: AbortSignal
-): Promise<ClientSummary[]> => {
-  const normalizedSearch = searchText?.trim() ?? '';
-  const { data, error } = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
-    search_text: normalizedSearch.length > 0 ? normalizedSearch : '',
-  }, { signal });
-
-  if (error) {
-    throw error;
-  }
-
-  return (data || []) as ClientSummary[];
 };
 
-export const fetchClientSummary = async (
-  clientId: string,
-  signal?: AbortSignal
-): Promise<ClientSummaryDetail> => {
-  const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
-    client_id: clientId,
-  }, { signal });
+export async function fetchClientsSummary(searchText?: string, signal?: AbortSignal) {
+  const data = await rpcWithRetry<ClientSummaryRow[]>(
+    'get_clients_summary',
+    { search_text: searchText ?? null },
+    { signal }
+  );
+  return data ?? [];
+}
 
-  if (error) {
-    throw error;
-  }
+export async function fetchClientSummary(clientId: string, signal?: AbortSignal) {
+  const rows = await rpcWithRetry<ClientTopCardSummary[]>(
+    'get_client_summary',
+    { client_id: clientId },
+    { signal }
+  );
+  return rows?.[0] ?? null;
+}
 
-  const rows = (data || []) as ClientSummaryDetail[];
-  const row = rows[0];
+export async function fetchClientSitesPerformance(clientId: string, signal?: AbortSignal) {
+  const data = await rpcWithRetry<SitePerformanceRow[]>(
+    'get_client_sites_performance',
+    { client_id: clientId },
+    { signal }
+  );
+  return data ?? [];
+}
 
-  if (!row) {
-    throw new Error('Unable to load client summary');
-  }
+export async function fetchClientSiteSummary(clientId: string, siteId: string, signal?: AbortSignal) {
+  const rows = await rpcWithRetry<SiteDetailsRow[]>(
+    'get_client_site_summary',
+    { client_id: clientId, site_id: siteId },
+    { signal }
+  );
+  return rows?.[0] ?? null;
+}
 
-  return row;
-};
-
-export const fetchClientOrdersPage = async (
+export async function fetchClientOrdersPage(
   clientId: string,
   limit = 50,
   offset = 0,
   signal?: AbortSignal
-): Promise<ClientOrdersPage> => {
-  const { data, error } = await rpcWithRetry<ClientOrderRow[]>('get_client_orders_page', {
-    client_id: clientId,
-    limit_count: limit,
-    offset_count: offset,
-  }, { signal });
+) {
+  const data = await rpcWithRetry<ClientOrdersPageRow[]>(
+    'get_client_orders_page',
+    {
+      client_id: clientId,
+      limit_count: limit,
+      offset_count: offset
+    },
+    { signal }
+  );
+  return data ?? [];
+}
 
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data || []) as ClientOrderRow[];
-  const total = rows.length > 0 ? rows[0].total_count : 0;
-
-  return { rows, totalCount: total };
-};
-
-export const fetchClientAnalytics = async (
-  clientId: string,
-  signal?: AbortSignal
-): Promise<ClientAnalytics | null> => {
-  const { data, error } = await rpcWithRetry<ClientAnalytics | null>('get_client_analytics', {
-    client_id: clientId,
-  }, { signal });
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
-};
-
-export const fetchClientSitesPerformance = async (
-  clientId: string,
-  signal?: AbortSignal
-): Promise<ClientSitesPerformanceRow[]> => {
-  const { data, error } = await rpcWithRetry<ClientSitesPerformanceRow[]>('get_client_sites_performance', {
-    client_id: clientId,
-  }, { signal });
-
-  if (error) {
-    throw error;
-  }
-
-  return (data || []) as ClientSitesPerformanceRow[];
-};
-
-export const fetchClientSiteSummary = async (
-  clientId: string,
-  siteId: string,
-  signal?: AbortSignal
-): Promise<ClientSiteSummary | null> => {
-  const { data, error } = await rpcWithRetry<ClientSiteSummary[]>('get_client_site_summary', {
-    client_id: clientId,
-    site_id: siteId,
-  }, { signal });
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data || []) as ClientSiteSummary[];
-  return rows[0] ?? null;
-};
-
-export const fetchClientSiteOrdersPage = async (
-  clientId: string,
-  siteId: string,
-  limit = 25,
-  offset = 0,
-  signal?: AbortSignal
-): Promise<ClientSiteOrdersPage> => {
-  const { data, error } = await rpcWithRetry<ClientOrderRow[]>('get_client_site_orders_page', {
-    client_id: clientId,
-    site_id: siteId,
-    limit_count: limit,
-    offset_count: offset,
-  }, { signal });
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data || []) as ClientOrderRow[];
-  const total = rows.length > 0 ? rows[0].total_count : 0;
-  return { rows, totalCount: total };
-};
-
+/**
+ * Convenience object export so components can do:
+ *   import { clientsApi } from '@/lib/clientsApi';
+ */
 export const clientsApi = {
+  rpcWithRetry,
   fetchClientsSummary,
   fetchClientSummary,
   fetchClientSitesPerformance,
   fetchClientSiteSummary,
-  fetchClientOrdersPage,
-  fetchClientAnalytics,
-  fetchClientSiteOrdersPage,
+  fetchClientOrdersPage
 };
 
-export {
-  fetchClientsSummary,
-  fetchClientSummary,
-  fetchClientSitesPerformance,
-  fetchClientSiteSummary,
-  fetchClientOrdersPage,
-  fetchClientAnalytics,
-  fetchClientSiteOrdersPage,
-};
+
