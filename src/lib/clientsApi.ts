@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { rpcWithRetry } from '@/lib/rpcWithRetry';
 
 export interface ClientSummary {
   id: string;
@@ -95,12 +95,16 @@ export const clientsApi = {
     const rows = (data || []) as ClientSummaryDetail[];
     const row = rows[0];
 
-    if (error || !row) {
-      throw error || new Error('Unable to load client summary');
-    }
+export const fetchClientsSummary = async (
+  searchText?: string,
+  signal?: AbortSignal
+): Promise<ClientSummary[]> => {
+  const data = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
+    search_text: searchText?.trim() || null,
+  }, { signal });
 
-    return row;
-  },
+  return (data || []) as ClientSummary[];
+};
 
   async getClientOrdersPage(clientId: string, limit = 50, offset = 0): Promise<ClientOrdersPage> {
     const { data, error } = await rpcWithRetry<ClientOrderRow[]>('get_client_orders_page', {
@@ -109,15 +113,15 @@ export const clientsApi = {
       offset_count: offset,
     });
 
-    if (error) {
-      throw error;
-    }
+  const rows = (data || []) as ClientSummaryDetail[];
+  const row = rows[0];
 
-    const rows = (data || []) as ClientOrderRow[];
-    const total = rows.length > 0 ? rows[0].total_count : 0;
+  if (!row) {
+    throw new Error('Unable to load client summary');
+  }
 
-    return { orders: rows, total };
-  },
+  return row;
+};
 
   async getClientAnalytics(clientId: string): Promise<ClientAnalytics> {
     const { data, error } = await rpcWithRetry<ClientAnalytics>('get_client_analytics', {
@@ -131,17 +135,16 @@ export const clientsApi = {
       throw error || new Error('Unable to load analytics');
     }
 
-    return data as ClientAnalytics;
-  },
+  return data;
+};
 
   async getClientSitesPerformance(clientId: string): Promise<ClientSitesPerformanceRow[]> {
     const { data, error } = await rpcWithRetry<ClientSitesPerformanceRow[]>('get_client_sites_performance', {
       client_id: clientId,
     });
 
-    if (error) {
-      throw error;
-    }
+  return (data || []) as ClientSitesPerformanceRow[];
+};
 
     return (data || []) as ClientSitesPerformanceRow[];
   },

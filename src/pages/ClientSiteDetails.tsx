@@ -68,6 +68,9 @@ export function ClientSiteDetailsPage() {
       setNotes(siteData.notes ?? '');
       setLastUpdated(new Date());
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to load site details');
       setSiteSummary(null);
       setOrdersTotal(0);
@@ -117,6 +120,9 @@ export function ClientSiteDetailsPage() {
       setOrders(collected.slice(targetOffset, targetEnd));
       setOrdersTotal(siteSummary.total_orders);
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setOrdersError(err instanceof Error ? err.message : 'Failed to load site orders');
       setOrders([]);
     } finally {
@@ -125,11 +131,15 @@ export function ClientSiteDetailsPage() {
   }, [clientId, ordersPage, siteSummary]);
 
   useEffect(() => {
-    fetchSiteSummary();
+    const controller = new AbortController();
+    fetchSiteSummary(controller.signal);
+    return () => controller.abort();
   }, [fetchSiteSummary]);
 
   useEffect(() => {
-    fetchSiteOrders();
+    const controller = new AbortController();
+    fetchSiteOrders(controller.signal);
+    return () => controller.abort();
   }, [fetchSiteOrders]);
 
   useEffect(() => {
@@ -513,7 +523,14 @@ export function ClientSiteDetailsPage() {
                             <FileText className="h-12 w-12 mx-auto text-muted-foreground/50" />
                             <div>
                               <p className="font-medium">No Orders Found</p>
-                              <p className="text-sm">No orders found for this site.</p>
+                              <p className="text-sm">No orders found for this site on this page.</p>
+                              <Button
+                                variant="link"
+                                className="h-auto p-0"
+                                onClick={() => navigate(`/clients/${siteSummary.client_id}`)}
+                              >
+                                View all client orders
+                              </Button>
                             </div>
                           </div>
                         </TableCell>
