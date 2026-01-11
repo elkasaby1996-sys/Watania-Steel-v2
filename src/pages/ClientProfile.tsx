@@ -22,7 +22,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatNumber, roundTo3Decimals } from '@/lib/utils';
 import {
-  clientsApi,
+  fetchClientAnalytics,
+  fetchClientOrdersPage,
+  fetchClientSitesPerformance,
+  fetchClientSummary,
   type ClientAnalytics,
   type ClientOrderRow,
   type ClientSitesPerformanceRow,
@@ -50,7 +53,7 @@ export function ClientProfilePage() {
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchCoreData = useCallback(async () => {
+  const fetchCoreData = useCallback(async (signal?: AbortSignal) => {
     if (!clientId) return;
 
     setLoading(true);
@@ -58,14 +61,17 @@ export function ClientProfilePage() {
 
     try {
       const [summaryData, sitesData] = await Promise.all([
-        clientsApi.getClientSummary(clientId),
-        clientsApi.getClientSitesPerformance(clientId),
+        fetchClientSummary(clientId, signal),
+        fetchClientSitesPerformance(clientId, signal),
       ]);
 
       setSummary(summaryData);
       setSitesPerformance(sitesData);
       setLastUpdated(new Date());
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to load client profile');
       setSummary(null);
       setSitesPerformance([]);
@@ -74,7 +80,7 @@ export function ClientProfilePage() {
     }
   }, [clientId]);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (signal?: AbortSignal) => {
     if (!clientId) return;
 
     setOrdersLoading(true);
@@ -82,15 +88,19 @@ export function ClientProfilePage() {
 
     try {
       const offset = (ordersPage - 1) * PAGE_SIZE;
-      const { orders: orderRows, total } = await clientsApi.getClientOrdersPage(
+      const { orders: orderRows, total } = await fetchClientOrdersPage(
         clientId,
         PAGE_SIZE,
-        offset
+        offset,
+        signal
       );
 
       setOrders(orderRows);
       setOrdersTotal(total);
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
       setOrders([]);
       setOrdersTotal(0);
@@ -99,16 +109,26 @@ export function ClientProfilePage() {
     }
   }, [clientId, ordersPage]);
 
-  const fetchAnalytics = useCallback(async () => {
+  const fetchAnalytics = useCallback(async (signal?: AbortSignal) => {
     if (!clientId) return;
 
     setAnalyticsLoading(true);
     setAnalyticsError(null);
 
     try {
-      const analyticsData = await clientsApi.getClientAnalytics(clientId);
+      const analyticsData = await fetchClientAnalytics(clientId, signal);
+      if (!analyticsData) {
+        setAnalytics(null);
+        return;
+      }
       setAnalytics(analyticsData);
     } catch (err) {
+      if (err instanceof Error) {
+        console.error('Failed to load client analytics:', err.message);
+      }
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
       setAnalytics(null);
     } finally {
@@ -117,15 +137,21 @@ export function ClientProfilePage() {
   }, [clientId]);
 
   useEffect(() => {
-    fetchCoreData();
+    const controller = new AbortController();
+    fetchCoreData(controller.signal);
+    return () => controller.abort();
   }, [fetchCoreData]);
 
   useEffect(() => {
-    fetchOrders();
+    const controller = new AbortController();
+    fetchOrders(controller.signal);
+    return () => controller.abort();
   }, [fetchOrders]);
 
   useEffect(() => {
-    fetchAnalytics();
+    const controller = new AbortController();
+    fetchAnalytics(controller.signal);
+    return () => controller.abort();
   }, [fetchAnalytics]);
 
   useEffect(() => {
@@ -148,12 +174,23 @@ export function ClientProfilePage() {
   const kpis = {
     totalOrders: summary?.total_orders ?? 0,
     totalTons: summary?.total_tons ?? 0,
-    totalAmount: summary?.total_amount ?? 0,
     sites: summary?.unique_sites ?? 0,
     lastOrderDate: summary?.last_order_date ?? 'N/A',
   };
 
   const statusBreakdown = useMemo(() => analytics?.status_breakdown || [], [analytics]);
+  const statusTotal = useMemo(
+    () => statusBreakdown.reduce((total, row) => total + row.count, 0),
+    [statusBreakdown]
+  );
+  const statusBreakdownWithPercentage = useMemo(
+    () =>
+      statusBreakdown.map((row) => ({
+        ...row,
+        percentage: statusTotal > 0 ? (row.count / statusTotal) * 100 : 0,
+      })),
+    [statusBreakdown, statusTotal]
+  );
   const orderTypeBreakdown = useMemo(() => analytics?.order_type_breakdown || [], [analytics]);
   const shiftBreakdown = useMemo(() => analytics?.shift_breakdown || [], [analytics]);
   const diameterBreakdown = useMemo(() => analytics?.diameter_breakdown || [], [analytics]);
@@ -485,10 +522,6 @@ export function ClientProfilePage() {
                   <span className="font-medium text-foreground">{formatNumber(kpis.totalTons)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Total Amount</span>
-                  <span className="font-medium text-foreground">QAR {formatNumber(kpis.totalAmount)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Sites</span>
                   <span className="font-medium text-foreground">{kpis.sites}</span>
                 </div>
@@ -631,7 +664,7 @@ export function ClientProfilePage() {
                 <CardDescription>Order count per status</CardDescription>
               </CardHeader>
               <CardContent>
-                {statusBreakdown.length > 0 ? (
+                {statusBreakdownWithPercentage.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow className="border-border">
@@ -641,7 +674,7 @@ export function ClientProfilePage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {statusBreakdown.map((row) => (
+                      {statusBreakdownWithPercentage.map((row) => (
                         <TableRow key={row.status} className="border-border">
                           <TableCell>
                             <Badge className={`${getStatusBadge(row.status)} border`}>
