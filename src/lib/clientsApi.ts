@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { rpcWithRetry } from '@/lib/rpcWithRetry';
 
 export interface ClientSummary {
   id: string;
@@ -12,9 +12,13 @@ export interface ClientSummary {
 export interface ClientSummaryDetail {
   client_id: string;
   client_name: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
+  notes: string | null;
   total_orders: number;
   total_tons: number;
-  total_amount: number;
   unique_sites: number;
   last_order_date: string | null;
 }
@@ -23,7 +27,6 @@ export interface ClientOrderRow {
   id: string;
   date: string | null;
   status: string | null;
-  amount: number | null;
   tons: number | null;
   company: string | null;
   site: string | null;
@@ -40,13 +43,20 @@ export interface ClientOrderRow {
 }
 
 export interface ClientOrdersPage {
-  orders: ClientOrderRow[];
-  total: number;
+  rows: ClientOrderRow[];
+  totalCount: number;
 }
 
 export interface ClientSitesPerformanceRow {
   site_id: string;
   site_name: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
+  location_text: string | null;
+  google_maps_url: string | null;
+  notes: string | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
@@ -54,80 +64,172 @@ export interface ClientSitesPerformanceRow {
 
 export interface ClientAnalytics {
   monthly_tons: { month: string; tons: number }[];
-  monthly_amount: { month: string; amount: number }[];
-  status_breakdown: { status: string; count: number; percentage: number }[];
+  status_breakdown: { status: string; count: number }[];
   order_type_breakdown: { order_type: string; count: number; tons: number }[];
   shift_breakdown: { shift: string; count: number; tons: number }[];
   diameter_breakdown: { diameter: string; tons: number; percentage: number }[];
   diameter_totals: { total_breakdown_tons: number; total_order_tons: number; has_mismatch: boolean };
 }
 
+export interface ClientSiteSummary {
+  site_id: string;
+  site_name: string;
+  client_id: string;
+  client_name: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
+  location_text: string | null;
+  google_maps_url: string | null;
+  notes: string | null;
+  total_orders: number;
+  total_tons: number;
+  last_order_date: string | null;
+}
+
+export interface ClientSiteOrdersPage {
+  rows: ClientOrderRow[];
+  totalCount: number;
+}
+
+export const fetchClientsSummary = async (
+  searchText?: string,
+  signal?: AbortSignal
+): Promise<ClientSummary[]> => {
+  const normalizedSearch = searchText?.trim() ?? '';
+  const { data, error } = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
+    search_text: normalizedSearch.length > 0 ? normalizedSearch : '',
+  }, { signal });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []) as ClientSummary[];
+};
+
+export const fetchClientSummary = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientSummaryDetail> => {
+  const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
+    client_id: clientId,
+  }, { signal });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data || []) as ClientSummaryDetail[];
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error('Unable to load client summary');
+  }
+
+  return row;
+};
+
+export const fetchClientOrdersPage = async (
+  clientId: string,
+  limit = 50,
+  offset = 0,
+  signal?: AbortSignal
+): Promise<ClientOrdersPage> => {
+  const { data, error } = await rpcWithRetry<ClientOrderRow[]>('get_client_orders_page', {
+    client_id: clientId,
+    limit_count: limit,
+    offset_count: offset,
+  }, { signal });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data || []) as ClientOrderRow[];
+  const total = rows.length > 0 ? rows[0].total_count : 0;
+
+  return { rows, totalCount: total };
+};
+
+export const fetchClientAnalytics = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientAnalytics | null> => {
+  const { data, error } = await rpcWithRetry<ClientAnalytics | null>('get_client_analytics', {
+    client_id: clientId,
+  }, { signal });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+};
+
+export const fetchClientSitesPerformance = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientSitesPerformanceRow[]> => {
+  const { data, error } = await rpcWithRetry<ClientSitesPerformanceRow[]>('get_client_sites_performance', {
+    client_id: clientId,
+  }, { signal });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []) as ClientSitesPerformanceRow[];
+};
+
+export const fetchClientSiteSummary = async (
+  clientId: string,
+  siteId: string,
+  signal?: AbortSignal
+): Promise<ClientSiteSummary | null> => {
+  const { data, error } = await rpcWithRetry<ClientSiteSummary[]>('get_client_site_summary', {
+    client_id: clientId,
+    site_id: siteId,
+  }, { signal });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data || []) as ClientSiteSummary[];
+  return rows[0] ?? null;
+};
+
+export const fetchClientSiteOrdersPage = async (
+  clientId: string,
+  siteId: string,
+  limit = 25,
+  offset = 0,
+  signal?: AbortSignal
+): Promise<ClientSiteOrdersPage> => {
+  const { data, error } = await rpcWithRetry<ClientOrderRow[]>('get_client_site_orders_page', {
+    client_id: clientId,
+    site_id: siteId,
+    limit_count: limit,
+    offset_count: offset,
+  }, { signal });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data || []) as ClientOrderRow[];
+  const total = rows.length > 0 ? rows[0].total_count : 0;
+  return { rows, totalCount: total };
+};
+
 export const clientsApi = {
-  async getClientsSummary(searchText?: string): Promise<ClientSummary[]> {
-    const { data, error } = await supabase.rpc('get_clients_summary', {
-      search_text: searchText?.trim() || null,
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    return (data || []) as ClientSummary[];
-  },
-
-  async getClientSummary(clientId: string): Promise<ClientSummaryDetail> {
-    const { data, error } = await supabase.rpc('get_client_summary', {
-      client_id: clientId,
-    });
-
-    const rows = (data || []) as ClientSummaryDetail[];
-    const row = rows[0];
-
-    if (error || !row) {
-      throw error || new Error('Unable to load client summary');
-    }
-
-    return row;
-  },
-
-  async getClientOrdersPage(clientId: string, limit = 50, offset = 0): Promise<ClientOrdersPage> {
-    const { data, error } = await supabase.rpc('get_client_orders_page', {
-      client_id: clientId,
-      limit_count: limit,
-      offset_count: offset,
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    const rows = (data || []) as ClientOrderRow[];
-    const total = rows.length > 0 ? rows[0].total_count : 0;
-
-    return { orders: rows, total };
-  },
-
-  async getClientAnalytics(clientId: string): Promise<ClientAnalytics> {
-    const { data, error } = await supabase.rpc('get_client_analytics', {
-      client_id: clientId,
-    });
-
-    if (error || !data) {
-      throw error || new Error('Unable to load analytics');
-    }
-
-    return data as ClientAnalytics;
-  },
-
-  async getClientSitesPerformance(clientId: string): Promise<ClientSitesPerformanceRow[]> {
-    const { data, error } = await supabase.rpc('get_client_sites_performance', {
-      client_id: clientId,
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    return (data || []) as ClientSitesPerformanceRow[];
-  },
+  fetchClientsSummary,
+  fetchClientSummary,
+  fetchClientSitesPerformance,
+  fetchClientSiteSummary,
+  fetchClientOrdersPage,
+  fetchClientAnalytics,
+  fetchClientSiteOrdersPage,
 };
