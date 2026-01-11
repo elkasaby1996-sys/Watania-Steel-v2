@@ -110,7 +110,7 @@ export function ClientProfilePage() {
 
     try {
       const offset = (ordersPage - 1) * PAGE_SIZE;
-      const { rows: orderRows, totalCount } = await fetchClientOrdersPage(
+      const { orders: orderRows, total } = await fetchClientOrdersPage(
         clientId,
         PAGE_SIZE,
         offset,
@@ -145,11 +145,8 @@ export function ClientProfilePage() {
       }
       setAnalytics(analyticsData);
     } catch (err) {
-      if (err instanceof Error && import.meta.env.DEV) {
+      if (err instanceof Error) {
         console.error('Failed to load client analytics:', err.message);
-      }
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return;
       }
       setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
       setAnalytics(null);
@@ -611,26 +608,6 @@ export function ClientProfilePage() {
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Total Tons</span>
                   <span className="font-medium text-foreground">{formatNumber(kpis.totalTons)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Contact Name</span>
-                  <span className="font-medium text-foreground">{summary.contact_name || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Contact Phone</span>
-                  <span className="font-medium text-foreground">{summary.contact_phone || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Contact Email</span>
-                  <span className="font-medium text-foreground">{summary.contact_email || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Address</span>
-                  <span className="font-medium text-foreground">{summary.address || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Notes</span>
-                  <span className="font-medium text-foreground">{summary.notes || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Sites</span>
