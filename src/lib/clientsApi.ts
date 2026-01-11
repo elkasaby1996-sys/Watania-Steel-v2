@@ -12,6 +12,11 @@ export interface ClientSummary {
 export interface ClientSummaryDetail {
   client_id: string;
   client_name: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
+  notes: string | null;
   total_orders: number;
   total_tons: number;
   unique_sites: number;
@@ -38,13 +43,20 @@ export interface ClientOrderRow {
 }
 
 export interface ClientOrdersPage {
-  orders: ClientOrderRow[];
-  total: number;
+  rows: ClientOrderRow[];
+  totalCount: number;
 }
 
 export interface ClientSitesPerformanceRow {
   site_id: string;
   site_name: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
+  location_text: string | null;
+  google_maps_url: string | null;
+  notes: string | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
@@ -80,20 +92,34 @@ export const clientsApi = {
       search_text: searchText?.trim() || null,
     });
 
-    if (error) {
-      throw error;
-    }
+export interface ClientSiteOrdersPage {
+  rows: ClientOrderRow[];
+  totalCount: number;
+}
 
-    return (data || []) as ClientSummary[];
-  },
+export const fetchClientsSummary = async (
+  searchText?: string,
+  signal?: AbortSignal
+): Promise<ClientSummary[]> => {
+  const { data, error } = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
+    search_text: searchText?.trim() || null,
+  }, { signal });
 
   async getClientSummary(clientId: string): Promise<ClientSummaryDetail> {
     const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
       client_id: clientId,
     });
 
-    const rows = (data || []) as ClientSummaryDetail[];
-    const row = rows[0];
+  return (data || []) as ClientSummary[];
+};
+
+export const fetchClientSummary = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientSummaryDetail> => {
+  const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
+    client_id: clientId,
+  }, { signal });
 
 export const fetchClientsSummary = async (
   searchText?: string,

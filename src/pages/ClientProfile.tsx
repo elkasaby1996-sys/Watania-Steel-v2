@@ -18,8 +18,18 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { formatNumber, roundTo3Decimals } from '@/lib/utils';
 import {
   fetchClientAnalytics,
@@ -31,12 +41,17 @@ import {
   type ClientSitesPerformanceRow,
   type ClientSummaryDetail,
 } from '@/lib/clientsApi';
+import { hasPermission } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { useAuthStore } from '@/stores/authStore';
 
 const PAGE_SIZE = 50;
 
 export function ClientProfilePage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const canEdit = hasPermission(user?.profile?.role, 'edit');
 
   const [summary, setSummary] = useState<ClientSummaryDetail | null>(null);
   const [analytics, setAnalytics] = useState<ClientAnalytics | null>(null);
@@ -52,6 +67,13 @@ export function ClientProfilePage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [savingClient, setSavingClient] = useState(false);
+  const [clientContactName, setClientContactName] = useState('');
+  const [clientContactPhone, setClientContactPhone] = useState('');
+  const [clientContactEmail, setClientContactEmail] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientNotes, setClientNotes] = useState('');
 
   const fetchCoreData = useCallback(async (signal?: AbortSignal) => {
     if (!clientId) return;
@@ -96,7 +118,7 @@ export function ClientProfilePage() {
       );
 
       setOrders(orderRows);
-      setOrdersTotal(total);
+      setOrdersTotal(totalCount);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         return;
@@ -155,6 +177,15 @@ export function ClientProfilePage() {
     setOrdersPage(1);
   }, [clientId]);
 
+  useEffect(() => {
+    if (!editDialogOpen || !summary) return;
+    setClientContactName(summary.contact_name ?? '');
+    setClientContactPhone(summary.contact_phone ?? '');
+    setClientContactEmail(summary.contact_email ?? '');
+    setClientAddress(summary.address ?? '');
+    setClientNotes(summary.notes ?? '');
+  }, [editDialogOpen, summary]);
+
   const handlePreviousPage = () => {
     setOrdersPage((prev) => Math.max(1, prev - 1));
   };
@@ -162,6 +193,54 @@ export function ClientProfilePage() {
   const handleNextPage = () => {
     const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
     setOrdersPage((prev) => Math.min(totalPages, prev + 1));
+  };
+
+  const handleSaveClientDetails = async () => {
+    if (!summary || !clientId) return;
+
+    if (!canEdit) {
+      return;
+    }
+
+    setSavingClient(true);
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({
+          contact_name: clientContactName.trim() || null,
+          contact_phone: clientContactPhone.trim() || null,
+          contact_email: clientContactEmail.trim() || null,
+          address: clientAddress.trim() || null,
+          notes: clientNotes.trim() || null,
+        })
+        .eq('id', clientId);
+
+      if (error) {
+        throw error;
+      }
+
+      setSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              contact_name: clientContactName.trim() || null,
+              contact_phone: clientContactPhone.trim() || null,
+              contact_email: clientContactEmail.trim() || null,
+              address: clientAddress.trim() || null,
+              notes: clientNotes.trim() || null,
+            }
+          : prev
+      );
+      setLastUpdated(new Date());
+      setEditDialogOpen(false);
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error('Failed to update client details:', err);
+      }
+    } finally {
+      setSavingClient(false);
+    }
   };
 
   const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
@@ -498,8 +577,20 @@ export function ClientProfilePage() {
           <div className="grid md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle>Client Overview</CardTitle>
-                <CardDescription>Key client details and totals</CardDescription>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle>Client Overview</CardTitle>
+                    <CardDescription>Key client details and totals</CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditDialogOpen(true)}
+                    disabled={!canEdit}
+                    title={!canEdit ? 'Editors or admins can edit client details.' : undefined}
+                  >
+                    Edit Client Details
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border">
@@ -574,6 +665,82 @@ export function ClientProfilePage() {
               </CardContent>
             </Card>
           </div>
+
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit Client Details</DialogTitle>
+                <DialogDescription>Update contact details for this client.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="clientContactName">Contact Name</Label>
+                    <Input
+                      id="clientContactName"
+                      value={clientContactName}
+                      onChange={(event) => setClientContactName(event.target.value)}
+                      placeholder="Client contact name"
+                      disabled={!canEdit || savingClient}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientContactPhone">Contact Phone</Label>
+                    <Input
+                      id="clientContactPhone"
+                      value={clientContactPhone}
+                      onChange={(event) => setClientContactPhone(event.target.value)}
+                      placeholder="Contact phone number"
+                      disabled={!canEdit || savingClient}
+                    />
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="clientContactEmail">Contact Email</Label>
+                    <Input
+                      id="clientContactEmail"
+                      value={clientContactEmail}
+                      onChange={(event) => setClientContactEmail(event.target.value)}
+                      placeholder="contact@example.com"
+                      disabled={!canEdit || savingClient}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientAddress">Address</Label>
+                    <Input
+                      id="clientAddress"
+                      value={clientAddress}
+                      onChange={(event) => setClientAddress(event.target.value)}
+                      placeholder="Client address"
+                      disabled={!canEdit || savingClient}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clientNotes">Notes</Label>
+                  <textarea
+                    id="clientNotes"
+                    value={clientNotes}
+                    onChange={(event) => setClientNotes(event.target.value)}
+                    placeholder="Additional notes"
+                    disabled={!canEdit || savingClient}
+                    className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="flex flex-wrap justify-between gap-2">
+                {!canEdit && (
+                  <p className="text-sm text-muted-foreground">
+                    You need editor or admin access to update client details.
+                  </p>
+                )}
+                <Button onClick={handleSaveClientDetails} disabled={!canEdit || savingClient}>
+                  {savingClient ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
