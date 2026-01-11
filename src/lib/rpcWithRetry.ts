@@ -40,7 +40,7 @@ export const rpcWithRetry = async <T>(
   fnName: string,
   params: Record<string, unknown> = {},
   options: RpcRetryOptions = {}
-): Promise<{ data: T | null; error: Error | null }> => {
+): Promise<T> => {
   const { retries = 2, retryDelayMs = 300, signal } = options;
   let attempt = 0;
   let lastError: Error | null = null;
@@ -50,7 +50,7 @@ export const rpcWithRetry = async <T>(
       const { data, error } = await supabase.rpc(fnName, params, { signal });
 
       if (!error) {
-        return { data: data as T, error: null };
+        return data as T;
       }
 
       lastError = error;
@@ -70,5 +70,5 @@ export const rpcWithRetry = async <T>(
     attempt += 1;
   }
 
-  return { data: null, error: lastError || new Error('RPC request failed') };
+  throw lastError || new Error('RPC request failed');
 };
