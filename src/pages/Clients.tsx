@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useNavigate } from 'react-router-dom';
 import { formatNumber } from '@/lib/utils';
-import { clientsApi, type ClientSummary } from '@/lib/clientsApi';
+import { fetchClientsSummary, type ClientSummary } from '@/lib/clientsApi';
 
 export function Clients() {
   const navigate = useNavigate();
@@ -16,14 +16,17 @@ export function Clients() {
   const [searchQuery, setSearchQuery] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchClients = useCallback(async (searchText?: string) => {
+  const fetchClients = useCallback(async (searchText?: string, signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await clientsApi.getClientsSummary(searchText);
+      const data = await fetchClientsSummary(searchText, signal);
       setClients(data);
       setLastUpdated(new Date());
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to load clients');
       setClients([]);
     } finally {
@@ -32,11 +35,15 @@ export function Clients() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const timeout = setTimeout(() => {
-      fetchClients(searchQuery);
+      fetchClients(searchQuery, controller.signal);
     }, searchQuery ? 300 : 0);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
   }, [fetchClients, searchQuery]);
 
   const handleClientClick = (clientId: string) => {
