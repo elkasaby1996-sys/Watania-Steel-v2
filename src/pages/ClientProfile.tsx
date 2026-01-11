@@ -126,9 +126,6 @@ export function ClientProfilePage() {
       if (err instanceof Error) {
         console.error('Failed to load client analytics:', err.message);
       }
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return;
-      }
       setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
       setAnalytics(null);
     } finally {

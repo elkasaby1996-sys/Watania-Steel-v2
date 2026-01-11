@@ -66,8 +66,6 @@ export interface ClientSiteSummary {
   client_name: string;
   contact_name: string | null;
   contact_phone: string | null;
-  contact_email: string | null;
-  address: string | null;
   location_text: string | null;
   google_maps_url: string | null;
   notes: string | null;
@@ -75,6 +73,27 @@ export interface ClientSiteSummary {
   total_tons: number;
   last_order_date: string | null;
 }
+
+export const clientsApi = {
+  async getClientsSummary(searchText?: string): Promise<ClientSummary[]> {
+    const { data, error } = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
+      search_text: searchText?.trim() || null,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data || []) as ClientSummary[];
+  },
+
+  async getClientSummary(clientId: string): Promise<ClientSummaryDetail> {
+    const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
+      client_id: clientId,
+    });
+
+    const rows = (data || []) as ClientSummaryDetail[];
+    const row = rows[0];
 
 export const fetchClientsSummary = async (
   searchText?: string,
@@ -87,13 +106,12 @@ export const fetchClientsSummary = async (
   return (data || []) as ClientSummary[];
 };
 
-export const fetchClientSummary = async (
-  clientId: string,
-  signal?: AbortSignal
-): Promise<ClientSummaryDetail> => {
-  const data = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
-    client_id: clientId,
-  }, { signal });
+  async getClientOrdersPage(clientId: string, limit = 50, offset = 0): Promise<ClientOrdersPage> {
+    const { data, error } = await rpcWithRetry<ClientOrderRow[]>('get_client_orders_page', {
+      client_id: clientId,
+      limit_count: limit,
+      offset_count: offset,
+    });
 
   const rows = (data || []) as ClientSummaryDetail[];
   const row = rows[0];
@@ -105,56 +123,45 @@ export const fetchClientSummary = async (
   return row;
 };
 
-export const fetchClientOrdersPage = async (
-  clientId: string,
-  limit = 50,
-  offset = 0,
-  signal?: AbortSignal
-): Promise<ClientOrdersPage> => {
-  const data = await rpcWithRetry<ClientOrderRow[]>('get_client_orders_page', {
-    client_id: clientId,
-    limit_count: limit,
-    offset_count: offset,
-  }, { signal });
+  async getClientAnalytics(clientId: string): Promise<ClientAnalytics> {
+    const { data, error } = await rpcWithRetry<ClientAnalytics>('get_client_analytics', {
+      client_id: clientId,
+    });
 
-  const rows = (data || []) as ClientOrderRow[];
-  const total = rows.length > 0 ? rows[0].total_count : 0;
-
-  return { orders: rows, total };
-};
-
-export const fetchClientAnalytics = async (
-  clientId: string,
-  signal?: AbortSignal
-): Promise<ClientAnalytics | null> => {
-  const data = await rpcWithRetry<ClientAnalytics | null>('get_client_analytics', {
-    client_id: clientId,
-  }, { signal });
+    if (error || !data) {
+      if (error) {
+        console.error('get_client_analytics error:', error.message);
+      }
+      throw error || new Error('Unable to load analytics');
+    }
 
   return data;
 };
 
-export const fetchClientSitesPerformance = async (
-  clientId: string,
-  signal?: AbortSignal
-): Promise<ClientSitesPerformanceRow[]> => {
-  const data = await rpcWithRetry<ClientSitesPerformanceRow[]>('get_client_sites_performance', {
-    client_id: clientId,
-  }, { signal });
+  async getClientSitesPerformance(clientId: string): Promise<ClientSitesPerformanceRow[]> {
+    const { data, error } = await rpcWithRetry<ClientSitesPerformanceRow[]>('get_client_sites_performance', {
+      client_id: clientId,
+    });
 
   return (data || []) as ClientSitesPerformanceRow[];
 };
 
-export const fetchClientSiteSummary = async (
-  clientId: string,
-  siteId: string,
-  signal?: AbortSignal
-): Promise<ClientSiteSummary | null> => {
-  const data = await rpcWithRetry<ClientSiteSummary[]>('get_client_site_summary', {
-    client_id: clientId,
-    site_id: siteId,
-  }, { signal });
+    return (data || []) as ClientSitesPerformanceRow[];
+  },
 
-  const rows = (data || []) as ClientSiteSummary[];
-  return rows[0] ?? null;
+  async getClientSiteSummary(clientId: string, siteId: string): Promise<ClientSiteSummary> {
+    const { data, error } = await supabase.rpc('get_client_site_summary', {
+      client_id: clientId,
+      site_id: siteId,
+    });
+
+    const rows = (data || []) as ClientSiteSummary[];
+    const row = rows[0];
+
+    if (error || !row) {
+      throw error || new Error('Unable to load site summary');
+    }
+
+    return row;
+  },
 };
