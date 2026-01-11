@@ -35,7 +35,7 @@ import { formatNumber, roundTo3Decimals } from '@/lib/utils';
 import {
   fetchClientAnalytics,
   fetchClientOrdersPage,
-  fetchClientRow,
+  fetchClientRow as fetchClientRowApi,
   fetchClientSitesPerformance,
   fetchClientSummary,
   type ClientAnalytics,
@@ -193,6 +193,7 @@ export function ClientProfilePage() {
 
       setOrders(orderRows);
       setOrdersTotal(totalCount);
+      setOrdersPage(page);
       if (import.meta.env.DEV) {
         console.log('RPC get_client_orders_page rows', orderRows.length);
       }
@@ -310,12 +311,12 @@ export function ClientProfilePage() {
   };
 
   useEffect(() => {
-    if (!editDialogOpen || !clientRow) return;
-    setClientContactName(clientRow.contact_name ?? '');
-    setClientContactPhone(clientRow.contact_phone ?? '');
-    setClientContactEmail(clientRow.contact_email ?? '');
-    setClientAddress(clientRow.address ?? '');
-    setClientNotes(clientRow.notes ?? '');
+    if (!editDialogOpen) return;
+    setClientContactName(clientRow?.contact_name ?? '');
+    setClientContactPhone(clientRow?.contact_phone ?? '');
+    setClientContactEmail(clientRow?.contact_email ?? '');
+    setClientAddress(clientRow?.address ?? '');
+    setClientNotes(clientRow?.notes ?? '');
   }, [editDialogOpen, clientRow]);
 
   const handlePreviousPage = () => {
