@@ -279,6 +279,37 @@ export function ClientProfilePage() {
     }
   };
 
+  const loadOrdersPage = async (page: number) => {
+    if (!clientId) return;
+
+    setOrdersLoading(true);
+    setOrdersError(null);
+
+    const offset = (page - 1) * PAGE_SIZE;
+
+    try {
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page payload', {
+          client_id: clientId,
+          limit_count: PAGE_SIZE,
+          offset_count: offset,
+        });
+      }
+      const { rows, totalCount } = await fetchClientOrdersPage(clientId, PAGE_SIZE, offset);
+      setOrders(rows);
+      setOrdersTotal(totalCount);
+      setOrdersPage(page);
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page rows', rows.length);
+      }
+    } catch (err) {
+      setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!editDialogOpen || !clientRow) return;
     setClientContactName(clientRow.contact_name ?? '');
