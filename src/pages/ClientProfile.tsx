@@ -18,22 +18,40 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { formatNumber, roundTo3Decimals } from '@/lib/utils';
 import {
-  clientsApi,
+  fetchClientAnalytics,
+  fetchClientOrdersPage,
+  fetchClientSitesPerformance,
+  fetchClientSummary,
   type ClientAnalytics,
   type ClientOrderRow,
   type ClientSitesPerformanceRow,
   type ClientSummaryDetail,
 } from '@/lib/clientsApi';
+import { hasPermission } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { useAuthStore } from '@/stores/authStore';
 
 const PAGE_SIZE = 50;
 
 export function ClientProfilePage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const canEdit = hasPermission(user?.profile?.role, 'edit');
 
   const [summary, setSummary] = useState<ClientSummaryDetail | null>(null);
   const [analytics, setAnalytics] = useState<ClientAnalytics | null>(null);
@@ -49,8 +67,15 @@ export function ClientProfilePage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [savingClient, setSavingClient] = useState(false);
+  const [clientContactName, setClientContactName] = useState('');
+  const [clientContactPhone, setClientContactPhone] = useState('');
+  const [clientContactEmail, setClientContactEmail] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientNotes, setClientNotes] = useState('');
 
-  const fetchCoreData = useCallback(async () => {
+  const fetchCoreData = useCallback(async (signal?: AbortSignal) => {
     if (!clientId) return;
 
     setLoading(true);
@@ -58,14 +83,17 @@ export function ClientProfilePage() {
 
     try {
       const [summaryData, sitesData] = await Promise.all([
-        clientsApi.getClientSummary(clientId),
-        clientsApi.getClientSitesPerformance(clientId),
+        fetchClientSummary(clientId, signal),
+        fetchClientSitesPerformance(clientId, signal),
       ]);
 
       setSummary(summaryData);
       setSitesPerformance(sitesData);
       setLastUpdated(new Date());
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to load client profile');
       setSummary(null);
       setSitesPerformance([]);
@@ -74,7 +102,7 @@ export function ClientProfilePage() {
     }
   }, [clientId]);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (signal?: AbortSignal) => {
     if (!clientId) return;
 
     setOrdersLoading(true);
@@ -82,15 +110,19 @@ export function ClientProfilePage() {
 
     try {
       const offset = (ordersPage - 1) * PAGE_SIZE;
-      const { orders: orderRows, total } = await clientsApi.getClientOrdersPage(
+      const { rows: orderRows, totalCount } = await fetchClientOrdersPage(
         clientId,
         PAGE_SIZE,
-        offset
+        offset,
+        signal
       );
 
       setOrders(orderRows);
-      setOrdersTotal(total);
+      setOrdersTotal(totalCount);
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
       setOrders([]);
       setOrdersTotal(0);
@@ -99,16 +131,26 @@ export function ClientProfilePage() {
     }
   }, [clientId, ordersPage]);
 
-  const fetchAnalytics = useCallback(async () => {
+  const fetchAnalytics = useCallback(async (signal?: AbortSignal) => {
     if (!clientId) return;
 
     setAnalyticsLoading(true);
     setAnalyticsError(null);
 
     try {
-      const analyticsData = await clientsApi.getClientAnalytics(clientId);
+      const analyticsData = await fetchClientAnalytics(clientId, signal);
+      if (!analyticsData) {
+        setAnalytics(null);
+        return;
+      }
       setAnalytics(analyticsData);
     } catch (err) {
+      if (err instanceof Error && import.meta.env.DEV) {
+        console.error('Failed to load client analytics:', err.message);
+      }
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
       setAnalytics(null);
     } finally {
@@ -117,20 +159,35 @@ export function ClientProfilePage() {
   }, [clientId]);
 
   useEffect(() => {
-    fetchCoreData();
+    const controller = new AbortController();
+    fetchCoreData(controller.signal);
+    return () => controller.abort();
   }, [fetchCoreData]);
 
   useEffect(() => {
-    fetchOrders();
+    const controller = new AbortController();
+    fetchOrders(controller.signal);
+    return () => controller.abort();
   }, [fetchOrders]);
 
   useEffect(() => {
-    fetchAnalytics();
+    const controller = new AbortController();
+    fetchAnalytics(controller.signal);
+    return () => controller.abort();
   }, [fetchAnalytics]);
 
   useEffect(() => {
     setOrdersPage(1);
   }, [clientId]);
+
+  useEffect(() => {
+    if (!editDialogOpen || !summary) return;
+    setClientContactName(summary.contact_name ?? '');
+    setClientContactPhone(summary.contact_phone ?? '');
+    setClientContactEmail(summary.contact_email ?? '');
+    setClientAddress(summary.address ?? '');
+    setClientNotes(summary.notes ?? '');
+  }, [editDialogOpen, summary]);
 
   const handlePreviousPage = () => {
     setOrdersPage((prev) => Math.max(1, prev - 1));
@@ -141,6 +198,54 @@ export function ClientProfilePage() {
     setOrdersPage((prev) => Math.min(totalPages, prev + 1));
   };
 
+  const handleSaveClientDetails = async () => {
+    if (!summary || !clientId) return;
+
+    if (!canEdit) {
+      return;
+    }
+
+    setSavingClient(true);
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({
+          contact_name: clientContactName.trim() || null,
+          contact_phone: clientContactPhone.trim() || null,
+          contact_email: clientContactEmail.trim() || null,
+          address: clientAddress.trim() || null,
+          notes: clientNotes.trim() || null,
+        })
+        .eq('id', clientId);
+
+      if (error) {
+        throw error;
+      }
+
+      setSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              contact_name: clientContactName.trim() || null,
+              contact_phone: clientContactPhone.trim() || null,
+              contact_email: clientContactEmail.trim() || null,
+              address: clientAddress.trim() || null,
+              notes: clientNotes.trim() || null,
+            }
+          : prev
+      );
+      setLastUpdated(new Date());
+      setEditDialogOpen(false);
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error('Failed to update client details:', err);
+      }
+    } finally {
+      setSavingClient(false);
+    }
+  };
+
   const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
   const startRecord = ordersTotal > 0 ? (ordersPage - 1) * PAGE_SIZE + 1 : 0;
   const endRecord = Math.min(ordersPage * PAGE_SIZE, ordersTotal);
@@ -148,12 +253,23 @@ export function ClientProfilePage() {
   const kpis = {
     totalOrders: summary?.total_orders ?? 0,
     totalTons: summary?.total_tons ?? 0,
-    totalAmount: summary?.total_amount ?? 0,
     sites: summary?.unique_sites ?? 0,
     lastOrderDate: summary?.last_order_date ?? 'N/A',
   };
 
   const statusBreakdown = useMemo(() => analytics?.status_breakdown || [], [analytics]);
+  const statusTotal = useMemo(
+    () => statusBreakdown.reduce((total, row) => total + row.count, 0),
+    [statusBreakdown]
+  );
+  const statusBreakdownWithPercentage = useMemo(
+    () =>
+      statusBreakdown.map((row) => ({
+        ...row,
+        percentage: statusTotal > 0 ? (row.count / statusTotal) * 100 : 0,
+      })),
+    [statusBreakdown, statusTotal]
+  );
   const orderTypeBreakdown = useMemo(() => analytics?.order_type_breakdown || [], [analytics]);
   const shiftBreakdown = useMemo(() => analytics?.shift_breakdown || [], [analytics]);
   const diameterBreakdown = useMemo(() => analytics?.diameter_breakdown || [], [analytics]);
@@ -464,8 +580,20 @@ export function ClientProfilePage() {
           <div className="grid md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle>Client Overview</CardTitle>
-                <CardDescription>Key client details and totals</CardDescription>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle>Client Overview</CardTitle>
+                    <CardDescription>Key client details and totals</CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditDialogOpen(true)}
+                    disabled={!canEdit}
+                    title={!canEdit ? 'Editors or admins can edit client details.' : undefined}
+                  >
+                    Edit Client Details
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border">
@@ -485,8 +613,24 @@ export function ClientProfilePage() {
                   <span className="font-medium text-foreground">{formatNumber(kpis.totalTons)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground">Total Amount</span>
-                  <span className="font-medium text-foreground">QAR {formatNumber(kpis.totalAmount)}</span>
+                  <span className="text-muted-foreground">Contact Name</span>
+                  <span className="font-medium text-foreground">{summary.contact_name || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Contact Phone</span>
+                  <span className="font-medium text-foreground">{summary.contact_phone || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Contact Email</span>
+                  <span className="font-medium text-foreground">{summary.contact_email || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Address</span>
+                  <span className="font-medium text-foreground">{summary.address || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Notes</span>
+                  <span className="font-medium text-foreground">{summary.notes || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Sites</span>
@@ -544,6 +688,82 @@ export function ClientProfilePage() {
               </CardContent>
             </Card>
           </div>
+
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit Client Details</DialogTitle>
+                <DialogDescription>Update contact details for this client.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="clientContactName">Contact Name</Label>
+                    <Input
+                      id="clientContactName"
+                      value={clientContactName}
+                      onChange={(event) => setClientContactName(event.target.value)}
+                      placeholder="Client contact name"
+                      disabled={!canEdit || savingClient}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientContactPhone">Contact Phone</Label>
+                    <Input
+                      id="clientContactPhone"
+                      value={clientContactPhone}
+                      onChange={(event) => setClientContactPhone(event.target.value)}
+                      placeholder="Contact phone number"
+                      disabled={!canEdit || savingClient}
+                    />
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="clientContactEmail">Contact Email</Label>
+                    <Input
+                      id="clientContactEmail"
+                      value={clientContactEmail}
+                      onChange={(event) => setClientContactEmail(event.target.value)}
+                      placeholder="contact@example.com"
+                      disabled={!canEdit || savingClient}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientAddress">Address</Label>
+                    <Input
+                      id="clientAddress"
+                      value={clientAddress}
+                      onChange={(event) => setClientAddress(event.target.value)}
+                      placeholder="Client address"
+                      disabled={!canEdit || savingClient}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clientNotes">Notes</Label>
+                  <textarea
+                    id="clientNotes"
+                    value={clientNotes}
+                    onChange={(event) => setClientNotes(event.target.value)}
+                    placeholder="Additional notes"
+                    disabled={!canEdit || savingClient}
+                    className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="flex flex-wrap justify-between gap-2">
+                {!canEdit && (
+                  <p className="text-sm text-muted-foreground">
+                    You need editor or admin access to update client details.
+                  </p>
+                )}
+                <Button onClick={handleSaveClientDetails} disabled={!canEdit || savingClient}>
+                  {savingClient ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
@@ -631,7 +851,7 @@ export function ClientProfilePage() {
                 <CardDescription>Order count per status</CardDescription>
               </CardHeader>
               <CardContent>
-                {statusBreakdown.length > 0 ? (
+                {statusBreakdownWithPercentage.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow className="border-border">
@@ -641,7 +861,7 @@ export function ClientProfilePage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {statusBreakdown.map((row) => (
+                      {statusBreakdownWithPercentage.map((row) => (
                         <TableRow key={row.status} className="border-border">
                           <TableCell>
                             <Badge className={`${getStatusBadge(row.status)} border`}>
