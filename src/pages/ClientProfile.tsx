@@ -50,11 +50,21 @@ import { useAuthStore } from '@/stores/authStore';
 
 const PAGE_SIZE = 50;
 
+const isValidUuid = (value: string) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(value);
+};
+
 export function ClientProfilePage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const canEdit = hasPermission(user?.profile?.role, 'edit');
+  const normalizedClientId = useMemo(() => clientId?.trim() ?? '', [clientId]);
+  const hasValidClientId = useMemo(
+    () => Boolean(normalizedClientId) && isValidUuid(normalizedClientId),
+    [normalizedClientId]
+  );
 
   const [clientRow, setClientRow] = useState<ClientRow | null>(null);
   const [summary, setSummary] = useState<ClientSummaryDetail | null>(null);
@@ -83,17 +93,46 @@ export function ClientProfilePage() {
   const [clientAddress, setClientAddress] = useState('');
   const [clientNotes, setClientNotes] = useState('');
 
-  useEffect(() => {
-    if (!clientId) return;
-    if (!import.meta.env.DEV) return;
-    console.log('ClientProfile clientId param', clientId);
-  }, [clientId]);
+  const fetchCoreData = useCallback(async (signal?: AbortSignal) => {
+    if (!hasValidClientId) return;
 
-  useEffect(() => {
-    if (!clientId) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_summary payload', { client_id: normalizedClientId });
+        console.log('RPC get_client_sites_performance payload', { client_id: normalizedClientId });
+      }
+      const [summaryData, sitesData] = await Promise.all([
+        fetchClientSummary(normalizedClientId, signal),
+        fetchClientSitesPerformance(normalizedClientId, signal),
+      ]);
+
+      setSummary(summaryData);
+      setSitesPerformance(sitesData);
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_summary rows', summaryData ? 1 : 0);
+        console.log('RPC get_client_sites_performance rows', sitesData.length);
+      }
+      setLastUpdated(new Date());
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Failed to load client profile');
+      setSummary(null);
+      setSitesPerformance([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [hasValidClientId, normalizedClientId]);
+
+  const fetchOrders = useCallback(async (signal?: AbortSignal) => {
+    if (!hasValidClientId) return;
 
     const controller = new AbortController();
-    const abortSignal = controller.signal;
+    const { signal } = controller;
 
     setOrdersPage(1);
     setClientLoading(true);
@@ -107,53 +146,49 @@ export function ClientProfilePage() {
     setAnalyticsLoading(true);
     setAnalyticsError(null);
 
-    const isAbortError = (err: unknown) => err instanceof DOMException && err.name === 'AbortError';
-
-    const loadClientRow = async () => {
-      try {
-        const row = await fetchClientRow(clientId, abortSignal);
-        if (abortSignal.aborted) return;
-        setClientRow(row);
-      } catch (err) {
-        if (isAbortError(err)) return;
-        setClientError(err instanceof Error ? err.message : 'Failed to load client details');
-        setClientRow(null);
-      } finally {
-        if (!abortSignal.aborted) {
-          setClientLoading(false);
-        }
+    try {
+      const offset = (ordersPage - 1) * PAGE_SIZE;
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page payload', {
+          client_id: normalizedClientId,
+          limit_count: PAGE_SIZE,
+          offset_count: offset,
+        });
       }
-    };
+      const { rows: orderRows, totalCount } = await fetchClientOrdersPage(
+        normalizedClientId,
+        PAGE_SIZE,
+        offset,
+        signal
+      );
 
-    const loadSummary = async () => {
-      try {
-        if (import.meta.env.DEV) {
-          console.log('RPC get_client_summary payload', { client_id: clientId });
-        }
-        const summaryData = await fetchClientSummary(clientId, abortSignal);
-        if (abortSignal.aborted) return;
-        setSummary(summaryData);
-        if (import.meta.env.DEV) {
-          console.log('RPC get_client_summary rows', summaryData ? 1 : 0);
-        }
-      } catch (err) {
-        if (isAbortError(err)) return;
-        setSummaryError(err instanceof Error ? err.message : 'Failed to load client summary');
-        setSummary(null);
-      } finally {
-        if (!abortSignal.aborted) {
-          setSummaryLoading(false);
-        }
+      setOrders(orderRows);
+      setOrdersTotal(totalCount);
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page rows', orderRows.length);
       }
-    };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
+      setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
+      setOrders([]);
+      setOrdersTotal(0);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [hasValidClientId, normalizedClientId, ordersPage]);
+
+  const fetchAnalytics = useCallback(async (signal?: AbortSignal) => {
+    if (!hasValidClientId) return;
 
     const loadSites = async () => {
       try {
         if (import.meta.env.DEV) {
           console.log('RPC get_client_sites_performance payload', { client_id: clientId });
         }
-        const sitesData = await fetchClientSitesPerformance(clientId, abortSignal);
-        if (abortSignal.aborted) return;
+        const sitesData = await fetchClientSitesPerformance(clientId, signal);
+        if (signal.aborted) return;
         setSitesPerformance(sitesData);
         if (import.meta.env.DEV) {
           console.log('RPC get_client_sites_performance rows', sitesData.length);
@@ -163,61 +198,40 @@ export function ClientProfilePage() {
         setSitesError(err instanceof Error ? err.message : 'Failed to load site performance');
         setSitesPerformance([]);
       } finally {
-        if (!abortSignal.aborted) {
+        if (!signal.aborted) {
           setSitesLoading(false);
         }
       }
     };
 
-    const loadOrders = async () => {
-      try {
-        if (import.meta.env.DEV) {
-          console.log('RPC get_client_orders_page payload', {
-            client_id: clientId,
-            limit_count: PAGE_SIZE,
-            offset_count: 0,
-          });
-        }
-        const { rows, totalCount } = await fetchClientOrdersPage(clientId, PAGE_SIZE, 0, abortSignal);
-        if (abortSignal.aborted) return;
-        setOrders(rows);
-        setOrdersTotal(totalCount);
-        if (import.meta.env.DEV) {
-          console.log('RPC get_client_orders_page rows', rows.length);
-        }
-      } catch (err) {
-        if (isAbortError(err)) return;
-        setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
-        setOrders([]);
-        setOrdersTotal(0);
-      } finally {
-        if (!abortSignal.aborted) {
-          setOrdersLoading(false);
-        }
+    try {
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_analytics payload', { client_id: normalizedClientId });
       }
-    };
-
-    const loadAnalytics = async () => {
-      try {
-        if (import.meta.env.DEV) {
-          console.log('RPC get_client_analytics payload', { client_id: clientId });
-        }
-        const analyticsData = await fetchClientAnalytics(clientId, abortSignal);
-        if (abortSignal.aborted) return;
-        setAnalytics(analyticsData);
-        if (import.meta.env.DEV) {
-          console.log('RPC get_client_analytics rows', analyticsData.monthly_tons.length);
-        }
-      } catch (err) {
-        if (isAbortError(err)) return;
-        setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
+      const analyticsData = await fetchClientAnalytics(normalizedClientId, signal);
+      if (!analyticsData) {
         setAnalytics(null);
-      } finally {
-        if (!abortSignal.aborted) {
-          setAnalyticsLoading(false);
-        }
+        return;
       }
-    };
+      setAnalytics(analyticsData);
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_analytics rows', analyticsData.monthly_tons.length);
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        console.error('Failed to load client analytics:', err.message);
+      }
+      setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
+      setAnalytics(null);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [hasValidClientId, normalizedClientId]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    console.log('ClientProfile clientId param', normalizedClientId || '(missing)');
+  }, [normalizedClientId]);
 
     loadClientRow();
     loadSummary();
@@ -228,7 +242,42 @@ export function ClientProfilePage() {
     setLastUpdated(new Date());
 
     return () => controller.abort();
-  }, [clientId]);
+  }, [fetchAnalytics]);
+
+  useEffect(() => {
+    setOrdersPage(1);
+  }, [normalizedClientId]);
+
+  const loadOrdersPage = async (page: number) => {
+    if (!clientId) return;
+
+    setOrdersLoading(true);
+    setOrdersError(null);
+
+    const offset = (page - 1) * PAGE_SIZE;
+
+    try {
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page payload', {
+          client_id: clientId,
+          limit_count: PAGE_SIZE,
+          offset_count: offset,
+        });
+      }
+      const { rows, totalCount } = await fetchClientOrdersPage(clientId, PAGE_SIZE, offset);
+      setOrders(rows);
+      setOrdersTotal(totalCount);
+      setOrdersPage(page);
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page rows', rows.length);
+      }
+    } catch (err) {
+      setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   const loadOrdersPage = async (page: number) => {
     if (!clientId) return;
@@ -282,7 +331,7 @@ export function ClientProfilePage() {
   };
 
   const handleSaveClientDetails = async () => {
-    if (!clientRow || !clientId) return;
+    if (!summary || !hasValidClientId) return;
 
     if (!canEdit) {
       return;
@@ -300,7 +349,7 @@ export function ClientProfilePage() {
           address: clientAddress.trim() || null,
           notes: clientNotes.trim() || null,
         })
-        .eq('id', clientId);
+        .eq('id', normalizedClientId);
 
       if (error) {
         throw error;
@@ -359,8 +408,8 @@ export function ClientProfilePage() {
   const diameterTotals = useMemo(() => analytics?.diameter_totals, [analytics]);
 
   const handleSiteClick = (siteId: string) => {
-    if (!clientId) return;
-    navigate(`/clients/${clientId}/sites/${siteId}`);
+    if (!hasValidClientId) return;
+    navigate(`/clients/${normalizedClientId}/sites/${siteId}`);
   };
 
   const getStatusBadge = (status: string | null) => {
@@ -376,7 +425,79 @@ export function ClientProfilePage() {
 
   const lastUpdatedLabel = lastUpdated ? lastUpdated.toLocaleString() : '—';
 
-  if (!clientId) {
+  if (!hasValidClientId) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/clients')}
+            className="text-foreground hover:bg-accent"
+          >
+            <ArrowLeft size={16} />
+            Back to Clients
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-3xl font-headline font-bold text-foreground">
+              Invalid Client
+            </h1>
+            <p className="text-muted-foreground">
+              The client link is missing or invalid. Please select a client from the list.
+            </p>
+          </div>
+        </div>
+
+        <Card className="border-destructive">
+          <CardContent className="py-10">
+            <div className="text-center space-y-4">
+              <AlertCircle className="h-12 w-12 mx-auto text-destructive" />
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Unable to Load Client</h3>
+                <p className="text-muted-foreground mt-1">
+                  We couldn&apos;t validate the client ID. Please return to the clients list and try again.
+                </p>
+              </div>
+              <Button onClick={() => navigate('/clients')}>
+                View All Clients
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/clients')}
+            className="text-foreground hover:bg-accent"
+          >
+            <ArrowLeft size={16} />
+            Back to Clients
+          </Button>
+          <div className="flex-1">
+            <div className="h-8 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-32 bg-muted animate-pulse rounded mt-2" />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="text-muted-foreground">Loading client details...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !summary) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -426,25 +547,11 @@ export function ClientProfilePage() {
           Back to Clients
         </Button>
         <div className="flex-1">
-          {clientLoading && !clientRow ? (
-            <div className="space-y-2">
-              <div className="h-8 w-48 bg-muted animate-pulse rounded" />
-              <div className="h-4 w-40 bg-muted animate-pulse rounded" />
-            </div>
-          ) : (
-            <>
-              <h1 className="text-3xl font-headline font-bold text-foreground">
-                {clientRow?.name ?? 'Client Profile'}
-              </h1>
-              <p className="text-muted-foreground">Client profile and order history</p>
-              <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
-            </>
-          )}
-          {clientError && (
-            <Alert variant="destructive" className="mt-3">
-              <AlertDescription>{clientError}</AlertDescription>
-            </Alert>
-          )}
+          <h1 className="text-3xl font-headline font-bold text-foreground">
+            {summary.name}
+          </h1>
+          <p className="text-muted-foreground">Client profile and order history</p>
+          <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
         </div>
       </div>
 
@@ -553,7 +660,7 @@ export function ClientProfilePage() {
                     <p className="font-medium text-foreground">Unable to load orders</p>
                     <p className="text-sm text-muted-foreground">{ordersError}</p>
                   </div>
-                  <Button variant="outline" onClick={() => loadOrdersPage(ordersPage)}>Retry</Button>
+                  <Button variant="outline" onClick={() => fetchOrders()}>Retry</Button>
                 </div>
               ) : (
                 <>
@@ -681,11 +788,11 @@ export function ClientProfilePage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Client Name</span>
-                  <span className="font-medium text-foreground">{clientRow?.name || '—'}</span>
+                  <span className="font-medium text-foreground">{summary.name}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Client ID</span>
-                  <span className="font-mono text-sm text-foreground">{clientRow?.id || '—'}</span>
+                  <span className="font-mono text-sm text-foreground">{summary.id}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Total Orders</span>
@@ -849,9 +956,18 @@ export function ClientProfilePage() {
               </CardContent>
             </Card>
           ) : analyticsError ? (
-            <Alert variant="destructive">
-              <AlertDescription>{analyticsError}</AlertDescription>
-            </Alert>
+            <Card className="border-destructive">
+              <CardContent className="py-10">
+                <div className="text-center space-y-4">
+                  <AlertCircle className="h-12 w-12 mx-auto text-destructive" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Analytics Unavailable</h3>
+                    <p className="text-muted-foreground mt-1">{analyticsError}</p>
+                  </div>
+                  <Button variant="outline" onClick={() => fetchAnalytics()}>Retry</Button>
+                </div>
+              </CardContent>
+            </Card>
           ) : !analytics || analytics.monthly_tons.length === 0 ? (
             <Card>
               <CardHeader>
