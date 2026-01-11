@@ -205,3 +205,28 @@ export const clientsApi = {
   fetchClientSiteSummary,
   fetchClientOrdersPage
 };
+// --- ensure these functions exist above in this file ---
+// fetchClientsSummary
+// fetchClientSummary
+// fetchClientSitesPerformance
+// fetchClientSiteSummary
+// fetchClientOrdersPage
+// fetchClientAnalytics
+
+export const clientsApi = {
+  fetchClientsSummary,
+  fetchClientSummary,
+  fetchClientSitesPerformance,
+  fetchClientSiteSummary,
+  fetchClientOrdersPage,
+  fetchClientAnalytics,
+};
+
+export {
+  fetchClientsSummary,
+  fetchClientSummary,
+  fetchClientSitesPerformance,
+  fetchClientSiteSummary,
+  fetchClientOrdersPage,
+  fetchClientAnalytics,
+};
