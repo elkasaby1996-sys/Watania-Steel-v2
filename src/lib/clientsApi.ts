@@ -1,3 +1,4 @@
+// src/lib/clientsApi.ts
 import { rpcWithRetry } from '@/lib/rpcWithRetry';
 
 export interface ClientSummary {
@@ -10,17 +11,21 @@ export interface ClientSummary {
 }
 
 export interface ClientSummaryDetail {
-  client_id: string;
-  client_name: string;
-  contact_name: string | null;
-  contact_phone: string | null;
-  contact_email: string | null;
-  address: string | null;
-  notes: string | null;
+  // NOTE: your RPC currently returns totals + last_order_date.
+  // If your SQL returns fewer fields, you can remove the extra ones below.
   total_orders: number;
   total_tons: number;
   unique_sites: number;
   last_order_date: string | null;
+
+  // Optional profile fields (keep optional so UI doesn’t break if null / not returned)
+  client_id?: string;
+  client_name?: string;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  address?: string | null;
+  notes?: string | null;
 }
 
 export interface ClientOrderRow {
@@ -39,7 +44,7 @@ export interface ClientOrderRow {
   phone_number: string | null;
   customer_name: string | null;
   source: 'orders' | 'history_orders';
-  total_count: number;
+  total_count: number; // from COUNT(*) OVER()
 }
 
 export interface ClientOrdersPage {
@@ -50,6 +55,8 @@ export interface ClientOrdersPage {
 export interface ClientSitesPerformanceRow {
   site_id: string;
   site_name: string;
+
+  // site details (nullable)
   contact_name: string | null;
   contact_phone: string | null;
   contact_email: string | null;
@@ -57,6 +64,8 @@ export interface ClientSitesPerformanceRow {
   location_text: string | null;
   google_maps_url: string | null;
   notes: string | null;
+
+  // totals
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
@@ -76,40 +85,37 @@ export interface ClientSiteSummary {
   site_name: string;
   client_id: string;
   client_name: string;
+
+  // details
   contact_name: string | null;
   contact_phone: string | null;
+  contact_email?: string | null;
+  address?: string | null;
   location_text: string | null;
   google_maps_url: string | null;
   notes: string | null;
+
+  // totals
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
 }
 
-export const clientsApi = {
-  async getClientsSummary(searchText?: string): Promise<ClientSummary[]> {
-    const { data, error } = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
-      search_text: searchText?.trim() || null,
-    });
-
-export interface ClientSiteOrdersPage {
-  rows: ClientOrderRow[];
-  totalCount: number;
-}
+/**
+ * Low-level fetchers (easy for components/hooks to call)
+ */
 
 export const fetchClientsSummary = async (
   searchText?: string,
   signal?: AbortSignal
 ): Promise<ClientSummary[]> => {
-  const { data, error } = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
-    search_text: searchText?.trim() || null,
-  }, { signal });
+  const { data, error } = await rpcWithRetry<ClientSummary[]>(
+    'get_clients_summary',
+    { search_text: searchText?.trim() || null },
+    { signal }
+  );
 
-  async getClientSummary(clientId: string): Promise<ClientSummaryDetail> {
-    const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
-      client_id: clientId,
-    });
-
+  if (error) throw error;
   return (data || []) as ClientSummary[];
 };
 
@@ -117,77 +123,99 @@ export const fetchClientSummary = async (
   clientId: string,
   signal?: AbortSignal
 ): Promise<ClientSummaryDetail> => {
-  const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>('get_client_summary', {
-    client_id: clientId,
-  }, { signal });
+  const { data, error } = await rpcWithRetry<ClientSummaryDetail[]>(
+    'get_client_summary',
+    { client_id: clientId },
+    { signal }
+  );
 
-export const fetchClientsSummary = async (
-  searchText?: string,
-  signal?: AbortSignal
-): Promise<ClientSummary[]> => {
-  const data = await rpcWithRetry<ClientSummary[]>('get_clients_summary', {
-    search_text: searchText?.trim() || null,
-  }, { signal });
-
-  return (data || []) as ClientSummary[];
-};
-
-  async getClientOrdersPage(clientId: string, limit = 50, offset = 0): Promise<ClientOrdersPage> {
-    const { data, error } = await rpcWithRetry<ClientOrderRow[]>('get_client_orders_page', {
-      client_id: clientId,
-      limit_count: limit,
-      offset_count: offset,
-    });
+  if (error) throw error;
 
   const rows = (data || []) as ClientSummaryDetail[];
   const row = rows[0];
-
-  if (!row) {
-    throw new Error('Unable to load client summary');
-  }
+  if (!row) throw new Error('Unable to load client summary');
 
   return row;
 };
 
-  async getClientAnalytics(clientId: string): Promise<ClientAnalytics> {
-    const { data, error } = await rpcWithRetry<ClientAnalytics>('get_client_analytics', {
-      client_id: clientId,
-    });
+export const fetchClientOrdersPage = async (
+  clientId: string,
+  limit = 50,
+  offset = 0,
+  signal?: AbortSignal
+): Promise<ClientOrdersPage> => {
+  const { data, error } = await rpcWithRetry<ClientOrderRow[]>(
+    'get_client_orders_page',
+    { client_id: clientId, limit_count: limit, offset_count: offset },
+    { signal }
+  );
 
-    if (error || !data) {
-      if (error) {
-        console.error('get_client_analytics error:', error.message);
-      }
-      throw error || new Error('Unable to load analytics');
-    }
+  if (error) throw error;
+
+  const rows = (data || []) as ClientOrderRow[];
+  const totalCount = rows.length > 0 ? Number(rows[0].total_count || 0) : 0;
+
+  return { rows, totalCount };
+};
+
+export const fetchClientSitesPerformance = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientSitesPerformanceRow[]> => {
+  const { data, error } = await rpcWithRetry<ClientSitesPerformanceRow[]>(
+    'get_client_sites_performance',
+    { client_id: clientId },
+    { signal }
+  );
+
+  if (error) throw error;
+  return (data || []) as ClientSitesPerformanceRow[];
+};
+
+export const fetchClientSiteSummary = async (
+  clientId: string,
+  siteId: string,
+  signal?: AbortSignal
+): Promise<ClientSiteSummary> => {
+  const { data, error } = await rpcWithRetry<ClientSiteSummary[]>(
+    'get_client_site_summary',
+    { client_id: clientId, site_id: siteId },
+    { signal }
+  );
+
+  if (error) throw error;
+
+  const rows = (data || []) as ClientSiteSummary[];
+  const row = rows[0];
+  if (!row) throw new Error('Unable to load site summary');
+
+  return row;
+};
+
+export const fetchClientAnalytics = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientAnalytics> => {
+  const { data, error } = await rpcWithRetry<ClientAnalytics>(
+    'get_client_analytics',
+    { client_id: clientId },
+    { signal }
+  );
+
+  if (error) throw error;
+  if (!data) throw new Error('Unable to load analytics');
 
   return data;
 };
 
-  async getClientSitesPerformance(clientId: string): Promise<ClientSitesPerformanceRow[]> {
-    const { data, error } = await rpcWithRetry<ClientSitesPerformanceRow[]>('get_client_sites_performance', {
-      client_id: clientId,
-    });
-
-  return (data || []) as ClientSitesPerformanceRow[];
-};
-
-    return (data || []) as ClientSitesPerformanceRow[];
-  },
-
-  async getClientSiteSummary(clientId: string, siteId: string): Promise<ClientSiteSummary> {
-    const { data, error } = await supabase.rpc('get_client_site_summary', {
-      client_id: clientId,
-      site_id: siteId,
-    });
-
-    const rows = (data || []) as ClientSiteSummary[];
-    const row = rows[0];
-
-    if (error || !row) {
-      throw error || new Error('Unable to load site summary');
-    }
-
-    return row;
-  },
+/**
+ * Convenience API object (if your components prefer clientsApi.xxx())
+ */
+export const clientsApi = {
+  getClientsSummary: fetchClientsSummary,
+  getClientSummary: fetchClientSummary,
+  getClientOrdersPage: fetchClientOrdersPage,
+  getClientSitesPerformance: fetchClientSitesPerformance,
+  getClientSiteSummary: fetchClientSiteSummary,
+  getClientAnalytics: fetchClientAnalytics,
 };
