@@ -50,26 +50,6 @@ BEGIN
   ) THEN
     ALTER TABLE public.client_sites ADD COLUMN notes text;
   END IF;
-
-  IF NOT EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'client_sites'
-      AND column_name = 'contact_email'
-  ) THEN
-    ALTER TABLE public.client_sites ADD COLUMN contact_email text;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'client_sites'
-      AND column_name = 'address'
-  ) THEN
-    ALTER TABLE public.client_sites ADD COLUMN address text;
-  END IF;
 END $$;
 
 DROP FUNCTION IF EXISTS public.get_client_summary(uuid);
@@ -208,8 +188,6 @@ RETURNS TABLE (
   client_name text,
   contact_name text,
   contact_phone text,
-  contact_email text,
-  address text,
   location_text text,
   google_maps_url text,
   notes text,
@@ -243,8 +221,6 @@ AS $$
     c.name AS client_name,
     s.contact_name,
     s.contact_phone,
-    s.contact_email,
-    s.address,
     s.location_text,
     s.google_maps_url,
     s.notes,
