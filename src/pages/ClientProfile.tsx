@@ -85,6 +85,7 @@ export function ClientProfilePage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshIndex, setRefreshIndex] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
   const [clientContactName, setClientContactName] = useState('');
@@ -221,9 +222,6 @@ export function ClientProfilePage() {
       if (err instanceof Error) {
         console.error('Failed to load client analytics:', err.message);
       }
-      setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
-      setAnalytics(null);
-    } finally {
       setAnalyticsLoading(false);
     }
   }, [hasValidClientId, normalizedClientId]);
