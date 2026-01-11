@@ -1,74 +1,79 @@
+// src/lib/rpcWithRetry.ts
 import { supabase } from '@/lib/supabase';
 
-type RpcRetryOptions = {
-  retries?: number;
-  retryDelayMs?: number;
+type RpcOptions = {
   signal?: AbortSignal;
+  retries?: number;
+  baseDelayMs?: number;
 };
 
-const isRetryableStatus = (status?: number) => {
-  if (!status) return false;
-  if (status === 429) return true;
-  return status >= 500 && status < 600;
-};
+function sleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const t = setTimeout(() => resolve(), ms);
+    if (signal) {
+      signal.addEventListener(
+        'abort',
+        () => {
+          clearTimeout(t);
+          reject(new DOMException('Aborted', 'AbortError'));
+        },
+        { once: true }
+      );
+    }
+  });
+}
 
-const isRetryableMessage = (message?: string) => {
-  if (!message) return false;
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes('failed to fetch') ||
-    normalized.includes('network') ||
-    normalized.includes('timeout') ||
-    normalized.includes('fetch failed')
-  );
-};
+function isRetryable(error: any) {
+  const status = typeof error?.status === 'number' ? error.status : 0;
+  const code = typeof error?.code === 'string' ? error.code : '';
 
-const shouldRetryError = (error: unknown) => {
-  if (!error || typeof error !== 'object') return false;
+  // common transient statuses
+  if ([408, 425, 429, 500, 502, 503, 504].includes(status)) return true;
 
-  const err = error as { status?: number; message?: string };
-  if (err.status === 401 || err.status === 403) {
-    return false;
-  }
+  // sometimes supabase returns codes instead of status
+  if (code === 'PGRST301' || code === 'PGRST302') return true;
 
-  return isRetryableStatus(err.status) || isRetryableMessage(err.message);
-};
+  return false;
+}
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Safe RPC wrapper (supports AbortSignal + retries)
+ * Returns the same shape Supabase returns: { data, error }
+ */
+export async function rpcWithRetry<T>(
+  fn: string,
+  args: Record<string, any> = {},
+  options: RpcOptions = {}
+): Promise<{ data: T | null; error: any | null }> {
+  const retries = options.retries ?? 2;
+  const baseDelayMs = options.baseDelayMs ?? 300;
+  const signal = options.signal;
 
-export const rpcWithRetry = async <T>(
-  fnName: string,
-  params: Record<string, unknown> = {},
-  options: RpcRetryOptions = {}
-): Promise<T> => {
-  const { retries = 2, retryDelayMs = 300, signal } = options;
   let attempt = 0;
-  let lastError: Error | null = null;
 
-  while (attempt <= retries) {
-    try {
-      const { data, error } = await supabase.rpc(fnName, params, { signal });
-
-      if (!error) {
-        return data as T;
-      }
-
-      lastError = error;
-
-      if (!shouldRetryError(error) || attempt >= retries) {
-        break;
-      }
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error('RPC request failed');
-
-      if (!shouldRetryError(err) || attempt >= retries) {
-        break;
-      }
+  while (true) {
+    if (signal?.aborted) {
+      return { data: null, error: new DOMException('Aborted', 'AbortError') };
     }
 
-    await sleep(retryDelayMs * 2 ** attempt);
-    attempt += 1;
-  }
+    const rpcCall = supabase.rpc(fn, args);
+    const { data, error } = signal ? await rpcCall.abortSignal(signal) : await rpcCall;
 
-  throw lastError || new Error('RPC request failed');
-};
+    if (!error) return { data: (data as T) ?? null, error: null };
+
+    // Abort should not retry
+    if (signal?.aborted || error?.name === 'AbortError') {
+      return { data: null, error };
+    }
+
+    // retry only for transient errors
+    if (attempt >= retries || !isRetryable(error)) {
+      return { data: null, error };
+    }
+
+    attempt += 1;
+    const delay = baseDelayMs * Math.pow(2, attempt - 1);
+    await sleep(delay, signal);
+  }
+}
+
