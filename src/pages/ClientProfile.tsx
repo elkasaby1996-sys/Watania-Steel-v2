@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -15,6 +15,7 @@ import {
   Weight,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,10 +35,12 @@ import { formatNumber, roundTo3Decimals } from '@/lib/utils';
 import {
   fetchClientAnalytics,
   fetchClientOrdersPage,
+  fetchClientRow,
   fetchClientSitesPerformance,
   fetchClientSummary,
   type ClientAnalytics,
   type ClientOrderRow,
+  type ClientRow,
   type ClientSitesPerformanceRow,
   type ClientSummaryDetail,
 } from '@/lib/clientsApi';
@@ -53,6 +56,7 @@ export function ClientProfilePage() {
   const { user } = useAuthStore();
   const canEdit = hasPermission(user?.profile?.role, 'edit');
 
+  const [clientRow, setClientRow] = useState<ClientRow | null>(null);
   const [summary, setSummary] = useState<ClientSummaryDetail | null>(null);
   const [analytics, setAnalytics] = useState<ClientAnalytics | null>(null);
   const [sitesPerformance, setSitesPerformance] = useState<ClientSitesPerformanceRow[]>([]);
@@ -60,8 +64,12 @@ export function ClientProfilePage() {
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersPage, setOrdersPage] = useState(1);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [clientLoading, setClientLoading] = useState(false);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [sitesLoading, setSitesLoading] = useState(false);
+  const [sitesError, setSitesError] = useState<string | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -75,128 +83,206 @@ export function ClientProfilePage() {
   const [clientAddress, setClientAddress] = useState('');
   const [clientNotes, setClientNotes] = useState('');
 
-  const fetchCoreData = useCallback(async (signal?: AbortSignal) => {
+  useEffect(() => {
     if (!clientId) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [summaryData, sitesData] = await Promise.all([
-        fetchClientSummary(clientId, signal),
-        fetchClientSitesPerformance(clientId, signal),
-      ]);
-
-      setSummary(summaryData);
-      setSitesPerformance(sitesData);
-      setLastUpdated(new Date());
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return;
-      }
-      setError(err instanceof Error ? err.message : 'Failed to load client profile');
-      setSummary(null);
-      setSitesPerformance([]);
-    } finally {
-      setLoading(false);
-    }
+    if (!import.meta.env.DEV) return;
+    console.log('ClientProfile clientId param', clientId);
   }, [clientId]);
 
-  const fetchOrders = useCallback(async (signal?: AbortSignal) => {
+  useEffect(() => {
+    if (!clientId) return;
+
+    const controller = new AbortController();
+    const abortSignal = controller.signal;
+
+    setOrdersPage(1);
+    setClientLoading(true);
+    setClientError(null);
+    setSummaryLoading(true);
+    setSummaryError(null);
+    setSitesLoading(true);
+    setSitesError(null);
+    setOrdersLoading(true);
+    setOrdersError(null);
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+
+    const isAbortError = (err: unknown) => err instanceof DOMException && err.name === 'AbortError';
+
+    const loadClientRow = async () => {
+      try {
+        const row = await fetchClientRow(clientId, abortSignal);
+        if (abortSignal.aborted) return;
+        setClientRow(row);
+      } catch (err) {
+        if (isAbortError(err)) return;
+        setClientError(err instanceof Error ? err.message : 'Failed to load client details');
+        setClientRow(null);
+      } finally {
+        if (!abortSignal.aborted) {
+          setClientLoading(false);
+        }
+      }
+    };
+
+    const loadSummary = async () => {
+      try {
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_summary payload', { client_id: clientId });
+        }
+        const summaryData = await fetchClientSummary(clientId, abortSignal);
+        if (abortSignal.aborted) return;
+        setSummary(summaryData);
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_summary rows', summaryData ? 1 : 0);
+        }
+      } catch (err) {
+        if (isAbortError(err)) return;
+        setSummaryError(err instanceof Error ? err.message : 'Failed to load client summary');
+        setSummary(null);
+      } finally {
+        if (!abortSignal.aborted) {
+          setSummaryLoading(false);
+        }
+      }
+    };
+
+    const loadSites = async () => {
+      try {
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_sites_performance payload', { client_id: clientId });
+        }
+        const sitesData = await fetchClientSitesPerformance(clientId, abortSignal);
+        if (abortSignal.aborted) return;
+        setSitesPerformance(sitesData);
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_sites_performance rows', sitesData.length);
+        }
+      } catch (err) {
+        if (isAbortError(err)) return;
+        setSitesError(err instanceof Error ? err.message : 'Failed to load site performance');
+        setSitesPerformance([]);
+      } finally {
+        if (!abortSignal.aborted) {
+          setSitesLoading(false);
+        }
+      }
+    };
+
+    const loadOrders = async () => {
+      try {
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_orders_page payload', {
+            client_id: clientId,
+            limit_count: PAGE_SIZE,
+            offset_count: 0,
+          });
+        }
+        const { rows, totalCount } = await fetchClientOrdersPage(clientId, PAGE_SIZE, 0, abortSignal);
+        if (abortSignal.aborted) return;
+        setOrders(rows);
+        setOrdersTotal(totalCount);
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_orders_page rows', rows.length);
+        }
+      } catch (err) {
+        if (isAbortError(err)) return;
+        setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
+        setOrders([]);
+        setOrdersTotal(0);
+      } finally {
+        if (!abortSignal.aborted) {
+          setOrdersLoading(false);
+        }
+      }
+    };
+
+    const loadAnalytics = async () => {
+      try {
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_analytics payload', { client_id: clientId });
+        }
+        const analyticsData = await fetchClientAnalytics(clientId, abortSignal);
+        if (abortSignal.aborted) return;
+        setAnalytics(analyticsData);
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_analytics rows', analyticsData.monthly_tons.length);
+        }
+      } catch (err) {
+        if (isAbortError(err)) return;
+        setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
+        setAnalytics(null);
+      } finally {
+        if (!abortSignal.aborted) {
+          setAnalyticsLoading(false);
+        }
+      }
+    };
+
+    loadClientRow();
+    loadSummary();
+    loadSites();
+    loadOrders();
+    loadAnalytics();
+
+    setLastUpdated(new Date());
+
+    return () => controller.abort();
+  }, [clientId]);
+
+  const loadOrdersPage = async (page: number) => {
     if (!clientId) return;
 
     setOrdersLoading(true);
     setOrdersError(null);
 
-    try {
-      const offset = (ordersPage - 1) * PAGE_SIZE;
-      const { orders: orderRows, total } = await fetchClientOrdersPage(
-        clientId,
-        PAGE_SIZE,
-        offset,
-        signal
-      );
+    const offset = (page - 1) * PAGE_SIZE;
 
-      setOrders(orderRows);
-      setOrdersTotal(totalCount);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return;
+    try {
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page payload', {
+          client_id: clientId,
+          limit_count: PAGE_SIZE,
+          offset_count: offset,
+        });
       }
+      const { rows, totalCount } = await fetchClientOrdersPage(clientId, PAGE_SIZE, offset);
+      setOrders(rows);
+      setOrdersTotal(totalCount);
+      setOrdersPage(page);
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page rows', rows.length);
+      }
+    } catch (err) {
       setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
       setOrders([]);
-      setOrdersTotal(0);
     } finally {
       setOrdersLoading(false);
     }
-  }, [clientId, ordersPage]);
-
-  const fetchAnalytics = useCallback(async (signal?: AbortSignal) => {
-    if (!clientId) return;
-
-    setAnalyticsLoading(true);
-    setAnalyticsError(null);
-
-    try {
-      const analyticsData = await fetchClientAnalytics(clientId, signal);
-      if (!analyticsData) {
-        setAnalytics(null);
-        return;
-      }
-      setAnalytics(analyticsData);
-    } catch (err) {
-      if (err instanceof Error) {
-        console.error('Failed to load client analytics:', err.message);
-      }
-      setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
-      setAnalytics(null);
-    } finally {
-      setAnalyticsLoading(false);
-    }
-  }, [clientId]);
+  };
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetchCoreData(controller.signal);
-    return () => controller.abort();
-  }, [fetchCoreData]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchOrders(controller.signal);
-    return () => controller.abort();
-  }, [fetchOrders]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchAnalytics(controller.signal);
-    return () => controller.abort();
-  }, [fetchAnalytics]);
-
-  useEffect(() => {
-    setOrdersPage(1);
-  }, [clientId]);
-
-  useEffect(() => {
-    if (!editDialogOpen || !summary) return;
-    setClientContactName(summary.contact_name ?? '');
-    setClientContactPhone(summary.contact_phone ?? '');
-    setClientContactEmail(summary.contact_email ?? '');
-    setClientAddress(summary.address ?? '');
-    setClientNotes(summary.notes ?? '');
-  }, [editDialogOpen, summary]);
+    if (!editDialogOpen || !clientRow) return;
+    setClientContactName(clientRow.contact_name ?? '');
+    setClientContactPhone(clientRow.contact_phone ?? '');
+    setClientContactEmail(clientRow.contact_email ?? '');
+    setClientAddress(clientRow.address ?? '');
+    setClientNotes(clientRow.notes ?? '');
+  }, [editDialogOpen, clientRow]);
 
   const handlePreviousPage = () => {
-    setOrdersPage((prev) => Math.max(1, prev - 1));
+    const nextPage = Math.max(1, ordersPage - 1);
+    loadOrdersPage(nextPage);
   };
 
   const handleNextPage = () => {
-    const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
-    setOrdersPage((prev) => Math.min(totalPages, prev + 1));
+    const totalPages = Math.max(1, Math.ceil(ordersTotal / PAGE_SIZE));
+    const nextPage = Math.min(totalPages, ordersPage + 1);
+    loadOrdersPage(nextPage);
   };
 
   const handleSaveClientDetails = async () => {
-    if (!summary || !clientId) return;
+    if (!clientRow || !clientId) return;
 
     if (!canEdit) {
       return;
@@ -220,7 +306,7 @@ export function ClientProfilePage() {
         throw error;
       }
 
-      setSummary((prev) =>
+      setClientRow((prev) =>
         prev
           ? {
               ...prev,
@@ -290,7 +376,7 @@ export function ClientProfilePage() {
 
   const lastUpdatedLabel = lastUpdated ? lastUpdated.toLocaleString() : '—';
 
-  if (loading) {
+  if (!clientId) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -304,41 +390,8 @@ export function ClientProfilePage() {
             Back to Clients
           </Button>
           <div className="flex-1">
-            <div className="h-8 w-48 bg-muted animate-pulse rounded" />
-            <div className="h-4 w-32 bg-muted animate-pulse rounded mt-2" />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Loading client details...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !summary) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/clients')}
-            className="text-foreground hover:bg-accent"
-          >
-            <ArrowLeft size={16} />
-            Back to Clients
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-headline font-bold text-foreground">
-              Client Not Found
-            </h1>
-            <p className="text-muted-foreground">
-              The requested client could not be found
-            </p>
+            <h1 className="text-3xl font-headline font-bold text-foreground">Client Not Found</h1>
+            <p className="text-muted-foreground">The client link is missing or invalid.</p>
           </div>
         </div>
 
@@ -349,12 +402,10 @@ export function ClientProfilePage() {
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Unable to Load Client</h3>
                 <p className="text-muted-foreground mt-1">
-                  {error || 'Please confirm the client exists and try again.'}
+                  Please return to the clients list and select a client.
                 </p>
               </div>
-              <Button onClick={() => navigate('/clients')}>
-                View All Clients
-              </Button>
+              <Button onClick={() => navigate('/clients')}>View All Clients</Button>
             </div>
           </CardContent>
         </Card>
@@ -375,55 +426,90 @@ export function ClientProfilePage() {
           Back to Clients
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
-            {summary.client_name}
-          </h1>
-          <p className="text-muted-foreground">Client profile and order history</p>
-          <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
+          {clientLoading && !clientRow ? (
+            <div className="space-y-2">
+              <div className="h-8 w-48 bg-muted animate-pulse rounded" />
+              <div className="h-4 w-40 bg-muted animate-pulse rounded" />
+            </div>
+          ) : (
+            <>
+              <h1 className="text-3xl font-headline font-bold text-foreground">
+                {clientRow?.name ?? 'Client Profile'}
+              </h1>
+              <p className="text-muted-foreground">Client profile and order history</p>
+              <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
+            </>
+          )}
+          {clientError && (
+            <Alert variant="destructive" className="mt-3">
+              <AlertDescription>{clientError}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
-            <div className="text-center">
-              <Package className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{kpis.totalOrders.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">Total Orders</p>
-            </div>
+            {summaryLoading ? (
+              <div className="h-10 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-center">
+                <Package className="h-5 w-5 text-primary mx-auto mb-1" />
+                <p className="text-2xl font-bold text-foreground">{kpis.totalOrders.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total Orders</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
-            <div className="text-center">
-              <Weight className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{formatNumber(kpis.totalTons)}</p>
-              <p className="text-xs text-muted-foreground">Total Tons</p>
-            </div>
+            {summaryLoading ? (
+              <div className="h-10 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-center">
+                <Weight className="h-5 w-5 text-primary mx-auto mb-1" />
+                <p className="text-2xl font-bold text-foreground">{formatNumber(kpis.totalTons)}</p>
+                <p className="text-xs text-muted-foreground">Total Tons</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
-            <div className="text-center">
-              <MapPin className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{kpis.sites}</p>
-              <p className="text-xs text-muted-foreground">Sites</p>
-            </div>
+            {summaryLoading ? (
+              <div className="h-10 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-center">
+                <MapPin className="h-5 w-5 text-primary mx-auto mb-1" />
+                <p className="text-2xl font-bold text-foreground">{kpis.sites}</p>
+                <p className="text-xs text-muted-foreground">Sites</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
-            <div className="text-center">
-              <Calendar className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-lg font-bold text-foreground">{kpis.lastOrderDate}</p>
-              <p className="text-xs text-muted-foreground">Last Order</p>
-            </div>
+            {summaryLoading ? (
+              <div className="h-10 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-center">
+                <Calendar className="h-5 w-5 text-primary mx-auto mb-1" />
+                <p className="text-lg font-bold text-foreground">{kpis.lastOrderDate}</p>
+                <p className="text-xs text-muted-foreground">Last Order</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
+      {summaryError && (
+        <Alert variant="destructive">
+          <AlertDescription>{summaryError}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="orders" className="space-y-4">
         <TabsList>
@@ -467,7 +553,7 @@ export function ClientProfilePage() {
                     <p className="font-medium text-foreground">Unable to load orders</p>
                     <p className="text-sm text-muted-foreground">{ordersError}</p>
                   </div>
-                  <Button variant="outline" onClick={fetchOrders}>Retry</Button>
+                  <Button variant="outline" onClick={() => loadOrdersPage(ordersPage)}>Retry</Button>
                 </div>
               ) : (
                 <>
@@ -595,11 +681,11 @@ export function ClientProfilePage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Client Name</span>
-                  <span className="font-medium text-foreground">{summary.client_name}</span>
+                  <span className="font-medium text-foreground">{clientRow?.name || '—'}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Client ID</span>
-                  <span className="font-mono text-sm text-foreground">{summary.client_id}</span>
+                  <span className="font-mono text-sm text-foreground">{clientRow?.id || '—'}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground">Total Orders</span>
@@ -629,7 +715,15 @@ export function ClientProfilePage() {
                 <CardDescription>Performance metrics for delivery sites</CardDescription>
               </CardHeader>
               <CardContent>
-                {sitesPerformance.length > 0 ? (
+                {sitesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : sitesError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{sitesError}</AlertDescription>
+                  </Alert>
+                ) : sitesPerformance.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow className="border-border">
@@ -755,18 +849,9 @@ export function ClientProfilePage() {
               </CardContent>
             </Card>
           ) : analyticsError ? (
-            <Card className="border-destructive">
-              <CardContent className="py-10">
-                <div className="text-center space-y-4">
-                  <AlertCircle className="h-12 w-12 mx-auto text-destructive" />
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">Analytics Unavailable</h3>
-                    <p className="text-muted-foreground mt-1">{analyticsError}</p>
-                  </div>
-                  <Button variant="outline" onClick={fetchAnalytics}>Retry</Button>
-                </div>
-              </CardContent>
-            </Card>
+            <Alert variant="destructive">
+              <AlertDescription>{analyticsError}</AlertDescription>
+            </Alert>
           ) : !analytics || analytics.monthly_tons.length === 0 ? (
             <Card>
               <CardHeader>
