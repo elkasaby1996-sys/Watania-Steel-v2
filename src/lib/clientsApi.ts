@@ -23,7 +23,16 @@ export interface ClientSummary {
 
 export interface ClientSummaryDetail {
   // Your RPC get_client_summary returns metrics.
-  // We enrich with client info (name/contact/etc) by querying public.clients.
+  // RPC metrics only (client info loaded separately).
+  id: string;
+
+  total_orders: number;
+  total_tons: number;
+  unique_sites: number;
+  last_order_date: string | null;
+}
+
+export interface ClientRow {
   id: string;
   name: string;
   contact_name: string | null;
@@ -31,11 +40,6 @@ export interface ClientSummaryDetail {
   contact_email: string | null;
   address: string | null;
   notes: string | null;
-
-  total_orders: number;
-  total_tons: number;
-  unique_sites: number;
-  last_order_date: string | null;
 }
 
 export interface ClientOrderRow {
@@ -149,50 +153,41 @@ export const fetchClientSummary = async (
   if (metricsError) throw metricsError;
 
   const metricsRow = (metricsData || [])[0] as any | undefined;
-
-  // client info from table (name/contact/address/notes)
-  let clientInfo: any = null;
-  {
-    const q = supabase
-      .from('clients')
-      .select('id,name,contact_name,contact_phone,contact_email,address,notes')
-      .eq('id', clientId)
-      .limit(1);
-
-    const { data, error } = await (signal ? q.abortSignal(signal) : q);
-    if (error) throw error;
-    clientInfo = (data || [])[0] ?? null;
-  }
-
-  if (!clientInfo) {
-    // If somehow client row missing, still return metrics so UI doesn’t die
-    return {
-      id: clientId,
-      name: 'Unknown Client',
-      contact_name: null,
-      contact_phone: null,
-      contact_email: null,
-      address: null,
-      notes: null,
-      total_orders: Number(metricsRow?.total_orders ?? 0),
-      total_tons: toNumber(metricsRow?.total_tons),
-      unique_sites: Number(metricsRow?.unique_sites ?? 0),
-      last_order_date: metricsRow?.last_order_date ? String(metricsRow.last_order_date) : null,
-    };
-  }
-
   return {
-    id: String(clientInfo.id),
-    name: String(clientInfo.name ?? ''),
-    contact_name: clientInfo.contact_name ?? null,
-    contact_phone: clientInfo.contact_phone ?? null,
-    contact_email: clientInfo.contact_email ?? null,
-    address: clientInfo.address ?? null,
-    notes: clientInfo.notes ?? null,
+    id: clientId,
     total_orders: Number(metricsRow?.total_orders ?? 0),
     total_tons: toNumber(metricsRow?.total_tons),
     unique_sites: Number(metricsRow?.unique_sites ?? 0),
     last_order_date: metricsRow?.last_order_date ? String(metricsRow.last_order_date) : null,
+  };
+};
+
+/**
+ * 2b) Client row details from public.clients
+ */
+export const fetchClientRow = async (
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientRow | null> => {
+  const q = supabase
+    .from('clients')
+    .select('id,name,contact_name,contact_phone,contact_email,address,notes')
+    .eq('id', clientId)
+    .limit(1);
+
+  const { data, error } = await (signal ? q.abortSignal(signal) : q);
+  if (error) throw error;
+  const row = (data || [])[0];
+  if (!row) return null;
+
+  return {
+    id: String(row.id),
+    name: String(row.name ?? ''),
+    contact_name: row.contact_name ?? null,
+    contact_phone: row.contact_phone ?? null,
+    contact_email: row.contact_email ?? null,
+    address: row.address ?? null,
+    notes: row.notes ?? null,
   };
 };
 
@@ -316,65 +311,48 @@ export const fetchClientAnalytics = async (
   clientId: string,
   signal?: AbortSignal
 ): Promise<ClientAnalytics> => {
-  const { data, error } = await rpcWithRetry<any>(
+  const { data, error } = await rpcWithRetry<any[]>(
     'get_client_analytics',
     { client_id: clientId },
     { signal }
   );
-  if (error || !data) throw error || new Error('Unable to load analytics');
+  if (error) throw error;
+  const analyticsRow = (data || [])[0] as any | undefined;
+  if (!analyticsRow) throw new Error('Unable to load analytics');
 
   // normalize numeric fields inside JSON
   const normalized: ClientAnalytics = {
-    monthly_tons: (data.monthly_tons || []).map((x: any) => ({
+    monthly_tons: (analyticsRow.monthly_tons || []).map((x: any) => ({
       month: String(x.month),
       tons: toNumber(x.tons),
     })),
-    status_breakdown: (data.status_breakdown || []).map((x: any) => ({
+    status_breakdown: (analyticsRow.status_breakdown || []).map((x: any) => ({
       status: String(x.status),
       count: Number(x.count ?? 0),
       percentage: x.percentage !== undefined ? toNumber(x.percentage) : undefined,
     })),
-    order_type_breakdown: (data.order_type_breakdown || []).map((x: any) => ({
+    order_type_breakdown: (analyticsRow.order_type_breakdown || []).map((x: any) => ({
       order_type: String(x.order_type),
       count: Number(x.count ?? 0),
       tons: toNumber(x.tons),
     })),
-    shift_breakdown: (data.shift_breakdown || []).map((x: any) => ({
+    shift_breakdown: (analyticsRow.shift_breakdown || []).map((x: any) => ({
       shift: String(x.shift),
       count: Number(x.count ?? 0),
       tons: toNumber(x.tons),
     })),
-    diameter_breakdown: (data.diameter_breakdown || []).map((x: any) => ({
+    diameter_breakdown: (analyticsRow.diameter_breakdown || []).map((x: any) => ({
       diameter: String(x.diameter),
       tons: toNumber(x.tons),
       percentage: toNumber(x.percentage),
     })),
     diameter_totals: {
-      total_breakdown_tons: toNumber(data?.diameter_totals?.total_breakdown_tons),
-      total_order_tons: toNumber(data?.diameter_totals?.total_order_tons),
-      has_mismatch: Boolean(data?.diameter_totals?.has_mismatch),
+      total_breakdown_tons: toNumber(analyticsRow?.diameter_totals?.total_breakdown_tons),
+      total_order_tons: toNumber(analyticsRow?.diameter_totals?.total_order_tons),
+      has_mismatch: Boolean(analyticsRow?.diameter_totals?.has_mismatch),
     },
   };
 
   return normalized;
 };
-
-/**
- * Convenience object (some components import clientsApi.*)
- */
-export const clientsApi = {
-  getClientsSummary: (searchText?: string, signal?: AbortSignal) =>
-    fetchClientsSummary(searchText, signal),
-  getClientSummary: (clientId: string, signal?: AbortSignal) =>
-    fetchClientSummary(clientId, signal),
-  getClientOrdersPage: (clientId: string, limit = 50, offset = 0, signal?: AbortSignal) =>
-    fetchClientOrdersPage(clientId, limit, offset, signal),
-  getClientSitesPerformance: (clientId: string, signal?: AbortSignal) =>
-    fetchClientSitesPerformance(clientId, signal),
-  getClientSiteSummary: (clientId: string, siteId: string, signal?: AbortSignal) =>
-    fetchClientSiteSummary(clientId, siteId, signal),
-  getClientAnalytics: (clientId: string, signal?: AbortSignal) =>
-    fetchClientAnalytics(clientId, signal),
-};
-
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -15,6 +15,7 @@ import {
   Weight,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,10 +35,12 @@ import { formatNumber, roundTo3Decimals } from '@/lib/utils';
 import {
   fetchClientAnalytics,
   fetchClientOrdersPage,
+  fetchClientRow,
   fetchClientSitesPerformance,
   fetchClientSummary,
   type ClientAnalytics,
   type ClientOrderRow,
+  type ClientRow,
   type ClientSitesPerformanceRow,
   type ClientSummaryDetail,
 } from '@/lib/clientsApi';
@@ -63,6 +66,7 @@ export function ClientProfilePage() {
     [normalizedClientId]
   );
 
+  const [clientRow, setClientRow] = useState<ClientRow | null>(null);
   const [summary, setSummary] = useState<ClientSummaryDetail | null>(null);
   const [analytics, setAnalytics] = useState<ClientAnalytics | null>(null);
   const [sitesPerformance, setSitesPerformance] = useState<ClientSitesPerformanceRow[]>([]);
@@ -70,8 +74,12 @@ export function ClientProfilePage() {
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersPage, setOrdersPage] = useState(1);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [clientLoading, setClientLoading] = useState(false);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [sitesLoading, setSitesLoading] = useState(false);
+  const [sitesError, setSitesError] = useState<string | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -123,8 +131,20 @@ export function ClientProfilePage() {
   const fetchOrders = useCallback(async (signal?: AbortSignal) => {
     if (!hasValidClientId) return;
 
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    setOrdersPage(1);
+    setClientLoading(true);
+    setClientError(null);
+    setSummaryLoading(true);
+    setSummaryError(null);
+    setSitesLoading(true);
+    setSitesError(null);
     setOrdersLoading(true);
     setOrdersError(null);
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
 
     try {
       const offset = (ordersPage - 1) * PAGE_SIZE;
@@ -162,8 +182,27 @@ export function ClientProfilePage() {
   const fetchAnalytics = useCallback(async (signal?: AbortSignal) => {
     if (!hasValidClientId) return;
 
-    setAnalyticsLoading(true);
-    setAnalyticsError(null);
+    const loadSites = async () => {
+      try {
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_sites_performance payload', { client_id: clientId });
+        }
+        const sitesData = await fetchClientSitesPerformance(clientId, signal);
+        if (signal.aborted) return;
+        setSitesPerformance(sitesData);
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_sites_performance rows', sitesData.length);
+        }
+      } catch (err) {
+        if (isAbortError(err)) return;
+        setSitesError(err instanceof Error ? err.message : 'Failed to load site performance');
+        setSitesPerformance([]);
+      } finally {
+        if (!signal.aborted) {
+          setSitesLoading(false);
+        }
+      }
+    };
 
     try {
       if (import.meta.env.DEV) {
@@ -194,21 +233,14 @@ export function ClientProfilePage() {
     console.log('ClientProfile clientId param', normalizedClientId || '(missing)');
   }, [normalizedClientId]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchCoreData(controller.signal);
-    return () => controller.abort();
-  }, [fetchCoreData]);
+    loadClientRow();
+    loadSummary();
+    loadSites();
+    loadOrders();
+    loadAnalytics();
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchOrders(controller.signal);
-    return () => controller.abort();
-  }, [fetchOrders]);
+    setLastUpdated(new Date());
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchAnalytics(controller.signal);
     return () => controller.abort();
   }, [fetchAnalytics]);
 
@@ -216,22 +248,55 @@ export function ClientProfilePage() {
     setOrdersPage(1);
   }, [normalizedClientId]);
 
+  const loadOrdersPage = async (page: number) => {
+    if (!clientId) return;
+
+    setOrdersLoading(true);
+    setOrdersError(null);
+
+    const offset = (page - 1) * PAGE_SIZE;
+
+    try {
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page payload', {
+          client_id: clientId,
+          limit_count: PAGE_SIZE,
+          offset_count: offset,
+        });
+      }
+      const { rows, totalCount } = await fetchClientOrdersPage(clientId, PAGE_SIZE, offset);
+      setOrders(rows);
+      setOrdersTotal(totalCount);
+      setOrdersPage(page);
+      if (import.meta.env.DEV) {
+        console.log('RPC get_client_orders_page rows', rows.length);
+      }
+    } catch (err) {
+      setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (!editDialogOpen || !summary) return;
-    setClientContactName(summary.contact_name ?? '');
-    setClientContactPhone(summary.contact_phone ?? '');
-    setClientContactEmail(summary.contact_email ?? '');
-    setClientAddress(summary.address ?? '');
-    setClientNotes(summary.notes ?? '');
-  }, [editDialogOpen, summary]);
+    if (!editDialogOpen || !clientRow) return;
+    setClientContactName(clientRow.contact_name ?? '');
+    setClientContactPhone(clientRow.contact_phone ?? '');
+    setClientContactEmail(clientRow.contact_email ?? '');
+    setClientAddress(clientRow.address ?? '');
+    setClientNotes(clientRow.notes ?? '');
+  }, [editDialogOpen, clientRow]);
 
   const handlePreviousPage = () => {
-    setOrdersPage((prev) => Math.max(1, prev - 1));
+    const nextPage = Math.max(1, ordersPage - 1);
+    loadOrdersPage(nextPage);
   };
 
   const handleNextPage = () => {
-    const totalPages = Math.ceil(ordersTotal / PAGE_SIZE);
-    setOrdersPage((prev) => Math.min(totalPages, prev + 1));
+    const totalPages = Math.max(1, Math.ceil(ordersTotal / PAGE_SIZE));
+    const nextPage = Math.min(totalPages, ordersPage + 1);
+    loadOrdersPage(nextPage);
   };
 
   const handleSaveClientDetails = async () => {
@@ -259,7 +324,7 @@ export function ClientProfilePage() {
         throw error;
       }
 
-      setSummary((prev) =>
+      setClientRow((prev) =>
         prev
           ? {
               ...prev,
@@ -415,12 +480,8 @@ export function ClientProfilePage() {
             Back to Clients
           </Button>
           <div className="flex-1">
-            <h1 className="text-3xl font-headline font-bold text-foreground">
-              Client Not Found
-            </h1>
-            <p className="text-muted-foreground">
-              The requested client could not be found
-            </p>
+            <h1 className="text-3xl font-headline font-bold text-foreground">Client Not Found</h1>
+            <p className="text-muted-foreground">The client link is missing or invalid.</p>
           </div>
         </div>
 
@@ -431,12 +492,10 @@ export function ClientProfilePage() {
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Unable to Load Client</h3>
                 <p className="text-muted-foreground mt-1">
-                  {error || 'Please confirm the client exists and try again.'}
+                  Please return to the clients list and select a client.
                 </p>
               </div>
-              <Button onClick={() => navigate('/clients')}>
-                View All Clients
-              </Button>
+              <Button onClick={() => navigate('/clients')}>View All Clients</Button>
             </div>
           </CardContent>
         </Card>
@@ -468,44 +527,65 @@ export function ClientProfilePage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
-            <div className="text-center">
-              <Package className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{kpis.totalOrders.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">Total Orders</p>
-            </div>
+            {summaryLoading ? (
+              <div className="h-10 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-center">
+                <Package className="h-5 w-5 text-primary mx-auto mb-1" />
+                <p className="text-2xl font-bold text-foreground">{kpis.totalOrders.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total Orders</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
-            <div className="text-center">
-              <Weight className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{formatNumber(kpis.totalTons)}</p>
-              <p className="text-xs text-muted-foreground">Total Tons</p>
-            </div>
+            {summaryLoading ? (
+              <div className="h-10 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-center">
+                <Weight className="h-5 w-5 text-primary mx-auto mb-1" />
+                <p className="text-2xl font-bold text-foreground">{formatNumber(kpis.totalTons)}</p>
+                <p className="text-xs text-muted-foreground">Total Tons</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
-            <div className="text-center">
-              <MapPin className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-2xl font-bold text-foreground">{kpis.sites}</p>
-              <p className="text-xs text-muted-foreground">Sites</p>
-            </div>
+            {summaryLoading ? (
+              <div className="h-10 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-center">
+                <MapPin className="h-5 w-5 text-primary mx-auto mb-1" />
+                <p className="text-2xl font-bold text-foreground">{kpis.sites}</p>
+                <p className="text-xs text-muted-foreground">Sites</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
-            <div className="text-center">
-              <Calendar className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-lg font-bold text-foreground">{kpis.lastOrderDate}</p>
-              <p className="text-xs text-muted-foreground">Last Order</p>
-            </div>
+            {summaryLoading ? (
+              <div className="h-10 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="text-center">
+                <Calendar className="h-5 w-5 text-primary mx-auto mb-1" />
+                <p className="text-lg font-bold text-foreground">{kpis.lastOrderDate}</p>
+                <p className="text-xs text-muted-foreground">Last Order</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
+      {summaryError && (
+        <Alert variant="destructive">
+          <AlertDescription>{summaryError}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="orders" className="space-y-4">
         <TabsList>
@@ -711,7 +791,15 @@ export function ClientProfilePage() {
                 <CardDescription>Performance metrics for delivery sites</CardDescription>
               </CardHeader>
               <CardContent>
-                {sitesPerformance.length > 0 ? (
+                {sitesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : sitesError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{sitesError}</AlertDescription>
+                  </Alert>
+                ) : sitesPerformance.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow className="border-border">
