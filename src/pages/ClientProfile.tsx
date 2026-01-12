@@ -205,6 +205,14 @@ export function ClientProfilePage() {
     setAnalyticsLoading(true);
     setAnalyticsError(null);
 
+    await Promise.all([loadSummary(), loadSites()]);
+  }, [hasValidClientId, normalizedClientId]);
+
+  const fetchAnalytics = useCallback(async (signal?: AbortSignal) => {
+    if (!hasValidClientId) return;
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+
     try {
       if (import.meta.env.DEV) {
         console.log('RPC get_client_analytics payload', { client_id: normalizedClientId });
