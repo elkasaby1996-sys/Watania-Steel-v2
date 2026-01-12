@@ -220,6 +220,21 @@ export function ClientProfilePage() {
     setAnalyticsLoading(true);
     setAnalyticsError(null);
 
+    void loadClientProfile();
+
+    return () => controller.abort();
+  }, [clientId]);
+
+  const loadOrdersPageWithoutSignal = (page: number) => {
+    void loadOrdersPage(page);
+  };
+
+  const loadAnalyticsWithoutSignal = useCallback(async () => {
+    if (!hasValidClientId) return;
+
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+
     try {
       if (import.meta.env.DEV) {
         console.log('RPC get_client_analytics payload', { client_id: normalizedClientId });
