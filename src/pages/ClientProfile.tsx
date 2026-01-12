@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -87,6 +87,8 @@ export function ClientProfilePage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshIndex, setRefreshIndex] = useState(0);
+
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
   const [clientContactName, setClientContactName] = useState('');
@@ -166,6 +168,8 @@ export function ClientProfilePage() {
     setOrdersPage(pageToLoad);
     setOrdersLoading(true);
     setOrdersError(null);
+    setAnalyticsError(null);
+  }, [normalizedClientId]);
 
     try {
       const offset = (pageToLoad - 1) * PAGE_SIZE;
@@ -232,8 +236,17 @@ export function ClientProfilePage() {
   const loadAnalyticsWithoutSignal = useCallback(async () => {
     if (!hasValidClientId) return;
 
-    setAnalyticsLoading(true);
-    setAnalyticsError(null);
+      if (import.meta.env.DEV) {
+        console.log('ClientProfile clientId param', normalizedClientId);
+        console.log('RPC get_client_summary payload', { client_id: normalizedClientId });
+        console.log('RPC get_client_sites_performance payload', { client_id: normalizedClientId });
+        console.log('RPC get_client_orders_page payload', {
+          client_id: normalizedClientId,
+          limit_count: PAGE_SIZE,
+          offset_count: offset,
+        });
+        console.log('RPC get_client_analytics payload', { client_id: normalizedClientId });
+      }
 
     try {
       if (import.meta.env.DEV) {
@@ -382,9 +395,7 @@ export function ClientProfilePage() {
         })
         .eq('id', normalizedClientId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       setClientRow((prev) =>
         prev
@@ -649,6 +660,12 @@ export function ClientProfilePage() {
           </CardContent>
         </Card>
       </div>
+      {summaryError && (
+        <Alert variant="destructive">
+          <AlertDescription>{summaryError}</AlertDescription>
+        </Alert>
+      )}
+
       {summaryError && (
         <Alert variant="destructive">
           <AlertDescription>{summaryError}</AlertDescription>
