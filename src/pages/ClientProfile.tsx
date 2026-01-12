@@ -9,41 +9,37 @@ import {
   fetchClientOrdersPage,
   fetchClientSitesPerformance,
   fetchClientSummary,
-  type ClientAnalytics,
-  type ClientOrdersPage,
+  type ClientOrderRow,
   type ClientSitePerformanceRow,
-  type ClientSummary
+  type ClientTopSummary
 } from '@/lib/clientsApi';
 
 const isAbortError = (err: unknown) => {
-  if (!err) return false;
-  if (err instanceof DOMException && err.name === 'AbortError') return true;
-  if (typeof err === 'object' && 'name' in err && String((err as any).name) === 'AbortError') return true;
-  if (typeof err === 'object' && 'message' in err && String((err as any).message).includes('AbortError')) return true;
-  return false;
+  if (!err || typeof err !== 'object') return false;
+  const name = 'name' in err ? String((err as any).name) : '';
+  const message = 'message' in err ? String((err as any).message) : '';
+  return name === 'AbortError' || message.toLowerCase().includes('abort');
 };
 
-const fmtTons = (v: number) =>
-  new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(v);
+const formatTons = (value: number) =>
+  new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-export default function ClientProfile() {
+export function ClientProfilePage() {
+  const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const params = useParams();
-  const clientId = params.clientId as string | undefined;
+
+  const [summary, setSummary] = useState<ClientTopSummary | null>(null);
+  const [sites, setSites] = useState<ClientSitePerformanceRow[]>([]);
+  const [orders, setOrders] = useState<ClientOrderRow[]>([]);
+  const [ordersTotal, setOrdersTotal] = useState<number>(0);
+  const [analytics, setAnalytics] = useState<any>(null);
 
   const [loading, setLoading] = useState(true);
-
-  const [summary, setSummary] = useState<ClientSummary | null>(null);
-  const [sites, setSites] = useState<ClientSitePerformanceRow[]>([]);
-  const [ordersPage, setOrdersPage] = useState<ClientOrdersPage | null>(null);
-  const [analytics, setAnalytics] = useState<ClientAnalytics | null>(null);
-
   const [error, setError] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
-  // Load the main client profile data
   useEffect(() => {
     if (!clientId) return;
 
@@ -55,20 +51,21 @@ export default function ClientProfile() {
 
     (async () => {
       try {
-        // reset paging when switching clients
+        // reset page on client change
         setPage(1);
 
-        const [summaryRes, sitesRes, ordersRes, analyticsRes] = await Promise.all([
+        const [s, sp, op, an] = await Promise.all([
           fetchClientSummary(clientId, abortSignal),
           fetchClientSitesPerformance(clientId, abortSignal),
           fetchClientOrdersPage(clientId, pageSize, 0, abortSignal),
           fetchClientAnalytics(clientId, abortSignal)
         ]);
 
-        setSummary(summaryRes);
-        setSites(sitesRes);
-        setOrdersPage(ordersRes);
-        setAnalytics(analyticsRes);
+        setSummary(s);
+        setSites(sp);
+        setOrders(op.rows);
+        setOrdersTotal(op.totalCount);
+        setAnalytics(an);
       } catch (err) {
         if (isAbortError(err)) return;
         const msg = err instanceof Error ? err.message : 'Failed to load client profile';
@@ -79,13 +76,10 @@ export default function ClientProfile() {
     })();
 
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
-  // Load orders when page changes
   useEffect(() => {
     if (!clientId) return;
-    if (page === 1) return; // already loaded in main effect
 
     const controller = new AbortController();
     const abortSignal = controller.signal;
@@ -93,37 +87,40 @@ export default function ClientProfile() {
     (async () => {
       try {
         const offset = (page - 1) * pageSize;
-        const res = await fetchClientOrdersPage(clientId, pageSize, offset, abortSignal);
-        setOrdersPage(res);
+        const op = await fetchClientOrdersPage(clientId, pageSize, offset, abortSignal);
+        setOrders(op.rows);
+        setOrdersTotal(op.totalCount);
       } catch (err) {
         if (isAbortError(err)) return;
-        const msg = err instanceof Error ? err.message : 'Failed to load client orders';
-        setError(msg);
+        // don’t hard-fail the whole page for paging errors
+        console.error(err);
       }
     })();
 
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, page]);
 
-  const totalOrders = ordersPage?.total_count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
+  const totalPages = useMemo(() => {
+    if (!ordersTotal) return 1;
+    return Math.max(1, Math.ceil(ordersTotal / pageSize));
+  }, [ordersTotal]);
 
-  const topSites = useMemo(() => {
-    const sorted = [...sites].sort((a, b) => (b.total_tons ?? 0) - (a.total_tons ?? 0));
-    return sorted.slice(0, 8);
-  }, [sites]);
+  const topStats = useMemo(() => {
+    const totalTons = summary?.total_tons ?? 0;
+    const totalOrders = summary?.total_orders ?? 0;
+    const uniqueSites = summary?.unique_sites ?? 0;
+    const lastDate = summary?.last_order_date ?? null;
+    return { totalTons, totalOrders, uniqueSites, lastDate };
+  }, [summary]);
 
   if (!clientId) {
     return (
       <div className="p-6">
         <Card>
           <CardHeader>
-            <CardTitle>Client not found</CardTitle>
+            <CardTitle>Client Profile</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Button onClick={() => navigate('/clients')}>Back to Clients</Button>
-          </CardContent>
+          <CardContent className="text-sm text-muted-foreground">Missing client id in route.</CardContent>
         </Card>
       </div>
     );
@@ -132,171 +129,146 @@ export default function ClientProfile() {
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Client Profile</h1>
-          <p className="text-xs text-muted-foreground break-all">ID: {clientId}</p>
+        <div>
+          <div className="text-sm text-muted-foreground">Client Profile</div>
+          <div className="text-xl font-semibold">{clientId}</div>
         </div>
         <Button variant="outline" onClick={() => navigate('/clients')}>
-          Back
+          Back to Clients
         </Button>
       </div>
 
       {error ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-red-600">Failed to load</CardTitle>
+            <CardTitle className="text-base">Failed to load client</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">{error}</p>
-          </CardContent>
+          <CardContent className="text-sm text-red-500">{error}</CardContent>
         </Card>
       ) : null}
 
-      {/* Top summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="grid gap-4 md:grid-cols-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-16 rounded bg-muted/40 animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-lg bg-muted/20 p-4">
-                <div className="text-xs text-muted-foreground">Total tons</div>
-                <div className="text-2xl font-semibold">{fmtTons(summary?.total_tons ?? 0)} t</div>
-              </div>
-              <div className="rounded-lg bg-muted/20 p-4">
-                <div className="text-xs text-muted-foreground">Total orders</div>
-                <div className="text-2xl font-semibold">{summary?.total_orders ?? 0}</div>
-              </div>
-              <div className="rounded-lg bg-muted/20 p-4">
-                <div className="text-xs text-muted-foreground">Sites</div>
-                <div className="text-2xl font-semibold">{summary?.unique_sites ?? 0}</div>
-              </div>
-              <div className="rounded-lg bg-muted/20 p-4">
-                <div className="text-xs text-muted-foreground">Last order date</div>
-                <div className="text-2xl font-semibold">{summary?.last_order_date ?? '—'}</div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Total Tons</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {loading ? '—' : `${formatTons(topStats.totalTons)} t`}
+          </CardContent>
+        </Card>
 
-      {/* Sites */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Total Orders</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">{loading ? '—' : topStats.totalOrders}</CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Sites</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">{loading ? '—' : topStats.uniqueSites}</CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Last Order</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">{loading ? '—' : topStats.lastDate ?? '—'}</CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Sites performance</CardTitle>
+          <CardTitle className="text-base">Site Performance</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="h-24 rounded bg-muted/40 animate-pulse" />
+            <div className="text-sm text-muted-foreground">Loading...</div>
           ) : sites.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sites found for this client.</p>
+            <div className="text-sm text-muted-foreground">No sites found for this client.</div>
           ) : (
-            <div className="space-y-3">
-              {topSites.map((s) => (
+            <div className="divide-y divide-border rounded-md border">
+              {sites.map((s) => (
                 <button
                   key={s.site_id}
-                  type="button"
-                  className="w-full rounded-lg border bg-background p-4 text-left hover:bg-muted/20 transition"
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40"
                   onClick={() => navigate(`/clients/${clientId}/sites/${s.site_id}`)}
+                  type="button"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="font-medium">{s.site_name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {s.contact_name ? `${s.contact_name}` : 'No contact'}
-                        {s.contact_phone ? ` • ${s.contact_phone}` : ''}
-                        {s.location_text ? ` • ${s.location_text}` : ''}
-                      </div>
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{s.site_name}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {s.location_text ?? 'No location'} • {s.contact_phone ?? 'No phone'}
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-semibold">{fmtTons(s.total_tons ?? 0)} t</div>
-                      <div className="text-xs text-muted-foreground">{s.total_orders ?? 0} orders</div>
-                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="font-semibold">{formatTons(Number(s.total_tons ?? 0))} t</div>
+                    <div className="text-xs text-muted-foreground">{s.total_orders} orders</div>
                   </div>
                 </button>
               ))}
-              {sites.length > topSites.length ? (
-                <p className="text-xs text-muted-foreground">
-                  Showing top {topSites.length} sites by tons. (Total sites: {sites.length})
-                </p>
-              ) : null}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Orders */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Orders</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              Prev
+            </Button>
+            <div className="text-sm text-muted-foreground">
+              Page {page} / {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="h-24 rounded bg-muted/40 animate-pulse" />
-          ) : !ordersPage || ordersPage.rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No orders found.</p>
+            <div className="text-sm text-muted-foreground">Loading...</div>
+          ) : orders.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No orders found.</div>
           ) : (
-            <div className="space-y-3">
-              <div className="rounded-lg border overflow-hidden">
-                <div className="grid grid-cols-12 gap-2 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                  <div className="col-span-2">Date</div>
-                  <div className="col-span-4">Site</div>
-                  <div className="col-span-2">Type</div>
-                  <div className="col-span-2">Status</div>
-                  <div className="col-span-2 text-right">Tons</div>
-                </div>
-                {ordersPage.rows.map((o) => (
-                  <div key={`${o.source}-${o.id}`} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm border-t">
-                    <div className="col-span-2">{o.date ?? '—'}</div>
-                    <div className="col-span-4">{o.site ?? o.company ?? '—'}</div>
-                    <div className="col-span-2">{o.order_type ?? '—'}</div>
-                    <div className="col-span-2">{o.status ?? '—'}</div>
-                    <div className="col-span-2 text-right">{o.tons == null ? '—' : `${fmtTons(o.tons)} t`}</div>
+            <div className="divide-y divide-border rounded-md border">
+              {orders.map((o) => (
+                <div key={`${o.source}-${o.id}`} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">
+                      {o.company ?? '—'} • {o.site ?? '—'}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {o.date ?? '—'} • {o.order_type ?? '—'} • {o.shift ?? '—'} • {o.status ?? '—'} • {o.source}
+                    </div>
                   </div>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-muted-foreground">
-                  Page {page} of {totalPages} • Total orders: {totalOrders}
+                  <div className="shrink-0 font-semibold">{formatTons(Number(o.tons ?? 0))} t</div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    Prev
-                  </Button>
-                  <Button
-                    variant="outline"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Analytics (optional) */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Analytics</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="h-24 rounded bg-muted/40 animate-pulse" />
+            <div className="text-sm text-muted-foreground">Loading...</div>
           ) : !analytics ? (
-            <p className="text-sm text-muted-foreground">No analytics returned.</p>
+            <div className="text-sm text-muted-foreground">No analytics available.</div>
           ) : (
-            <pre className="text-xs whitespace-pre-wrap break-words rounded-lg bg-muted/20 p-4">
+            <pre className="max-h-[320px] overflow-auto rounded-md bg-muted p-3 text-xs">
               {JSON.stringify(analytics, null, 2)}
             </pre>
           )}
@@ -305,3 +277,6 @@ export default function ClientProfile() {
     </div>
   );
 }
+
+// Optional default export, in case somewhere imports default:
+export default ClientProfilePage;
