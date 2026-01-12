@@ -131,15 +131,8 @@ export function ClientProfilePage() {
     setSitesLoading(true);
     setSitesError(null);
 
-    try {
-      if (import.meta.env.DEV) {
-        console.log('RPC get_client_summary payload', { client_id: normalizedClientId });
-        console.log('RPC get_client_sites_performance payload', { client_id: normalizedClientId });
-      }
-      const [summaryData, sitesData] = await Promise.all([
-        fetchClientSummary(normalizedClientId, signal),
-        fetchClientSitesPerformance(normalizedClientId, signal),
-      ]);
+      setClientLoading(true);
+      setClientError(null);
 
       if (signal?.aborted) return;
       setSummary(summaryData);
@@ -178,11 +171,8 @@ export function ClientProfilePage() {
     try {
       const offset = (pageToLoad - 1) * PAGE_SIZE;
       if (import.meta.env.DEV) {
-        console.log('RPC get_client_orders_page payload', {
-          client_id: normalizedClientId,
-          limit_count: PAGE_SIZE,
-          offset_count: offset,
-        });
+        console.log('RPC get_client_summary payload', { client_id: normalizedClientId });
+        console.log('RPC get_client_sites_performance payload', { client_id: normalizedClientId });
       }
       const { rows: orderRows, totalCount } = await fetchClientOrdersPage(
         normalizedClientId,
@@ -282,10 +272,20 @@ export function ClientProfilePage() {
   const loadOrdersPage = async (page: number) => {
     if (!hasValidClientId) return;
 
-    setOrdersLoading(true);
-    setOrdersError(null);
+    return () => controller.abort();
+  }, [
+    fetchAnalytics,
+    fetchClientRow,
+    fetchCoreData,
+    fetchOrders,
+    hasValidClientId,
+    normalizedClientId,
+    refreshIndex,
+  ]);
 
-    const offset = (page - 1) * PAGE_SIZE;
+  useEffect(() => {
+    setOrdersPage(1);
+  }, [normalizedClientId]);
 
     try {
       if (import.meta.env.DEV) {
@@ -321,13 +321,13 @@ export function ClientProfilePage() {
 
   const handlePreviousPage = () => {
     const nextPage = Math.max(1, ordersPage - 1);
-    loadOrdersPage(nextPage);
+    loadOrdersPageWithoutSignal(nextPage);
   };
 
   const handleNextPage = () => {
     const totalPages = Math.max(1, Math.ceil(ordersTotal / PAGE_SIZE));
     const nextPage = Math.min(totalPages, ordersPage + 1);
-    loadOrdersPage(nextPage);
+    loadOrdersPageWithoutSignal(nextPage);
   };
 
   const handleSaveClientDetails = async () => {
