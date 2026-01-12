@@ -55,6 +55,9 @@ const isValidUuid = (value: string) => {
   return uuidRegex.test(value);
 };
 
+const isAbortError = (error: unknown) =>
+  error instanceof DOMException && error.name === 'AbortError';
+
 export function ClientProfilePage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
@@ -85,7 +88,6 @@ export function ClientProfilePage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [refreshIndex, setRefreshIndex] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
   const [clientContactName, setClientContactName] = useState('');
@@ -94,61 +96,109 @@ export function ClientProfilePage() {
   const [clientAddress, setClientAddress] = useState('');
   const [clientNotes, setClientNotes] = useState('');
 
-  const fetchCoreData = useCallback(async (signal?: AbortSignal) => {
-    if (!hasValidClientId) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      if (import.meta.env.DEV) {
-        console.log('RPC get_client_summary payload', { client_id: normalizedClientId });
-        console.log('RPC get_client_sites_performance payload', { client_id: normalizedClientId });
-      }
-      const [summaryData, sitesData] = await Promise.all([
-        fetchClientSummary(normalizedClientId, signal),
-        fetchClientSitesPerformance(normalizedClientId, signal),
-      ]);
-
-      setSummary(summaryData);
-      setSitesPerformance(sitesData);
-      if (import.meta.env.DEV) {
-        console.log('RPC get_client_summary rows', summaryData ? 1 : 0);
-        console.log('RPC get_client_sites_performance rows', sitesData.length);
-      }
-      setLastUpdated(new Date());
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return;
-      }
-      setError(err instanceof Error ? err.message : 'Failed to load client profile');
-      setSummary(null);
-      setSitesPerformance([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [hasValidClientId, normalizedClientId]);
-
-  const fetchOrders = useCallback(async (signal?: AbortSignal) => {
-    if (!hasValidClientId) return;
+  useEffect(() => {
+    if (!clientId) return;
 
     const controller = new AbortController();
     const { signal } = controller;
 
-    setOrdersPage(1);
-    setClientLoading(true);
-    setClientError(null);
-    setSummaryLoading(true);
-    setSummaryError(null);
-    setSitesLoading(true);
-    setSitesError(null);
+    const loadClientProfile = async () => {
+      setClientLoading(true);
+      setClientError(null);
+      setSummaryLoading(true);
+      setSummaryError(null);
+      setSitesLoading(true);
+      setSitesError(null);
+      setOrdersLoading(true);
+      setOrdersError(null);
+      setAnalyticsLoading(true);
+      setAnalyticsError(null);
+
+      try {
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_summary payload', { client_id: normalizedClientId });
+          console.log('RPC get_client_sites_performance payload', { client_id: normalizedClientId });
+          console.log('RPC get_client_analytics payload', { client_id: normalizedClientId });
+        }
+
+        const offset = 0;
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_orders_page payload', {
+            client_id: normalizedClientId,
+            limit_count: PAGE_SIZE,
+            offset_count: offset,
+          });
+        }
+
+        const [
+          clientRowData,
+          summaryData,
+          sitesData,
+          ordersPageData,
+          analyticsData,
+        ] = await Promise.all([
+          fetchClientRow(normalizedClientId, signal),
+          fetchClientSummary(normalizedClientId, signal),
+          fetchClientSitesPerformance(normalizedClientId, signal),
+          fetchClientOrdersPage(normalizedClientId, PAGE_SIZE, offset, signal),
+          fetchClientAnalytics(normalizedClientId, signal),
+        ]);
+
+        if (signal.aborted) return;
+
+        setClientRow(clientRowData);
+        setSummary(summaryData);
+        setSitesPerformance(sitesData);
+        setOrders(ordersPageData.rows);
+        setOrdersTotal(ordersPageData.totalCount);
+        setOrdersPage(1);
+        setAnalytics(analyticsData);
+        setLastUpdated(new Date());
+
+        if (import.meta.env.DEV) {
+          console.log('RPC get_client_summary rows', summaryData ? 1 : 0);
+          console.log('RPC get_client_sites_performance rows', sitesData.length);
+          console.log('RPC get_client_orders_page rows', ordersPageData.rows.length);
+          console.log('RPC get_client_analytics rows', analyticsData?.monthly_tons.length ?? 0);
+        }
+      } catch (err) {
+        if (isAbortError(err)) return;
+        const message = err instanceof Error ? err.message : 'Failed to load client profile';
+        setClientError(message);
+        setSummaryError(message);
+        setSitesError(message);
+        setOrdersError(message);
+        setAnalyticsError(message);
+      } finally {
+        if (!signal.aborted) {
+          setClientLoading(false);
+          setSummaryLoading(false);
+          setSitesLoading(false);
+          setOrdersLoading(false);
+          setAnalyticsLoading(false);
+        }
+      }
+    };
+
+    void loadClientProfile();
+
+    return () => controller.abort();
+  }, [clientId]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    console.log('ClientProfile clientId param', normalizedClientId || '(missing)');
+  }, [normalizedClientId]);
+
+  const loadOrdersPage = async (page: number) => {
+    if (!hasValidClientId) return;
+
     setOrdersLoading(true);
     setOrdersError(null);
-    setAnalyticsLoading(true);
-    setAnalyticsError(null);
+
+    const offset = (page - 1) * PAGE_SIZE;
 
     try {
-      const offset = (ordersPage - 1) * PAGE_SIZE;
       if (import.meta.env.DEV) {
         console.log('RPC get_client_orders_page payload', {
           client_id: normalizedClientId,
@@ -156,176 +206,66 @@ export function ClientProfilePage() {
           offset_count: offset,
         });
       }
-      const { rows: orderRows, totalCount } = await fetchClientOrdersPage(
+      const { rows, totalCount } = await fetchClientOrdersPage(
         normalizedClientId,
         PAGE_SIZE,
-        offset,
-        signal
+        offset
       );
-
-      setOrders(orderRows);
+      setOrders(rows);
       setOrdersTotal(totalCount);
+      setOrdersPage(page);
       if (import.meta.env.DEV) {
-        console.log('RPC get_client_orders_page rows', orderRows.length);
+        console.log('RPC get_client_orders_page rows', rows.length);
       }
     } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return;
-      }
       setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
       setOrders([]);
       setOrdersTotal(0);
     } finally {
       setOrdersLoading(false);
     }
-  }, [hasValidClientId, normalizedClientId, ordersPage]);
+  };
 
-  const fetchAnalytics = useCallback(async (signal?: AbortSignal) => {
+  const reloadAnalytics = async () => {
     if (!hasValidClientId) return;
-
-    const loadSites = async () => {
-      try {
-        if (import.meta.env.DEV) {
-          console.log('RPC get_client_sites_performance payload', { client_id: clientId });
-        }
-        const sitesData = await fetchClientSitesPerformance(clientId, signal);
-        if (signal.aborted) return;
-        setSitesPerformance(sitesData);
-        if (import.meta.env.DEV) {
-          console.log('RPC get_client_sites_performance rows', sitesData.length);
-        }
-      } catch (err) {
-        if (isAbortError(err)) return;
-        setSitesError(err instanceof Error ? err.message : 'Failed to load site performance');
-        setSitesPerformance([]);
-      } finally {
-        if (!signal.aborted) {
-          setSitesLoading(false);
-        }
-      }
-    };
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
 
     try {
       if (import.meta.env.DEV) {
         console.log('RPC get_client_analytics payload', { client_id: normalizedClientId });
       }
-      const analyticsData = await fetchClientAnalytics(normalizedClientId, signal);
-      if (!analyticsData) {
-        setAnalytics(null);
-        return;
-      }
+      const analyticsData = await fetchClientAnalytics(normalizedClientId);
       setAnalytics(analyticsData);
       if (import.meta.env.DEV) {
-        console.log('RPC get_client_analytics rows', analyticsData.monthly_tons.length);
+        console.log('RPC get_client_analytics rows', analyticsData?.monthly_tons.length ?? 0);
       }
     } catch (err) {
-      if (err instanceof Error) {
-        console.error('Failed to load client analytics:', err.message);
-      }
+      setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics');
+      setAnalytics(null);
+    } finally {
       setAnalyticsLoading(false);
     }
-  }, [hasValidClientId, normalizedClientId]);
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    console.log('ClientProfile clientId param', normalizedClientId || '(missing)');
-  }, [normalizedClientId]);
-
-    loadClientRow();
-    loadSummary();
-    loadSites();
-    loadOrders();
-    loadAnalytics();
-
-    setLastUpdated(new Date());
-
-    return () => controller.abort();
-  }, [fetchAnalytics]);
-
-  useEffect(() => {
-    setOrdersPage(1);
-  }, [normalizedClientId]);
-
-  const loadOrdersPage = async (page: number) => {
-    if (!clientId) return;
-
-    setOrdersLoading(true);
-    setOrdersError(null);
-
-    const offset = (page - 1) * PAGE_SIZE;
-
-    try {
-      if (import.meta.env.DEV) {
-        console.log('RPC get_client_orders_page payload', {
-          client_id: clientId,
-          limit_count: PAGE_SIZE,
-          offset_count: offset,
-        });
-      }
-      const { rows, totalCount } = await fetchClientOrdersPage(clientId, PAGE_SIZE, offset);
-      setOrders(rows);
-      setOrdersTotal(totalCount);
-      setOrdersPage(page);
-      if (import.meta.env.DEV) {
-        console.log('RPC get_client_orders_page rows', rows.length);
-      }
-    } catch (err) {
-      setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
-      setOrders([]);
-    } finally {
-      setOrdersLoading(false);
-    }
-  };
-
-  const loadOrdersPage = async (page: number) => {
-    if (!clientId) return;
-
-    setOrdersLoading(true);
-    setOrdersError(null);
-
-    const offset = (page - 1) * PAGE_SIZE;
-
-    try {
-      if (import.meta.env.DEV) {
-        console.log('RPC get_client_orders_page payload', {
-          client_id: clientId,
-          limit_count: PAGE_SIZE,
-          offset_count: offset,
-        });
-      }
-      const { rows, totalCount } = await fetchClientOrdersPage(clientId, PAGE_SIZE, offset);
-      setOrders(rows);
-      setOrdersTotal(totalCount);
-      setOrdersPage(page);
-      if (import.meta.env.DEV) {
-        console.log('RPC get_client_orders_page rows', rows.length);
-      }
-    } catch (err) {
-      setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
-      setOrders([]);
-    } finally {
-      setOrdersLoading(false);
-    }
   };
 
   useEffect(() => {
-    if (!editDialogOpen || !clientRow) return;
-    setClientContactName(clientRow.contact_name ?? '');
-    setClientContactPhone(clientRow.contact_phone ?? '');
-    setClientContactEmail(clientRow.contact_email ?? '');
-    setClientAddress(clientRow.address ?? '');
-    setClientNotes(clientRow.notes ?? '');
+    if (!editDialogOpen) return;
+    setClientContactName(clientRow?.contact_name ?? '');
+    setClientContactPhone(clientRow?.contact_phone ?? '');
+    setClientContactEmail(clientRow?.contact_email ?? '');
+    setClientAddress(clientRow?.address ?? '');
+    setClientNotes(clientRow?.notes ?? '');
   }, [editDialogOpen, clientRow]);
 
   const handlePreviousPage = () => {
     const nextPage = Math.max(1, ordersPage - 1);
-    loadOrdersPage(nextPage);
+    loadOrdersPageWithoutSignal(nextPage);
   };
 
   const handleNextPage = () => {
     const totalPages = Math.max(1, Math.ceil(ordersTotal / PAGE_SIZE));
     const nextPage = Math.min(totalPages, ordersPage + 1);
-    loadOrdersPage(nextPage);
+    loadOrdersPageWithoutSignal(nextPage);
   };
 
   const handleSaveClientDetails = async () => {
@@ -465,6 +405,9 @@ export function ClientProfilePage() {
       </div>
     );
   }
+
+  const loading = clientLoading || summaryLoading;
+  const error = clientError || summaryError;
 
   if (loading) {
     return (
@@ -658,7 +601,7 @@ export function ClientProfilePage() {
                     <p className="font-medium text-foreground">Unable to load orders</p>
                     <p className="text-sm text-muted-foreground">{ordersError}</p>
                   </div>
-                  <Button variant="outline" onClick={() => fetchOrders()}>Retry</Button>
+                  <Button variant="outline" onClick={() => loadOrdersPage(ordersPage)}>Retry</Button>
                 </div>
               ) : (
                 <>
@@ -962,7 +905,7 @@ export function ClientProfilePage() {
                     <h3 className="text-lg font-semibold text-foreground">Analytics Unavailable</h3>
                     <p className="text-muted-foreground mt-1">{analyticsError}</p>
                   </div>
-                  <Button variant="outline" onClick={() => fetchAnalytics()}>Retry</Button>
+                  <Button variant="outline" onClick={reloadAnalytics}>Retry</Button>
                 </div>
               </CardContent>
             </Card>
