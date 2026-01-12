@@ -87,7 +87,6 @@ export function ClientProfilePage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [refreshIndex, setRefreshIndex] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
   const [clientContactName, setClientContactName] = useState('');
@@ -321,6 +320,7 @@ export function ClientProfilePage() {
     } catch (err) {
       setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
       setOrders([]);
+      setOrdersTotal(0);
     } finally {
       setOrdersLoading(false);
     }
@@ -682,7 +682,7 @@ export function ClientProfilePage() {
                     <p className="font-medium text-foreground">Unable to load orders</p>
                     <p className="text-sm text-muted-foreground">{ordersError}</p>
                   </div>
-                  <Button variant="outline" onClick={() => fetchOrders()}>Retry</Button>
+                  <Button variant="outline" onClick={() => loadOrdersPage(ordersPage)}>Retry</Button>
                 </div>
               ) : (
                 <>
