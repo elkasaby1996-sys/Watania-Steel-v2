@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,37 +24,39 @@ export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState<SiteFormValues>({
-    contact_name: '',
-    contact_phone: '',
-    location_text: '',
-    google_maps_url: '',
-    notes: ''
+
+  const { register, handleSubmit, reset } = useForm<SiteFormValues>({
+    defaultValues: {
+      contact_name: '',
+      contact_phone: '',
+      location_text: '',
+      google_maps_url: '',
+      notes: ''
+    }
   });
 
   useEffect(() => {
-    setFormValues({
+    reset({
       contact_name: site?.contact_name ?? '',
       contact_phone: site?.contact_phone ?? '',
       location_text: site?.location_text ?? '',
       google_maps_url: site?.google_maps_url ?? '',
       notes: site?.notes ?? ''
     });
-  }, [site]);
+  }, [reset, site]);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const onSubmit = handleSubmit(async (values) => {
     if (!site?.site_id) return;
     setSaving(true);
     setError(null);
 
     try {
       const patch: ClientSitePatch = {
-        contact_name: formValues.contact_name?.trim() || null,
-        contact_phone: formValues.contact_phone?.trim() || null,
-        location_text: formValues.location_text?.trim() || null,
-        google_maps_url: formValues.google_maps_url?.trim() || null,
-        notes: formValues.notes?.trim() || null
+        contact_name: values.contact_name?.trim() || null,
+        contact_phone: values.contact_phone?.trim() || null,
+        location_text: values.location_text?.trim() || null,
+        google_maps_url: values.google_maps_url?.trim() || null,
+        notes: values.notes?.trim() || null
       };
 
       const updated = await updateClientSite(site.site_id, patch);
@@ -71,7 +74,7 @@ export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps
     } finally {
       setSaving(false);
     }
-  };
+  });
 
   if (!canEdit) {
     return null;
@@ -85,49 +88,31 @@ export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit Site Details</DialogTitle>
-          <DialogDescription>Update contact and location information for this site.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="site-contact-name">Contact Name</Label>
-              <Input
-                id="site-contact-name"
-                value={formValues.contact_name}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, contact_name: event.target.value }))}
-              />
+              <Input id="site-contact-name" {...register('contact_name')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="site-contact-phone">Contact Phone</Label>
-              <Input
-                id="site-contact-phone"
-                value={formValues.contact_phone}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, contact_phone: event.target.value }))}
-              />
+              <Input id="site-contact-phone" {...register('contact_phone')} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="site-location-text">Location Text</Label>
-              <Input
-                id="site-location-text"
-                value={formValues.location_text}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, location_text: event.target.value }))}
-              />
+              <Input id="site-location-text" {...register('location_text')} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="site-google-maps">Google Maps URL</Label>
-              <Input
-                id="site-google-maps"
-                value={formValues.google_maps_url}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, google_maps_url: event.target.value }))}
-              />
+              <Input id="site-google-maps" {...register('google_maps_url')} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="site-notes">Notes</Label>
               <textarea
                 id="site-notes"
                 className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                value={formValues.notes}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, notes: event.target.value }))}
+                {...register('notes')}
               />
             </div>
           </div>

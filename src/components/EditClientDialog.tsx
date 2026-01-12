@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,37 +24,39 @@ export function EditClientDialog({ client, canEdit, onUpdated }: EditClientDialo
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState<ClientFormValues>({
-    contact_name: '',
-    contact_phone: '',
-    contact_email: '',
-    address: '',
-    notes: ''
+
+  const { register, handleSubmit, reset } = useForm<ClientFormValues>({
+    defaultValues: {
+      contact_name: '',
+      contact_phone: '',
+      contact_email: '',
+      address: '',
+      notes: ''
+    }
   });
 
   useEffect(() => {
-    setFormValues({
+    reset({
       contact_name: client?.contact_name ?? '',
       contact_phone: client?.contact_phone ?? '',
       contact_email: client?.contact_email ?? '',
       address: client?.address ?? '',
       notes: client?.notes ?? ''
     });
-  }, [client]);
+  }, [client, reset]);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const onSubmit = handleSubmit(async (values) => {
     if (!client?.client_id) return;
     setSaving(true);
     setError(null);
 
     try {
       const patch: ClientPatch = {
-        contact_name: formValues.contact_name?.trim() || null,
-        contact_phone: formValues.contact_phone?.trim() || null,
-        contact_email: formValues.contact_email?.trim() || null,
-        address: formValues.address?.trim() || null,
-        notes: formValues.notes?.trim() || null
+        contact_name: values.contact_name?.trim() || null,
+        contact_phone: values.contact_phone?.trim() || null,
+        contact_email: values.contact_email?.trim() || null,
+        address: values.address?.trim() || null,
+        notes: values.notes?.trim() || null
       };
 
       const updated = await updateClient(client.client_id, patch);
@@ -67,7 +70,7 @@ export function EditClientDialog({ client, canEdit, onUpdated }: EditClientDialo
     } finally {
       setSaving(false);
     }
-  };
+  });
 
   if (!canEdit) {
     return null;
@@ -81,50 +84,31 @@ export function EditClientDialog({ client, canEdit, onUpdated }: EditClientDialo
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit Client Details</DialogTitle>
-          <DialogDescription>Update the client contact details and notes.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="client-contact-name">Contact Name</Label>
-              <Input
-                id="client-contact-name"
-                value={formValues.contact_name}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, contact_name: event.target.value }))}
-              />
+              <Input id="client-contact-name" {...register('contact_name')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="client-contact-phone">Contact Phone</Label>
-              <Input
-                id="client-contact-phone"
-                value={formValues.contact_phone}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, contact_phone: event.target.value }))}
-              />
+              <Input id="client-contact-phone" {...register('contact_phone')} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="client-contact-email">Contact Email</Label>
-              <Input
-                id="client-contact-email"
-                type="email"
-                value={formValues.contact_email}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, contact_email: event.target.value }))}
-              />
+              <Input id="client-contact-email" type="email" {...register('contact_email')} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="client-address">Address</Label>
-              <Input
-                id="client-address"
-                value={formValues.address}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, address: event.target.value }))}
-              />
+              <Input id="client-address" {...register('address')} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="client-notes">Notes</Label>
               <textarea
                 id="client-notes"
                 className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                value={formValues.notes}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, notes: event.target.value }))}
+                {...register('notes')}
               />
             </div>
           </div>
