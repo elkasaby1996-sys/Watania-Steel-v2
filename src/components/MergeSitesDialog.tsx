@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -97,16 +97,7 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
       setResult(summary);
       onMerged();
     } catch (err) {
-      const errorMessage = (() => {
-        if (!err || typeof err !== 'object') return 'Failed to merge sites.';
-        const message = 'message' in err ? String((err as any).message) : '';
-        const status = 'status' in err ? Number((err as any).status) : null;
-        if (status === 404 || message.toLowerCase().includes('not found') || message.includes('404')) {
-          return 'Merge RPC not found. Apply the migration in supabase/migrations/20250927_client_site_management.sql.';
-        }
-        return message || 'Failed to merge sites.';
-      })();
-      setError(errorMessage);
+      setError(err instanceof Error ? err.message : 'Failed to merge sites.');
     } finally {
       setSaving(false);
     }
@@ -124,9 +115,6 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Merge Duplicate Sites</DialogTitle>
-          <DialogDescription>
-            Reassign orders to the primary site and delete the duplicate site permanently.
-          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {suggestions.length > 0 ? (
