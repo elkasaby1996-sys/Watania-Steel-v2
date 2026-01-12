@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Search, Building2, Loader2, AlertCircle } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Search, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,91 +51,7 @@ export function Clients() {
   };
 
   const lastUpdatedLabel = lastUpdated ? lastUpdated.toLocaleString() : '—';
-
-  // Loading State
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        {/* Header Skeleton */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/')}
-            className="text-foreground hover:bg-accent"
-          >
-            <ArrowLeft size={16} />
-            Back to Dashboard
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-headline font-bold text-foreground">
-              Clients Database
-            </h1>
-            <p className="text-muted-foreground">
-              Loading client data...
-            </p>
-          </div>
-        </div>
-
-        {/* Loading Spinner */}
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Loading clients...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Error State
-  if (error) {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/')}
-            className="text-foreground hover:bg-accent"
-          >
-            <ArrowLeft size={16} />
-            Back to Dashboard
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-headline font-bold text-foreground">
-              Clients Database
-            </h1>
-            <p className="text-muted-foreground">
-              Manage and analyze client relationships
-            </p>
-          </div>
-        </div>
-
-        {/* Error Card */}
-        <Card className="border-destructive">
-          <CardContent className="py-10">
-            <div className="text-center space-y-4">
-              <AlertCircle className="h-12 w-12 mx-auto text-destructive" />
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">Failed to Load Clients</h3>
-                <p className="text-muted-foreground mt-1">
-                  {error || 'An unexpected error occurred while loading client data.'}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => fetchClients(searchQuery)}
-              >
-                Try Again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const skeletonRows = useMemo(() => Array.from({ length: 6 }, (_, index) => index), []);
 
   return (
     <div className="space-y-6">
@@ -160,6 +76,25 @@ export function Clients() {
           <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
         </div>
       </div>
+
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="py-6">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <AlertCircle className="h-10 w-10 text-destructive" />
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Failed to Load Clients</h3>
+                <p className="text-muted-foreground mt-1">
+                  {error || 'An unexpected error occurred while loading client data.'}
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => fetchClients(searchQuery)}>
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search and Filters */}
       <Card>
@@ -204,7 +139,27 @@ export function Clients() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clients.length > 0 ? (
+                {loading ? (
+                  skeletonRows.map((row) => (
+                    <TableRow key={`skeleton-${row}`} className="border-border">
+                      <TableCell>
+                        <div className="h-4 w-48 rounded bg-muted animate-pulse" />
+                      </TableCell>
+                      <TableCell>
+                        <div className="ml-auto h-4 w-16 rounded bg-muted animate-pulse" />
+                      </TableCell>
+                      <TableCell>
+                        <div className="ml-auto h-4 w-20 rounded bg-muted animate-pulse" />
+                      </TableCell>
+                      <TableCell>
+                        <div className="ml-auto h-4 w-12 rounded bg-muted animate-pulse" />
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : clients.length > 0 ? (
                   clients.map((client) => (
                     <TableRow
                       key={client.id}
