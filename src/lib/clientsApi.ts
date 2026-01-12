@@ -1,50 +1,14 @@
 import { supabase } from '@/lib/supabase';
 
-type RpcOptions = {
-  signal?: AbortSignal;
-  retries?: number;
-};
-
-const isAbortError = (err: unknown) => {
-  if (!err || typeof err !== 'object') return false;
-  const name = 'name' in err ? String((err as any).name) : '';
-  const message = 'message' in err ? String((err as any).message) : '';
-  return name === 'AbortError' || message.toLowerCase().includes('abort');
-};
-
-async function rpcWithRetry<T>(
-  fnName: string,
-  args: Record<string, any>,
-  opts: RpcOptions = {}
-): Promise<T> {
-  const retries = opts.retries ?? 1;
-
-  let lastErr: unknown = null;
-
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      let q = supabase.rpc(fnName as any, args as any);
-      if (opts.signal) q = (q as any).abortSignal(opts.signal);
-
-      const { data, error } = await q;
-      if (error) throw error;
-
-      return data as T;
-    } catch (err) {
-      if (isAbortError(err)) throw err;
-      lastErr = err;
-      if (attempt === retries) break;
-      // small backoff
-      await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
-    }
-  }
-
-  throw lastErr instanceof Error ? lastErr : new Error(`RPC failed: ${fnName}`);
+async function rpc<T>(fnName: string, args: Record<string, any>, _signal?: AbortSignal): Promise<T> {
+  const { data, error } = await supabase.rpc(fnName as any, args as any);
+  if (error) throw error;
+  return data as T;
 }
 
 /** ---------- Types ---------- */
 
-export type ClientSummaryRow = {
+export type ClientSummary = {
   id: string;
   name: string;
   total_orders: number;
@@ -54,6 +18,8 @@ export type ClientSummaryRow = {
 };
 
 export type ClientTopSummary = {
+  client_id?: string;
+  client_name?: string;
   total_orders: number;
   total_tons: number;
   unique_sites: number;
@@ -65,9 +31,13 @@ export type ClientSitePerformanceRow = {
   site_name: string;
   contact_name: string | null;
   contact_phone: string | null;
+  contact_email: string | null;
   location_text: string | null;
+  address: string | null;
   google_maps_url: string | null;
   notes: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null; // date
@@ -80,12 +50,30 @@ export type ClientSiteDetails = {
   client_name: string;
   contact_name: string | null;
   contact_phone: string | null;
+  contact_email: string | null;
   location_text: string | null;
+  address: string | null;
   google_maps_url: string | null;
   notes: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null; // date
+};
+
+export type ClientSiteRecord = {
+  id: string;
+  client_id: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  location_text: string | null;
+  address: string | null;
+  google_maps_url: string | null;
+  notes: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
 };
 
 export type ClientOrderRow = {
@@ -117,51 +105,52 @@ export type ClientAnalytics = any; // keep flexible because RPC returns jsonb
 /** ---------- API functions ---------- */
 
 export async function fetchClientsSummary(searchText?: string, signal?: AbortSignal) {
-  const data = await rpcWithRetry<ClientSummaryRow[]>(
+  const data = await rpc<ClientSummary[]>(
     'get_clients_summary',
     { search_text: searchText ?? null },
-    { signal, retries: 1 }
+    signal
   );
   return data ?? [];
 }
 
 export async function fetchClientSummary(clientId: string, signal?: AbortSignal) {
-  const data = await rpcWithRetry<ClientTopSummary[]>(
+  const data = await rpc<ClientTopSummary[]>(
     'get_client_summary',
     { client_id: clientId },
-    { signal, retries: 1 }
+    signal
   );
   return data?.[0] ?? null;
 }
 
 export async function fetchClientSitesPerformance(clientId: string, signal?: AbortSignal) {
-  const data = await rpcWithRetry<ClientSitePerformanceRow[]>(
+  const data = await rpc<ClientSitePerformanceRow[]>(
     'get_client_sites_performance',
     { client_id: clientId },
-    { signal, retries: 1 }
+    signal
   );
   return data ?? [];
 }
 
 export async function fetchClientSiteSummary(clientId: string, siteId: string, signal?: AbortSignal) {
-  const data = await rpcWithRetry<ClientSiteDetails[]>(
+  const data = await rpc<ClientSiteDetails[]>(
     'get_client_site_summary',
     { client_id: clientId, site_id: siteId },
-    { signal, retries: 1 }
+    signal
   );
   return data?.[0] ?? null;
 }
 
 export async function fetchClientOrdersPage(
   clientId: string,
-  limit = 50,
-  offset = 0,
+  page: number,
+  pageSize: number,
   signal?: AbortSignal
 ): Promise<ClientOrdersPageResult> {
-  const data = await rpcWithRetry<ClientOrderRow[]>(
+  const offset = Math.max(0, (page - 1) * pageSize);
+  const data = await rpc<ClientOrderRow[]>(
     'get_client_orders_page',
-    { client_id: clientId, limit_count: limit, offset_count: offset },
-    { signal, retries: 1 }
+    { client_id: clientId, limit_count: pageSize, offset_count: offset },
+    signal
   );
 
   const rows = data ?? [];
@@ -171,12 +160,40 @@ export async function fetchClientOrdersPage(
 
 export async function fetchClientAnalytics(clientId: string, signal?: AbortSignal) {
   // This RPC returns jsonb (not an array)
-  const data = await rpcWithRetry<ClientAnalytics>(
+  const data = await rpc<ClientAnalytics>(
     'get_client_analytics',
     { client_id: clientId },
-    { signal, retries: 1 }
+    signal
   );
   return data ?? null;
+}
+
+export type ClientSitePatch = Partial<{
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  location_text: string | null;
+  address: string | null;
+  google_maps_url: string | null;
+  notes: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+}>;
+
+export async function updateClientSite(
+  siteId: string,
+  patch: ClientSitePatch,
+  _signal?: AbortSignal
+): Promise<ClientSiteRecord> {
+  const { data, error } = await supabase
+    .from('client_sites')
+    .update(patch)
+    .eq('id', siteId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as ClientSiteRecord;
 }
 
 /**
@@ -188,5 +205,6 @@ export const clientsApi = {
   fetchClientSitesPerformance,
   fetchClientSiteSummary,
   fetchClientOrdersPage,
-  fetchClientAnalytics
+  fetchClientAnalytics,
+  updateClientSite
 };
