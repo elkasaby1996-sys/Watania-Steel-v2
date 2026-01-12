@@ -17,6 +17,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EditClientDialog } from '@/components/EditClientDialog';
+import { MergeSitesDialog } from '@/components/MergeSitesDialog';
+import { hasPermission } from '@/lib/auth';
 import { formatNumber } from '@/lib/utils';
 import {
   fetchClientAnalytics,
@@ -28,6 +31,7 @@ import {
   type ClientSitePerformanceRow,
   type ClientTopSummary
 } from '@/lib/clientsApi';
+import { useAuthStore } from '@/stores/authStore';
 
 const COLORS = [
   '#8B5CF6',
@@ -66,6 +70,9 @@ const formatMonthLabel = (value: string) => {
 export function ClientProfilePage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const canEdit = hasPermission(user?.profile?.role, 'edit');
+  const canMerge = hasPermission(user?.profile?.role, 'delete');
 
   const [summary, setSummary] = useState<ClientTopSummary | null>(null);
   const [sites, setSites] = useState<ClientSitePerformanceRow[]>([]);
@@ -81,6 +88,20 @@ export function ClientProfilePage() {
 
   const [page, setPage] = useState(1);
   const pageSize = 25;
+
+  const refreshSummaryAndSites = async () => {
+    if (!clientId) return;
+    try {
+      const [summaryResult, sitesResult] = await Promise.all([
+        fetchClientSummary(clientId),
+        fetchClientSitesPerformance(clientId)
+      ]);
+      setSummary(summaryResult);
+      setSites(sitesResult);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     if (!clientId) return;
@@ -364,8 +385,13 @@ export function ClientProfilePage() {
         <TabsContent value="overview">
           <div className="space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="text-base">Client Overview</CardTitle>
+                <EditClientDialog
+                  client={summary}
+                  canEdit={canEdit}
+                  onUpdated={(updated) => setSummary(updated)}
+                />
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2">
@@ -398,8 +424,14 @@ export function ClientProfilePage() {
             </Card>
 
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="text-base">Sites Performance</CardTitle>
+                <MergeSitesDialog
+                  clientId={clientId}
+                  sites={sites}
+                  canMerge={canMerge}
+                  onMerged={refreshSummaryAndSites}
+                />
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -439,6 +471,34 @@ export function ClientProfilePage() {
                     </Table>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Client Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Contact Name</span>
+                  <span className="font-medium text-foreground">{summary?.contact_name ?? '—'}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Contact Phone</span>
+                  <span className="font-medium text-foreground">{summary?.contact_phone ?? '—'}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Contact Email</span>
+                  <span className="font-medium text-foreground">{summary?.contact_email ?? '—'}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Address</span>
+                  <span className="font-medium text-foreground">{summary?.address ?? '—'}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Notes</span>
+                  <span className="font-medium text-foreground">{summary?.notes ?? '—'}</span>
+                </div>
               </CardContent>
             </Card>
           </div>
