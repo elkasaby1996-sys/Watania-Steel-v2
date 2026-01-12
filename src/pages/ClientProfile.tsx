@@ -315,14 +315,14 @@ export function ClientProfilePage() {
       setOrdersTotal(totalCount);
       setOrdersPage(page);
       if (import.meta.env.DEV) {
-        console.log('RPC get_client_orders_page rows', rows.length);
+        console.log('RPC get_client_analytics rows', analyticsData?.monthly_tons.length ?? 0);
       }
     } catch (err) {
       setOrdersError(err instanceof Error ? err.message : 'Failed to load orders');
       setOrders([]);
       setOrdersTotal(0);
     } finally {
-      setOrdersLoading(false);
+      setAnalyticsLoading(false);
     }
   };
 
@@ -986,7 +986,7 @@ export function ClientProfilePage() {
                     <h3 className="text-lg font-semibold text-foreground">Analytics Unavailable</h3>
                     <p className="text-muted-foreground mt-1">{analyticsError}</p>
                   </div>
-                  <Button variant="outline" onClick={() => fetchAnalytics()}>Retry</Button>
+                  <Button variant="outline" onClick={reloadAnalytics}>Retry</Button>
                 </div>
               </CardContent>
             </Card>
