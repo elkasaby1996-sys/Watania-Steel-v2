@@ -5,6 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useNavigate } from 'react-router-dom';
+import { MergeClientsDialog } from '@/components/MergeClientsDialog';
+import { useToast } from '@/hooks/use-toast';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { formatNumber } from '@/lib/utils';
 import { fetchClientsSummary, type ClientSummary } from '@/lib/clientsApi';
 
@@ -15,6 +18,8 @@ export function Clients() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const { toast } = useToast();
+  const { isAdmin } = useIsAdmin();
 
   const fetchClients = useCallback(async (searchText?: string, signal?: AbortSignal) => {
     setLoading(true);
@@ -27,12 +32,18 @@ export function Clients() {
       if (err instanceof DOMException && err.name === 'AbortError') {
         return;
       }
-      setError(err instanceof Error ? err.message : 'Failed to load clients');
+      const message = err instanceof Error ? err.message : 'Failed to load clients';
+      setError(message);
       setClients([]);
+      toast({
+        title: 'Failed to load clients',
+        description: message,
+        variant: 'destructive'
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -52,6 +63,10 @@ export function Clients() {
 
   const lastUpdatedLabel = lastUpdated ? lastUpdated.toLocaleString() : '—';
   const skeletonRows = useMemo(() => Array.from({ length: 6 }, (_, index) => index), []);
+
+  const handleMerged = (_primaryId: string, _duplicateId: string) => {
+    fetchClients(searchQuery);
+  };
 
   return (
     <div className="space-y-6">
@@ -99,7 +114,7 @@ export function Clients() {
       {/* Search and Filters */}
       <Card>
         <div className="p-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
               <Input
@@ -114,6 +129,13 @@ export function Clients() {
             <p className="text-sm text-muted-foreground">
               {clients.length} clients total
             </p>
+            {isAdmin && (
+              <MergeClientsDialog
+                clients={clients}
+                canMerge={isAdmin}
+                onMerged={handleMerged}
+              />
+            )}
           </div>
         </div>
       </Card>

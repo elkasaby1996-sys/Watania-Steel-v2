@@ -18,7 +18,6 @@ export interface Order {
   customer_name: string;
   date: string;
   status: 'pending' | 'in-progress' | 'completed' | 'delayed' | 'delivered';
-  amount: number;
   tons: number;
   shift: 'morning' | 'night';
   delivery_number?: string;
@@ -77,7 +76,6 @@ export interface HistoryOrder {
   customer_name: string;
   date: string;
   status: 'delivered' | 'in-progress';
-  amount: number;
   tons: number;
   shift: 'morning' | 'night';
   delivery_number?: string;
@@ -122,7 +120,6 @@ export const dbToFrontend = (dbOrder: Order): any => {
     customerName: dbOrder.customer_name,
     date: dbOrder.date,
     status: dbOrder.status,
-    amount: dbOrder.amount,
     tons: dbOrder.tons,
     shift: dbOrder.shift,
     deliveryNumber: dbOrder.delivery_number || dbOrder.id,
@@ -153,7 +150,6 @@ export const frontendToDb = (order: any): any => {
     customer_name: order.customerName,
     date: order.date,
     status: order.status,
-    amount: order.amount,
     tons: order.tons,
     shift: order.shift,
     delivery_number: order.deliveryNumber || order.id,
@@ -555,7 +551,7 @@ export const driverService = {
 };
 
 const HISTORY_ORDER_LIST_COLUMNS =
-  'id,customer_name,date,status,amount,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at,signed_delivery_note,order_type';
+  'id,customer_name,date,status,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at,signed_delivery_note,order_type';
 
 export const historyService = {
   async getAll(): Promise<HistoryOrder[]> {
@@ -679,7 +675,6 @@ export const historyService = {
         customer_name: order.customerName,
         date: order.date,
         status: 'delivered',
-        amount: order.amount || 0,
         tons: order.tons || 0,
         shift: order.shift || 'morning',
         delivery_number: order.deliveryNumber || order.id,
@@ -735,7 +730,6 @@ export const historyService = {
         customer_name: order.customer_name,
         date: order.date,
         status: 'in-progress',
-        amount: order.amount || 0,
         tons: order.tons || 0,
         shift: order.shift || 'morning',
         delivery_number: order.delivery_number || order.id,
