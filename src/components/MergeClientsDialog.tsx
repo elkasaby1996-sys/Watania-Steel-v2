@@ -100,6 +100,16 @@ export function MergeClientsDialog({
     !confirmationMatch;
 
   const handleMerge = async () => {
+    if (!canMerge) {
+      const message = 'Only admins can merge clients.';
+      setError(message);
+      toast({
+        title: 'Merge blocked',
+        description: message,
+        variant: 'destructive'
+      });
+      return;
+    }
     if (!primaryClientId || !duplicateClientId) {
       setError('Select both a primary and duplicate client.');
       return;

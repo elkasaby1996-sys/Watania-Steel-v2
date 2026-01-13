@@ -1,6 +1,17 @@
 // src/pages/ClientProfile.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from 'recharts';
 import { MergeClientsDialog } from '@/components/MergeClientsDialog';
 import { MergeSitesDialog } from '@/components/MergeSitesDialog';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
@@ -12,6 +23,7 @@ import {
   fetchClientSitesPerformance,
   fetchClientOrdersPage,
   fetchClientAnalytics,
+  type ClientOrdersPageParams,
   type ClientSummary
 } from '../lib/clientsApi';
 
@@ -232,6 +244,7 @@ function BreakdownTable({ title, rows }: BreakdownTableProps) {
 export function ClientProfilePage() {
   const navigate = useNavigate();
   const { clientId } = useParams<{ clientId: string }>();
+  const PAGE_SIZE = 50;
 
   const [activeTab, setActiveTab] = useState<'orders' | 'overview' | 'analytics'>('orders');
 
@@ -259,15 +272,14 @@ export function ClientProfilePage() {
 
   // pagination
   const [ordersPage, setOrdersPage] = useState(1);
-  const pageSize = 50;
 
   // abort controllers
   const summaryAbortRef = useRef<AbortController | null>(null);
   const ordersAbortRef = useRef<AbortController | null>(null);
 
   const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil((ordersTotalCount || 0) / pageSize));
-  }, [ordersTotalCount]);
+    return Math.max(1, Math.ceil((ordersTotalCount || 0) / PAGE_SIZE));
+  }, [PAGE_SIZE, ordersTotalCount]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -344,8 +356,8 @@ export function ClientProfilePage() {
         setOrdersError(null);
 
         const params: ClientOrdersPageParams = {
-          limit: pageSize,
-          offset: (page - 1) * pageSize
+          limit: PAGE_SIZE,
+          offset: (ordersPage - 1) * PAGE_SIZE
         };
         const ordersRes = await fetchClientOrdersPage(clientId, params, signal);
 
@@ -364,42 +376,6 @@ export function ClientProfilePage() {
 
     return () => controller.abort();
   }, [clientId, ordersPage]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-
-    let isActive = true;
-    setMergeClientsLoading(true);
-    setMergeClientsError(null);
-
-    fetchClientsSummary()
-      .then((data) => {
-        if (!isActive) return;
-        setMergeClientsList(Array.isArray(data) ? data : []);
-      })
-      .catch((err) => {
-        if (!isActive) return;
-        setMergeClientsError(err instanceof Error ? err.message : 'Failed to load clients list');
-      })
-      .finally(() => {
-        if (isActive) setMergeClientsLoading(false);
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [isAdmin]);
-
-  const handleClientsMerged = (primaryId: string, duplicateId: string) => {
-    setRefreshKey((prev) => prev + 1);
-    if (duplicateId === clientId) {
-      navigate(`/clients/${primaryId}`);
-    }
-  };
-
-  const handleSitesMerged = () => {
-    setRefreshKey((prev) => prev + 1);
-  };
 
   useEffect(() => {
     if (!isAdmin) return;
