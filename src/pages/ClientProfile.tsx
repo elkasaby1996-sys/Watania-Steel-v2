@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   BarChart,
@@ -15,19 +15,39 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EditClientDialog } from '@/components/EditClientDialog';
+import { MergeSitesDialog } from '@/components/MergeSitesDialog';
+import { hasPermission } from '@/lib/auth';
 import { formatNumber } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/useUserRole';
 import {
   fetchClientAnalytics,
   fetchClientOrdersPage,
   fetchClientSitesPerformance,
   fetchClientSummary,
+  fetchClientsSummary,
+  mergeClients,
   type ClientAnalytics,
   type ClientOrderRow,
   type ClientSitePerformanceRow,
+  type ClientSummary,
   type ClientTopSummary
 } from '@/lib/clientsApi';
+import { useAuthStore } from '@/stores/authStore';
 
 const COLORS = [
   '#8B5CF6',
@@ -66,6 +86,9 @@ const formatMonthLabel = (value: string) => {
 export function ClientProfilePage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const canEdit = hasPermission(user?.profile?.role, 'edit');
+  const canMerge = hasPermission(user?.profile?.role, 'delete');
 
   const [summary, setSummary] = useState<ClientTopSummary | null>(null);
   const [sites, setSites] = useState<ClientSitePerformanceRow[]>([]);
@@ -81,27 +104,40 @@ export function ClientProfilePage() {
 
   const [page, setPage] = useState(1);
   const pageSize = 25;
+  const { role: userRole, isLoading: roleLoading } = useUserRole();
+  const { toast } = useToast();
+  const isAdmin = userRole === 'admin';
 
-  useEffect(() => {
-    if (!clientId) return;
+  const [mergeSearch, setMergeSearch] = useState('');
+  const [mergeResults, setMergeResults] = useState<ClientSummary[]>([]);
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const [selectedDuplicate, setSelectedDuplicate] = useState<ClientSummary | null>(null);
+  const [mergePending, setMergePending] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-    const controller = new AbortController();
-    const signal = controller.signal;
+  const refreshClientData = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!clientId) return;
+      const controller = signal ? null : new AbortController();
+      const controllerSignal = signal ?? controller?.signal;
 
-    setLoading(true);
-    setError(null);
-    setAnalyticsError(null);
+      setLoading(true);
+      setOrdersLoading(true);
+      setAnalyticsLoading(true);
+      setError(null);
+      setAnalyticsError(null);
 
-    const loadProfile = async () => {
       setPage(1);
+
       const [summaryResult, sitesResult, ordersResult, analyticsResult] = await Promise.allSettled([
-        fetchClientSummary(clientId, signal),
-        fetchClientSitesPerformance(clientId, signal),
-        fetchClientOrdersPage(clientId, 1, pageSize, signal),
-        fetchClientAnalytics(clientId, signal)
+        fetchClientSummary(clientId, controllerSignal),
+        fetchClientSitesPerformance(clientId, controllerSignal),
+        fetchClientOrdersPage(clientId, 1, pageSize, controllerSignal),
+        fetchClientAnalytics(clientId, controllerSignal)
       ]);
 
-      if (signal.aborted) return;
+      if (controllerSignal?.aborted) return;
 
       let loadError: string | null = null;
 
@@ -135,12 +171,20 @@ export function ClientProfilePage() {
       setOrdersLoading(false);
       setAnalyticsLoading(false);
       if (loadError) setError(loadError);
-    };
+    },
+    [clientId, pageSize]
+  );
 
-    loadProfile();
+  useEffect(() => {
+    if (!clientId) return;
+
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    refreshClientData(signal);
 
     return () => controller.abort();
-  }, [clientId]);
+  }, [clientId, refreshClientData]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -169,6 +213,35 @@ export function ClientProfilePage() {
 
     return () => controller.abort();
   }, [clientId, page, pageSize]);
+
+  useEffect(() => {
+    if (!clientId || !isAdmin) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    setMergeLoading(true);
+    setMergeError(null);
+
+    const timeout = setTimeout(async () => {
+      try {
+        const data = await fetchClientsSummary(mergeSearch, signal);
+        if (signal.aborted) return;
+        const filtered = data.filter((client) => client.id !== clientId);
+        setMergeResults(filtered);
+      } catch (err) {
+        if (isAbortError(err)) return;
+        setMergeResults([]);
+        setMergeError(err instanceof Error ? err.message : 'Failed to load clients.');
+      } finally {
+        if (!signal.aborted) setMergeLoading(false);
+      }
+    }, mergeSearch ? 300 : 0);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [clientId, isAdmin, mergeSearch]);
 
   const handleRetryAnalytics = async () => {
     if (!clientId) return;
@@ -254,6 +327,42 @@ export function ClientProfilePage() {
       lastDate: summary?.last_order_date ?? null
     };
   }, [summary]);
+
+  const handleMergeClients = async () => {
+    if (!clientId || !selectedDuplicate) return;
+    if (!isAdmin) {
+      toast({
+        title: 'Admin access required',
+        description: 'Only admins can merge clients.'
+      });
+      return;
+    }
+
+    setMergePending(true);
+    setMergeError(null);
+
+    try {
+      await mergeClients(clientId, selectedDuplicate.id);
+      toast({
+        title: 'Merged successfully',
+        description: `Orders and sites moved from ${selectedDuplicate.name}.`
+      });
+      setSelectedDuplicate(null);
+      setMergeSearch('');
+      setConfirmOpen(false);
+      await refreshClientData();
+      navigate(`/clients/${clientId}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to merge clients.';
+      setMergeError(message);
+      toast({
+        title: 'Merge failed',
+        description: message
+      });
+    } finally {
+      setMergePending(false);
+    }
+  };
 
   if (!clientId) {
     return (
@@ -364,8 +473,13 @@ export function ClientProfilePage() {
         <TabsContent value="overview">
           <div className="space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="text-base">Client Overview</CardTitle>
+                <EditClientDialog
+                  client={summary}
+                  canEdit={canEdit}
+                  onUpdated={(updated) => setSummary(updated)}
+                />
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2">
@@ -398,8 +512,14 @@ export function ClientProfilePage() {
             </Card>
 
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="text-base">Sites Performance</CardTitle>
+                  <MergeSitesDialog
+                    clientId={clientId}
+                    sites={sites}
+                    canMerge={canMerge}
+                    onMerged={refreshClientData}
+                  />
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -441,6 +561,124 @@ export function ClientProfilePage() {
                 )}
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Client Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Contact Name</span>
+                  <span className="font-medium text-foreground">{summary?.contact_name ?? '—'}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Contact Phone</span>
+                  <span className="font-medium text-foreground">{summary?.contact_phone ?? '—'}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Contact Email</span>
+                  <span className="font-medium text-foreground">{summary?.contact_email ?? '—'}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Address</span>
+                  <span className="font-medium text-foreground">{summary?.address ?? '—'}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="text-muted-foreground">Notes</span>
+                  <span className="font-medium text-foreground">{summary?.notes ?? '—'}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {!roleLoading && isAdmin && (
+              <Card className="border-destructive/40">
+                <CardHeader>
+                  <CardTitle className="text-base text-destructive">Merge Duplicate Client</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    Move all orders &amp; sites from another client into this client, then remove the duplicate.
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground" htmlFor="merge-client-search">
+                      Duplicate client
+                    </label>
+                    <input
+                      id="merge-client-search"
+                      className="flex h-10 w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Search clients to merge..."
+                      value={mergeSearch}
+                      onChange={(event) => setMergeSearch(event.target.value)}
+                    />
+                  </div>
+                  <div className="rounded-lg border border-border">
+                    {mergeLoading ? (
+                      <div className="p-3 text-sm text-muted-foreground">Searching clients...</div>
+                    ) : mergeResults.length === 0 ? (
+                      <div className="p-3 text-sm text-muted-foreground">
+                        {mergeSearch ? 'No clients match your search.' : 'Start typing to find a client.'}
+                      </div>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto">
+                        {mergeResults.map((client) => (
+                          <button
+                            key={client.id}
+                            type="button"
+                            className={`flex w-full items-center justify-between gap-3 border-b border-border px-3 py-2 text-left text-sm transition-colors last:border-b-0 hover:bg-muted/60 ${
+                              selectedDuplicate?.id === client.id ? 'bg-muted/70' : ''
+                            }`}
+                            onClick={() => setSelectedDuplicate(client)}
+                          >
+                            <div>
+                              <div className="font-medium text-foreground">{client.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatNumber(client.total_tons)} t • {client.last_order_date ?? 'No orders'}
+                              </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground">{client.total_orders} orders</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {mergeError && <p className="text-sm text-destructive">{mergeError}</p>}
+                  <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        disabled={!selectedDuplicate || mergePending}
+                      >
+                        Merge into {summary?.client_name ?? 'Primary Client'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm merge</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will move all orders and sites from{' '}
+                          <strong>{selectedDuplicate?.name ?? 'the duplicate'}</strong> into{' '}
+                          <strong>{summary?.client_name ?? clientId}</strong> and delete the duplicate client. This
+                          action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={mergePending}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={(event) => {
+                            event.preventDefault();
+                            handleMergeClients();
+                          }}
+                          disabled={mergePending}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {mergePending ? 'Merging...' : 'Confirm Merge'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 
