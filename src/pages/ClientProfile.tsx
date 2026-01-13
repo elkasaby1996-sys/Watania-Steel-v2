@@ -1,16 +1,21 @@
 // src/pages/ClientProfile.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import { MergeClientsDialog } from '@/components/MergeClientsDialog';
+import { MergeSitesDialog } from '@/components/MergeSitesDialog';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 // ✅ IMPORTANT: these must exist in src/lib/clientsApi.ts
 import {
+  fetchClientsSummary,
   fetchClientSummary,
   fetchClientSitesPerformance,
   fetchClientOrdersPage,
   fetchClientAnalytics,
+  type ClientSummary
 } from '../lib/clientsApi';
 
-type ClientSummary = {
+type ClientOverviewSummary = {
   total_orders: number;
   total_tons: number;
   unique_sites: number;
@@ -65,7 +70,7 @@ export function ClientProfilePage() {
 
   const [activeTab, setActiveTab] = useState<'orders' | 'overview' | 'analytics'>('orders');
 
-  const [summary, setSummary] = useState<ClientSummary | null>(null);
+  const [summary, setSummary] = useState<ClientOverviewSummary | null>(null);
   const [sites, setSites] = useState<SitePerformanceRow[]>([]);
   const [orders, setOrders] = useState<ClientOrderRow[]>([]);
   const [ordersTotalCount, setOrdersTotalCount] = useState<number>(0);
@@ -81,6 +86,11 @@ export function ClientProfilePage() {
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
   const [analyticsJson, setAnalyticsJson] = useState<any>(null);
+  const [mergeClientsList, setMergeClientsList] = useState<ClientSummary[]>([]);
+  const [mergeClientsLoading, setMergeClientsLoading] = useState(false);
+  const [mergeClientsError, setMergeClientsError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { isAdmin } = useIsAdmin();
 
   // pagination
   const [page, setPage] = useState(1);
@@ -158,7 +168,7 @@ export function ClientProfilePage() {
     })();
 
     return () => controller.abort();
-  }, [clientId]);
+  }, [clientId, refreshKey]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -193,6 +203,42 @@ export function ClientProfilePage() {
     return () => controller.abort();
   }, [clientId, page]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    let isActive = true;
+    setMergeClientsLoading(true);
+    setMergeClientsError(null);
+
+    fetchClientsSummary()
+      .then((data) => {
+        if (!isActive) return;
+        setMergeClientsList(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!isActive) return;
+        setMergeClientsError(err instanceof Error ? err.message : 'Failed to load clients list');
+      })
+      .finally(() => {
+        if (isActive) setMergeClientsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAdmin]);
+
+  const handleClientsMerged = (primaryId: string, duplicateId: string) => {
+    setRefreshKey((prev) => prev + 1);
+    if (duplicateId === clientId) {
+      navigate(`/clients/${primaryId}`);
+    }
+  };
+
+  const handleSitesMerged = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
+
   if (!clientId) {
     return (
       <div className="p-6">
@@ -218,25 +264,38 @@ export function ClientProfilePage() {
           <div className="text-xs text-slate-400 mt-1">Client ID: {clientId}</div>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            className={`px-3 py-2 rounded ${activeTab === 'orders' ? 'bg-slate-700' : 'bg-slate-800'}`}
-            onClick={() => setActiveTab('orders')}
-          >
-            Orders
-          </button>
-          <button
-            className={`px-3 py-2 rounded ${activeTab === 'overview' ? 'bg-slate-700' : 'bg-slate-800'}`}
-            onClick={() => setActiveTab('overview')}
-          >
-            Overview
-          </button>
-          <button
-            className={`px-3 py-2 rounded ${activeTab === 'analytics' ? 'bg-slate-700' : 'bg-slate-800'}`}
-            onClick={() => setActiveTab('analytics')}
-          >
-            Analytics
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <MergeClientsDialog
+              clients={mergeClientsList}
+              canMerge={isAdmin}
+              defaultPrimaryId={clientId}
+              loadingClients={mergeClientsLoading}
+              loadError={mergeClientsError}
+              onMerged={handleClientsMerged}
+              triggerLabel="Merge Clients"
+            />
+          )}
+          <div className="flex gap-2">
+            <button
+              className={`px-3 py-2 rounded ${activeTab === 'orders' ? 'bg-slate-700' : 'bg-slate-800'}`}
+              onClick={() => setActiveTab('orders')}
+            >
+              Orders
+            </button>
+            <button
+              className={`px-3 py-2 rounded ${activeTab === 'overview' ? 'bg-slate-700' : 'bg-slate-800'}`}
+              onClick={() => setActiveTab('overview')}
+            >
+              Overview
+            </button>
+            <button
+              className={`px-3 py-2 rounded ${activeTab === 'analytics' ? 'bg-slate-700' : 'bg-slate-800'}`}
+              onClick={() => setActiveTab('analytics')}
+            >
+              Analytics
+            </button>
+          </div>
         </div>
       </div>
 
@@ -300,7 +359,15 @@ export function ClientProfilePage() {
           </div>
 
           <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
-            <div className="font-semibold mb-3">Sites Performance</div>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div className="font-semibold">Sites Performance</div>
+              <MergeSitesDialog
+                clientId={clientId}
+                sites={sites}
+                canMerge={isAdmin}
+                onMerged={handleSitesMerged}
+              />
+            </div>
             {loadingSites ? (
               <div className="text-slate-400 text-sm">Loading…</div>
             ) : sites.length === 0 ? (
@@ -318,7 +385,11 @@ export function ClientProfilePage() {
                   </thead>
                   <tbody>
                     {sites.map((s) => (
-                      <tr key={s.site_id} className="border-b border-slate-800/60">
+                      <tr
+                        key={s.site_id}
+                        className="border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/40"
+                        onClick={() => navigate(`/clients/${clientId}/sites/${s.site_id}`)}
+                      >
                         <td className="py-2">
                           <Link
                             className="hover:underline"
