@@ -97,7 +97,8 @@ export function ClientProfilePage() {
   const pageSize = 50;
 
   // abort controllers
-  const abortRef = useRef<AbortController | null>(null);
+  const summaryAbortRef = useRef<AbortController | null>(null);
+  const ordersAbortRef = useRef<AbortController | null>(null);
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil((ordersTotalCount || 0) / pageSize));
@@ -106,10 +107,10 @@ export function ClientProfilePage() {
   useEffect(() => {
     if (!clientId) return;
 
-    // abort previous loads
-    abortRef.current?.abort();
+    // abort previous summary loads
+    summaryAbortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
+    summaryAbortRef.current = controller;
     const signal = controller.signal;
 
     // reset state
@@ -126,19 +127,17 @@ export function ClientProfilePage() {
 
     setPage(1);
 
-    // load summary + sites + analytics, and first orders page
+    // load summary + sites + analytics
     (async () => {
       try {
         setLoadingSummary(true);
         setLoadingSites(true);
         setLoadingAnalytics(true);
-        setLoadingOrders(true);
 
-        const [summaryRes, sitesRes, analyticsRes, ordersRes] = await Promise.all([
+        const [summaryRes, sitesRes, analyticsRes] = await Promise.all([
           fetchClientSummary(clientId, signal),
           fetchClientSitesPerformance(clientId, signal),
-          fetchClientAnalytics(clientId, signal),
-          fetchClientOrdersPage(clientId, pageSize, 0, signal),
+          fetchClientAnalytics(clientId, signal)
         ]);
 
         if (signal.aborted) return;
@@ -146,10 +145,6 @@ export function ClientProfilePage() {
         setSummary(summaryRes);
         setSites(Array.isArray(sitesRes) ? sitesRes : []);
         setAnalyticsJson(analyticsRes ?? null);
-
-        const rows = Array.isArray(ordersRes?.rows) ? ordersRes.rows : [];
-        setOrders(rows);
-        setOrdersTotalCount(Number(ordersRes?.totalCount ?? (rows[0]?.total_count ?? 0) ?? 0));
       } catch (err: any) {
         if (signal.aborted) return;
         const msg = err?.message || 'Failed to load client profile';
@@ -161,7 +156,6 @@ export function ClientProfilePage() {
         if (!signal.aborted) {
           setLoadingSummary(false);
           setLoadingSites(false);
-          setLoadingOrders(false);
           setLoadingAnalytics(false);
         }
       }
@@ -174,9 +168,9 @@ export function ClientProfilePage() {
     if (!clientId) return;
 
     // load orders page on page change
-    abortRef.current?.abort();
+    ordersAbortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
+    ordersAbortRef.current = controller;
     const signal = controller.signal;
 
     (async () => {
@@ -184,8 +178,11 @@ export function ClientProfilePage() {
         setLoadingOrders(true);
         setOrdersError(null);
 
-        const offset = (page - 1) * pageSize;
-        const ordersRes = await fetchClientOrdersPage(clientId, pageSize, offset, signal);
+        const params: ClientOrdersPageParams = {
+          limit: pageSize,
+          offset: (page - 1) * pageSize
+        };
+        const ordersRes = await fetchClientOrdersPage(clientId, params, signal);
 
         if (signal.aborted) return;
 
