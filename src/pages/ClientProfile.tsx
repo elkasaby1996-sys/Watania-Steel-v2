@@ -64,6 +64,171 @@ function safeDate(d: string | null | undefined) {
   return d;
 }
 
+type AnalyticsRow = {
+  label: string;
+  tons: number;
+};
+
+type AnalyticsSectionProps = {
+  analytics: any;
+};
+
+const toNumber = (value: unknown) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+};
+
+const normalizeBreakdown = (data: unknown, labelKey: string, valueKey: string): AnalyticsRow[] => {
+  if (!Array.isArray(data)) return [];
+  return data.map((entry) => ({
+    label: String((entry as Record<string, unknown>)[labelKey] ?? 'Unknown'),
+    tons: toNumber((entry as Record<string, unknown>)[valueKey])
+  })).filter((row) => row.tons > 0);
+};
+
+const getAnalyticsList = (analytics: any, keys: string[], labelKey: string, valueKey: string) => {
+  for (const key of keys) {
+    const list = normalizeBreakdown(analytics?.[key], labelKey, valueKey);
+    if (list.length > 0) return list;
+  }
+  return [];
+};
+
+const getMonthlyTons = (analytics: any) => {
+  const candidates = analytics?.monthly_tons ?? analytics?.monthlyTons ?? analytics?.time_series ?? analytics?.timeSeries;
+  if (!Array.isArray(candidates)) return [];
+  return candidates.map((entry) => ({
+    label: String((entry as Record<string, unknown>).month ?? (entry as Record<string, unknown>).date ?? 'N/A'),
+    tons: toNumber((entry as Record<string, unknown>).tons)
+  })).filter((row) => row.tons > 0);
+};
+
+const chartTooltipStyle = {
+  backgroundColor: '#0f172a',
+  border: '1px solid rgba(148, 163, 184, 0.35)',
+  borderRadius: '8px',
+  color: '#f8fafc',
+  fontSize: '12px'
+};
+
+function AnalyticsSection({ analytics }: AnalyticsSectionProps) {
+  const monthlyTons = useMemo(() => getMonthlyTons(analytics), [analytics]);
+  const statusBreakdown = useMemo(
+    () => getAnalyticsList(analytics, ['status_breakdown', 'statusBreakdown'], 'status', 'tons'),
+    [analytics]
+  );
+  const typeBreakdown = useMemo(
+    () => getAnalyticsList(analytics, ['order_type_breakdown', 'orderTypeBreakdown'], 'order_type', 'tons'),
+    [analytics]
+  );
+  const shiftBreakdown = useMemo(
+    () => getAnalyticsList(analytics, ['shift_breakdown', 'shiftBreakdown'], 'shift', 'tons'),
+    [analytics]
+  );
+  const diameterBreakdown = useMemo(
+    () => getAnalyticsList(analytics, ['diameter_breakdown', 'diameterBreakdown', 'diameter_totals'], 'diameter', 'tons'),
+    [analytics]
+  );
+
+  if (
+    monthlyTons.length === 0 &&
+    statusBreakdown.length === 0 &&
+    typeBreakdown.length === 0 &&
+    shiftBreakdown.length === 0 &&
+    diameterBreakdown.length === 0
+  ) {
+    return <div className="text-slate-400 text-sm">No analytics data available for this client.</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-slate-800 p-4">
+        <div className="font-semibold mb-3">Monthly Tons</div>
+        {monthlyTons.length === 0 ? (
+          <div className="text-slate-400 text-sm">No monthly data available.</div>
+        ) : (
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyTons}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis dataKey="label" stroke="#94a3b8" fontSize={12} />
+                <YAxis stroke="#94a3b8" fontSize={12} />
+                <Tooltip contentStyle={chartTooltipStyle} />
+                <Bar dataKey="tons" fill="#38bdf8" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <BreakdownTable title="Status Breakdown" rows={statusBreakdown} />
+        <BreakdownTable title="Order Type Breakdown" rows={typeBreakdown} />
+        <BreakdownTable title="Shift Breakdown" rows={shiftBreakdown} />
+      </div>
+
+      <div className="rounded-lg border border-slate-800 p-4">
+        <div className="font-semibold mb-3">Diameter Breakdown</div>
+        {diameterBreakdown.length === 0 ? (
+          <div className="text-slate-400 text-sm">No diameter data available.</div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={diameterBreakdown}
+                    dataKey="tons"
+                    nameKey="label"
+                    innerRadius="50%"
+                    outerRadius="80%"
+                    fill="#38bdf8"
+                  />
+                  <Tooltip contentStyle={chartTooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <BreakdownTable title="" rows={diameterBreakdown} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type BreakdownTableProps = {
+  title: string;
+  rows: AnalyticsRow[];
+};
+
+function BreakdownTable({ title, rows }: BreakdownTableProps) {
+  return (
+    <div className="rounded-lg border border-slate-800 p-4">
+      {title && <div className="font-semibold mb-3">{title}</div>}
+      {rows.length === 0 ? (
+        <div className="text-slate-400 text-sm">No data available.</div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="text-slate-400">
+            <tr className="border-b border-slate-800">
+              <th className="text-left py-2">Label</th>
+              <th className="text-right py-2">Tons</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label} className="border-b border-slate-800/60">
+                <td className="py-2">{row.label}</td>
+                <td className="py-2 text-right">{formatNumber(row.tons)} t</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export function ClientProfilePage() {
   const navigate = useNavigate();
   const { clientId } = useParams<{ clientId: string }>();
@@ -93,7 +258,7 @@ export function ClientProfilePage() {
   const { isAdmin } = useIsAdmin();
 
   // pagination
-  const [page, setPage] = useState(1);
+  const [ordersPage, setOrdersPage] = useState(1);
   const pageSize = 50;
 
   // abort controllers
@@ -125,7 +290,7 @@ export function ClientProfilePage() {
     setOrdersError(null);
     setAnalyticsError(null);
 
-    setPage(1);
+    setOrdersPage(1);
 
     // load summary + sites + analytics
     (async () => {
@@ -188,7 +353,7 @@ export function ClientProfilePage() {
 
         const rows = Array.isArray(ordersRes?.rows) ? ordersRes.rows : [];
         setOrders(rows);
-        setOrdersTotalCount(Number(ordersRes?.totalCount ?? (rows[0]?.total_count ?? 0) ?? 0));
+        setOrdersTotalCount(Number(rows[0]?.total_count ?? 0));
       } catch (err: any) {
         if (signal.aborted) return;
         setOrdersError(err?.message || 'Failed to load orders');
@@ -198,7 +363,43 @@ export function ClientProfilePage() {
     })();
 
     return () => controller.abort();
-  }, [clientId, page]);
+  }, [clientId, ordersPage]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    let isActive = true;
+    setMergeClientsLoading(true);
+    setMergeClientsError(null);
+
+    fetchClientsSummary()
+      .then((data) => {
+        if (!isActive) return;
+        setMergeClientsList(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!isActive) return;
+        setMergeClientsError(err instanceof Error ? err.message : 'Failed to load clients list');
+      })
+      .finally(() => {
+        if (isActive) setMergeClientsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAdmin]);
+
+  const handleClientsMerged = (primaryId: string, duplicateId: string) => {
+    setRefreshKey((prev) => prev + 1);
+    if (duplicateId === clientId) {
+      navigate(`/clients/${primaryId}`);
+    }
+  };
+
+  const handleSitesMerged = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -331,7 +532,7 @@ export function ClientProfilePage() {
       )}
 
       {/* Tabs */}
-      {activeTab === 'overview' && (
+  {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
             <div className="font-semibold mb-3">Client Overview</div>
@@ -422,24 +623,27 @@ export function ClientProfilePage() {
             <div className="flex items-center gap-2 text-sm">
               <button
                 className="px-3 py-1 rounded bg-slate-800 disabled:opacity-50"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1 || loadingOrders}
+                onClick={() => setOrdersPage((current) => Math.max(1, current - 1))}
+                disabled={ordersPage <= 1 || loadingOrders}
               >
                 Prev
               </button>
               <div className="text-slate-400">
-                Page {page} / {totalPages}
+                Page {ordersPage} / {totalPages}
               </div>
               <button
                 className="px-3 py-1 rounded bg-slate-800 disabled:opacity-50"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages || loadingOrders}
+                onClick={() => setOrdersPage((current) => Math.min(totalPages, current + 1))}
+                disabled={ordersPage >= totalPages || loadingOrders}
               >
                 Next
               </button>
             </div>
           </div>
 
+          {ordersError && (
+            <div className="text-sm text-red-300 mb-2">{ordersError}</div>
+          )}
           {loadingOrders ? (
             <div className="text-slate-400 text-sm">Loading…</div>
           ) : orders.length === 0 ? (
@@ -486,14 +690,18 @@ export function ClientProfilePage() {
           <div className="font-semibold mb-3">Analytics</div>
           {loadingAnalytics ? (
             <div className="text-slate-400 text-sm">Loading…</div>
-          ) : analyticsJson ? (
-            // Your UI can render charts later; this keeps it working now.
-            <pre className="text-xs whitespace-pre-wrap break-words bg-slate-950/40 border border-slate-800 rounded p-3 max-h-[360px] overflow-auto">
-              {JSON.stringify(analyticsJson, null, 2)}
-            </pre>
           ) : (
-            <div className="text-slate-400 text-sm">
-              Analytics unavailable for this client.
+            <div className="space-y-6">
+              {analyticsError && (
+                <div className="text-sm text-red-300">{analyticsError}</div>
+              )}
+              {analyticsJson ? (
+                <AnalyticsSection analytics={analyticsJson} />
+              ) : (
+                <div className="text-slate-400 text-sm">
+                  No analytics data available for this client.
+                </div>
+              )}
             </div>
           )}
         </div>
