@@ -109,14 +109,18 @@ export function ClientSiteDetailsPage() {
     setSiteSummary(updated);
   };
 
-  const contactRows = useMemo(() => (
-    [
+  const contactRows = useMemo(
+    () => [
       { label: 'Contact Name', value: siteSummary?.contact_name },
       { label: 'Contact Phone', value: siteSummary?.contact_phone },
+      { label: 'Contact Email', value: siteSummary?.contact_email },
+      { label: 'Address', value: siteSummary?.address },
       { label: 'Location Text', value: siteSummary?.location_text },
-      { label: 'Google Maps URL', value: siteSummary?.google_maps_url }
-    ]
-  ), [siteSummary]);
+      { label: 'Google Maps URL', value: siteSummary?.google_maps_url },
+      { label: 'Notes', value: siteSummary?.notes }
+    ],
+    [siteSummary]
+  );
 
   if (!clientId || !siteId) {
     return (
@@ -217,10 +221,6 @@ export function ClientSiteDetailsPage() {
                     <span className="font-medium text-foreground">{row.value || '—'}</span>
                   </div>
                 ))}
-                <div className="flex justify-between items-center border-b border-border pb-2">
-                  <span className="text-muted-foreground">Notes</span>
-                  <span className="font-medium text-foreground">{siteSummary.notes || '—'}</span>
-                </div>
                 {siteSummary.google_maps_url && (
                   <Button asChild variant="outline">
                     <a href={siteSummary.google_maps_url} target="_blank" rel="noreferrer">

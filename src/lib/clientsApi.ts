@@ -211,7 +211,8 @@ export async function fetchClientOrdersPage(
   params: ClientOrdersPageParams,
   signal?: AbortSignal
 ): Promise<ClientOrdersPageResult> {
-  const offset = Math.max(0, (page - 1) * pageSize);
+  const limit = params.limit;
+  const offset = Math.max(0, params.offset);
   const data = await rpcWithRetry<ClientOrderRow[]>(
     'get_client_orders_page',
     { client_id: clientId, limit_count: limit, offset_count: offset },
