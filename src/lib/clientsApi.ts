@@ -1,9 +1,51 @@
 import { supabase } from '@/lib/supabase';
 
+export type RpcError = {
+  message?: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+  status?: number;
+};
+
+const isTransientRpcError = (error: RpcError) => {
+  const status = error.status ?? 0;
+  if ([408, 425, 429].includes(status) || status >= 500) {
+    return true;
+  }
+  const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+  return message.includes('timeout') || message.includes('temporarily') || message.includes('network');
+};
+
 async function rpc<T>(fnName: string, args: Record<string, any>, _signal?: AbortSignal): Promise<T> {
   const { data, error } = await supabase.rpc(fnName as any, args as any);
   if (error) throw error;
   return data as T;
+}
+
+export async function rpcWithRetry<T>(
+  fnName: string,
+  args: Record<string, any>,
+  signal?: AbortSignal,
+  retries = 1
+): Promise<T> {
+  let attempt = 0;
+  while (attempt <= retries) {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+    try {
+      return await rpc<T>(fnName, args, signal);
+    } catch (error) {
+      const err = error as RpcError;
+      if (attempt >= retries || !isTransientRpcError(err)) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+      attempt += 1;
+    }
+  }
+  throw new Error('RPC failed after retries');
 }
 
 /** ---------- Types ---------- */
@@ -105,7 +147,7 @@ export type ClientAnalytics = any; // keep flexible because RPC returns jsonb
 /** ---------- API functions ---------- */
 
 export async function fetchClientsSummary(searchText?: string, signal?: AbortSignal) {
-  const data = await rpc<ClientSummary[]>(
+  const data = await rpcWithRetry<ClientSummary[]>(
     'get_clients_summary',
     { search_text: searchText ?? null },
     signal
@@ -114,7 +156,7 @@ export async function fetchClientsSummary(searchText?: string, signal?: AbortSig
 }
 
 export async function fetchClientSummary(clientId: string, signal?: AbortSignal) {
-  const data = await rpc<ClientTopSummary[]>(
+  const data = await rpcWithRetry<ClientTopSummary[]>(
     'get_client_summary',
     { client_id: clientId },
     signal
@@ -123,7 +165,7 @@ export async function fetchClientSummary(clientId: string, signal?: AbortSignal)
 }
 
 export async function fetchClientSitesPerformance(clientId: string, signal?: AbortSignal) {
-  const data = await rpc<ClientSitePerformanceRow[]>(
+  const data = await rpcWithRetry<ClientSitePerformanceRow[]>(
     'get_client_sites_performance',
     { client_id: clientId },
     signal
@@ -132,7 +174,7 @@ export async function fetchClientSitesPerformance(clientId: string, signal?: Abo
 }
 
 export async function fetchClientSiteSummary(clientId: string, siteId: string, signal?: AbortSignal) {
-  const data = await rpc<ClientSiteDetails[]>(
+  const data = await rpcWithRetry<ClientSiteDetails[]>(
     'get_client_site_summary',
     { client_id: clientId, site_id: siteId },
     signal
@@ -148,7 +190,7 @@ export async function fetchClientSiteOrdersPage(
   signal?: AbortSignal
 ): Promise<ClientOrdersPageResult> {
   const offset = Math.max(0, (page - 1) * pageSize);
-  const data = await rpc<ClientOrderRow[]>(
+  const data = await rpcWithRetry<ClientOrderRow[]>(
     'get_client_site_orders_page',
     { client_id: clientId, site_id: siteId, limit_count: pageSize, offset_count: offset },
     signal
@@ -161,14 +203,15 @@ export async function fetchClientSiteOrdersPage(
 
 export async function fetchClientOrdersPage(
   clientId: string,
-  page: number,
-  pageSize: number,
+  limit: number,
+  offset: number,
   signal?: AbortSignal
 ): Promise<ClientOrdersPageResult> {
-  const offset = Math.max(0, (page - 1) * pageSize);
-  const data = await rpc<ClientOrderRow[]>(
+  const safeOffset = Math.max(0, offset);
+  const safeLimit = Math.max(1, limit);
+  const data = await rpcWithRetry<ClientOrderRow[]>(
     'get_client_orders_page',
-    { client_id: clientId, limit_count: pageSize, offset_count: offset },
+    { client_id: clientId, limit_count: safeLimit, offset_count: safeOffset },
     signal
   );
 
@@ -179,7 +222,7 @@ export async function fetchClientOrdersPage(
 
 export async function fetchClientAnalytics(clientId: string, signal?: AbortSignal) {
   // This RPC returns jsonb (not an array)
-  const data = await rpc<ClientAnalytics>(
+  const data = await rpcWithRetry<ClientAnalytics>(
     'get_client_analytics',
     { client_id: clientId },
     signal
@@ -210,7 +253,7 @@ export async function updateClient(
   patch: ClientPatch,
   _signal?: AbortSignal
 ): Promise<ClientTopSummary> {
-  const data = await rpc<ClientTopSummary>(
+  const data = await rpcWithRetry<ClientTopSummary>(
     'update_client',
     {
       p_client_id: clientId,
@@ -226,12 +269,12 @@ export async function updateClient(
   return data;
 }
 
-export async function updateClientSite(
+export async function updateSite(
   siteId: string,
   patch: ClientSitePatch,
   _signal?: AbortSignal
 ): Promise<ClientSiteRecord> {
-  const data = await rpc<ClientSiteRecord>(
+  const data = await rpcWithRetry<ClientSiteRecord>(
     'update_site',
     {
       p_site_id: siteId,
@@ -247,6 +290,34 @@ export async function updateClientSite(
   return data as ClientSiteRecord;
 }
 
+export async function mergeClients(
+  primaryClientId: string,
+  duplicateClientId: string,
+  newPrimaryName?: string | null,
+  _signal?: AbortSignal
+): Promise<{ [key: string]: any }> {
+  try {
+    const data = await rpcWithRetry<{ [key: string]: any }>(
+      'merge_clients',
+      {
+        p_primary_client_id: primaryClientId,
+        p_duplicate_client_id: duplicateClientId,
+        p_new_primary_name: newPrimaryName ?? null
+      },
+      _signal
+    );
+
+    return data ?? {};
+  } catch (error) {
+    const err = error as RpcError;
+    const message = `${err.message ?? ''} ${err.details ?? ''}`.toLowerCase();
+    if (message.includes('merge_clients') && (message.includes('does not exist') || message.includes('not found'))) {
+      throw new Error('merge_clients RPC missing');
+    }
+    throw error;
+  }
+}
+
 export async function mergeClientSites(
   clientId: string,
   primarySiteId: string,
@@ -254,7 +325,7 @@ export async function mergeClientSites(
   newPrimaryName?: string | null,
   _signal?: AbortSignal
 ): Promise<{ [key: string]: any }> {
-  const data = await rpc<{ [key: string]: any }>(
+  const data = await rpcWithRetry<{ [key: string]: any }>(
     'merge_client_sites',
     {
       p_client_id: clientId,
@@ -267,19 +338,3 @@ export async function mergeClientSites(
 
   return data ?? {};
 }
-
-/**
- * Optional convenience object (so imports like `clientsApi.fetchClientSummary` also work)
- */
-export const clientsApi = {
-  fetchClientsSummary,
-  fetchClientSummary,
-  fetchClientSitesPerformance,
-  fetchClientSiteSummary,
-  fetchClientSiteOrdersPage,
-  fetchClientOrdersPage,
-  fetchClientAnalytics,
-  updateClient,
-  updateClientSite,
-  mergeClientSites
-};

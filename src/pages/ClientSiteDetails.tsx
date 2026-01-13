@@ -7,8 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EditSiteDialog } from '@/components/EditSiteDialog';
 import { formatNumber } from '@/lib/utils';
-import { hasPermission } from '@/lib/auth';
-import { useAuthStore } from '@/stores/authStore';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import {
   fetchClientSiteOrdersPage,
   fetchClientSiteSummary,
@@ -19,8 +18,7 @@ import {
 export function ClientSiteDetailsPage() {
   const { clientId, siteId } = useParams<{ clientId: string; siteId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const canEdit = hasPermission(user?.profile?.role, 'edit');
+  const { isAdmin } = useIsAdmin();
 
   const [siteSummary, setSiteSummary] = useState<ClientSiteDetails | null>(null);
   const [orders, setOrders] = useState<ClientOrderRow[]>([]);
@@ -209,7 +207,7 @@ export function ClientSiteDetailsPage() {
                 </CardTitle>
                 <CardDescription>Contact and location information</CardDescription>
               </div>
-              <EditSiteDialog site={siteSummary} canEdit={canEdit} onUpdated={handleSiteUpdated} />
+              <EditSiteDialog site={siteSummary} canEdit={isAdmin} onUpdated={handleSiteUpdated} />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">

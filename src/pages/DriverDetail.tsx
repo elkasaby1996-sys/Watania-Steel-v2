@@ -24,7 +24,6 @@ interface Order {
   customer_name: string;
   date: string;
   status: 'pending' | 'in-progress' | 'completed' | 'delayed' | 'delivered';
-  amount: number;
   tons: number;
   shift: 'morning' | 'night';
   delivery_number?: string;

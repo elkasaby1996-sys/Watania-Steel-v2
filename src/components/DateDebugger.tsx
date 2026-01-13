@@ -24,7 +24,6 @@ export function DateDebugger() {
         customer_name: 'Test Customer',
         date: testDate, // User-specified date
         status: 'in-progress',
-        amount: 100,
         tons: 1,
         shift: 'morning',
         delivery_number: `TEST-${Date.now()}`,
