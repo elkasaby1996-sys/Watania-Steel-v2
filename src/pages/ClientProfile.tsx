@@ -116,17 +116,33 @@ export function ClientProfilePage() {
   const [mergePending, setMergePending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const refreshClientData = useCallback(
-    async (signal?: AbortSignal) => {
-      if (!clientId) return;
-      const controller = signal ? null : new AbortController();
-      const controllerSignal = signal ?? controller?.signal;
+  const refreshSummaryAndSites = async () => {
+    if (!clientId) return;
+    try {
+      const [summaryResult, sitesResult] = await Promise.all([
+        fetchClientSummary(clientId),
+        fetchClientSitesPerformance(clientId)
+      ]);
+      setSummary(summaryResult);
+      setSites(sitesResult);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-      setLoading(true);
-      setOrdersLoading(true);
-      setAnalyticsLoading(true);
-      setError(null);
-      setAnalyticsError(null);
+  const refreshSummaryAndSites = async () => {
+    if (!clientId) return;
+    try {
+      const [summaryResult, sitesResult] = await Promise.all([
+        fetchClientSummary(clientId),
+        fetchClientSitesPerformance(clientId)
+      ]);
+      setSummary(summaryResult);
+      setSites(sitesResult);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
       setPage(1);
 
@@ -350,7 +366,7 @@ export function ClientProfilePage() {
       setSelectedDuplicate(null);
       setMergeSearch('');
       setConfirmOpen(false);
-      await refreshClientData();
+      await refreshSummaryAndSites();
       navigate(`/clients/${clientId}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to merge clients.';
@@ -514,12 +530,12 @@ export function ClientProfilePage() {
             <Card>
               <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="text-base">Sites Performance</CardTitle>
-                  <MergeSitesDialog
-                    clientId={clientId}
-                    sites={sites}
-                    canMerge={canMerge}
-                    onMerged={refreshClientData}
-                  />
+                <MergeSitesDialog
+                  clientId={clientId}
+                  sites={sites}
+                  canMerge={canMerge}
+                  onMerged={refreshSummaryAndSites}
+                />
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -589,96 +605,6 @@ export function ClientProfilePage() {
                 </div>
               </CardContent>
             </Card>
-
-            {!roleLoading && isAdmin && (
-              <Card className="border-destructive/40">
-                <CardHeader>
-                  <CardTitle className="text-base text-destructive">Merge Duplicate Client</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-sm text-muted-foreground">
-                    Move all orders &amp; sites from another client into this client, then remove the duplicate.
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground" htmlFor="merge-client-search">
-                      Duplicate client
-                    </label>
-                    <input
-                      id="merge-client-search"
-                      className="flex h-10 w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      placeholder="Search clients to merge..."
-                      value={mergeSearch}
-                      onChange={(event) => setMergeSearch(event.target.value)}
-                    />
-                  </div>
-                  <div className="rounded-lg border border-border">
-                    {mergeLoading ? (
-                      <div className="p-3 text-sm text-muted-foreground">Searching clients...</div>
-                    ) : mergeResults.length === 0 ? (
-                      <div className="p-3 text-sm text-muted-foreground">
-                        {mergeSearch ? 'No clients match your search.' : 'Start typing to find a client.'}
-                      </div>
-                    ) : (
-                      <div className="max-h-56 overflow-y-auto">
-                        {mergeResults.map((client) => (
-                          <button
-                            key={client.id}
-                            type="button"
-                            className={`flex w-full items-center justify-between gap-3 border-b border-border px-3 py-2 text-left text-sm transition-colors last:border-b-0 hover:bg-muted/60 ${
-                              selectedDuplicate?.id === client.id ? 'bg-muted/70' : ''
-                            }`}
-                            onClick={() => setSelectedDuplicate(client)}
-                          >
-                            <div>
-                              <div className="font-medium text-foreground">{client.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {formatNumber(client.total_tons)} t • {client.last_order_date ?? 'No orders'}
-                              </div>
-                            </div>
-                            <div className="text-xs text-muted-foreground">{client.total_orders} orders</div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {mergeError && <p className="text-sm text-destructive">{mergeError}</p>}
-                  <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        disabled={!selectedDuplicate || mergePending}
-                      >
-                        Merge into {summary?.client_name ?? 'Primary Client'}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm merge</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will move all orders and sites from{' '}
-                          <strong>{selectedDuplicate?.name ?? 'the duplicate'}</strong> into{' '}
-                          <strong>{summary?.client_name ?? clientId}</strong> and delete the duplicate client. This
-                          action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel disabled={mergePending}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={(event) => {
-                            event.preventDefault();
-                            handleMergeClients();
-                          }}
-                          disabled={mergePending}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          {mergePending ? 'Merging...' : 'Confirm Merge'}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </TabsContent>
 
