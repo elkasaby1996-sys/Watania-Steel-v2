@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   BarChart,
@@ -144,26 +144,16 @@ export function ClientProfilePage() {
     }
   };
 
-  useEffect(() => {
-    if (!clientId) return;
-
-    const controller = new AbortController();
-    const signal = controller.signal;
-
-    setLoading(true);
-    setError(null);
-    setAnalyticsError(null);
-
-    const loadProfile = async () => {
       setPage(1);
+
       const [summaryResult, sitesResult, ordersResult, analyticsResult] = await Promise.allSettled([
-        fetchClientSummary(clientId, signal),
-        fetchClientSitesPerformance(clientId, signal),
-        fetchClientOrdersPage(clientId, 1, pageSize, signal),
-        fetchClientAnalytics(clientId, signal)
+        fetchClientSummary(clientId, controllerSignal),
+        fetchClientSitesPerformance(clientId, controllerSignal),
+        fetchClientOrdersPage(clientId, 1, pageSize, controllerSignal),
+        fetchClientAnalytics(clientId, controllerSignal)
       ]);
 
-      if (signal.aborted) return;
+      if (controllerSignal?.aborted) return;
 
       let loadError: string | null = null;
 
@@ -197,12 +187,20 @@ export function ClientProfilePage() {
       setOrdersLoading(false);
       setAnalyticsLoading(false);
       if (loadError) setError(loadError);
-    };
+    },
+    [clientId, pageSize]
+  );
 
-    loadProfile();
+  useEffect(() => {
+    if (!clientId) return;
+
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    refreshClientData(signal);
 
     return () => controller.abort();
-  }, [clientId]);
+  }, [clientId, refreshClientData]);
 
   useEffect(() => {
     if (!clientId) return;
