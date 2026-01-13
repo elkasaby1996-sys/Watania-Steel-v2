@@ -174,16 +174,13 @@ export function AddOrderDialog() {
       // Use delivery number as order ID
       const orderId = formData.deliveryNumber;
       
-      // Calculate amount based on tons
       const tons = Number(formData.tons);
-      const amount = tons * 100; // 100 per ton as example
       
       const newOrder = {
         id: orderId,
         customerName: formData.deliveryName,
         date: new Date().toISOString().split('T')[0],
         status: formData.status,
-        amount,
         tons,
         shift: formData.shift,
         deliveryNumber: formData.deliveryNumber,

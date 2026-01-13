@@ -8,7 +8,6 @@ interface Order {
   customerName: string;
   date: string;
   status: 'pending' | 'in-progress' | 'completed' | 'delayed' | 'delivered';
-  amount: number;
   tons: number;
   shift: 'morning' | 'night';
   deliveryNumber?: string;
@@ -39,7 +38,6 @@ const dbToFrontend = (dbOrder: DBOrder): Order => {
     customerName: dbOrder.customer_name,
     date: dbOrder.date,
     status: dbOrder.status,
-    amount: dbOrder.amount,
     tons: dbOrder.tons,
     shift: dbOrder.shift,
     deliveryNumber: dbOrder.delivery_number || dbOrder.id,
@@ -71,7 +69,6 @@ const frontendToDb = (order: Order): any => {
     customer_name: order.customerName,
     date: order.date,
     status: order.status,
-    amount: order.amount,
     tons: order.tons,
     shift: order.shift,
     delivery_number: order.deliveryNumber || order.id,
@@ -447,7 +444,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           customer_name: order.customerName,
           date: order.date,
           status: 'delivered',
-          amount: order.amount || 0,
           tons: order.tons || 0,
           shift: order.shift || 'morning',
           delivery_number: order.deliveryNumber || order.id,
