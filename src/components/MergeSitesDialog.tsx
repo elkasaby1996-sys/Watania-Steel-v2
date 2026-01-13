@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 import { mergeClientSites, type ClientSitePerformanceRow } from '@/lib/clientsApi';
 
 type MergeSitesDialogProps = {
@@ -32,9 +33,12 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
   const [primarySiteId, setPrimarySiteId] = useState<string | null>(null);
   const [duplicateSiteId, setDuplicateSiteId] = useState<string | null>(null);
   const [newPrimaryName, setNewPrimaryName] = useState('');
+  const [confirmationText, setConfirmationText] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<string | null>(null);
+  const [primaryFilter, setPrimaryFilter] = useState('');
+  const [duplicateFilter, setDuplicateFilter] = useState('');
+  const { toast } = useToast();
 
   const suggestions = useMemo<SuggestedGroup[]>(() => {
     const map = new Map<string, ClientSitePerformanceRow[]>();
@@ -57,7 +61,9 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
       setDuplicateSiteId(null);
       setNewPrimaryName('');
       setError(null);
-      setResult(null);
+      setConfirmationText('');
+      setPrimaryFilter('');
+      setDuplicateFilter('');
       return;
     }
 
@@ -80,24 +86,28 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
 
     setSaving(true);
     setError(null);
-    setResult(null);
 
     try {
-      const response = await mergeClientSites(
+      await mergeClientSites(
         clientId,
         primarySiteId,
         duplicateSiteId,
         newPrimaryName.trim() || null
       );
-      const summary = [
-        `Orders updated: ${response.orders_updated ?? 0}`,
-        `History orders updated: ${response.history_orders_updated ?? 0}`,
-        `Duplicate deleted: ${response.duplicate_deleted ? 'Yes' : 'No'}`
-      ].join(' · ');
-      setResult(summary);
+      toast({
+        title: 'Sites merged',
+        description: 'Orders and site history moved to the primary site.'
+      });
       onMerged();
+      setOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to merge sites.');
+      const message = err instanceof Error ? err.message : 'Failed to merge sites.';
+      setError(message);
+      toast({
+        title: 'Merge failed',
+        description: message,
+        variant: 'destructive'
+      });
     } finally {
       setSaving(false);
     }
@@ -106,6 +116,27 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
   if (!canMerge) {
     return null;
   }
+
+  const filteredPrimarySites = sites.filter((site) =>
+    site.site_name?.toLowerCase().includes(primaryFilter.trim().toLowerCase())
+  );
+  const filteredDuplicateSites = sites.filter((site) => {
+    if (site.site_id === primarySiteId) return false;
+    return site.site_name?.toLowerCase().includes(duplicateFilter.trim().toLowerCase());
+  });
+
+  const primarySiteName = sites.find((site) => site.site_id === primarySiteId)?.site_name ?? '';
+  const normalizedConfirmation = confirmationText.trim().toLowerCase();
+  const confirmationMatch =
+    normalizedConfirmation === 'merge' ||
+    (primarySiteName && normalizedConfirmation === primarySiteName.toLowerCase());
+
+  const disableMerge =
+    saving ||
+    !primarySiteId ||
+    !duplicateSiteId ||
+    primarySiteId === duplicateSiteId ||
+    !confirmationMatch;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -117,6 +148,10 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
           <DialogTitle>Merge Duplicate Sites</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            This will move all orders and history orders from the duplicate site into the primary
+            site, merge the records, and delete the duplicate.
+          </div>
           {suggestions.length > 0 ? (
             <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
               <div className="font-medium text-foreground">Suggested duplicates</div>
@@ -136,12 +171,18 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
 
           <div className="space-y-2">
             <Label htmlFor="primary-site">Primary site</Label>
+            <Input
+              id="primary-site-search"
+              value={primaryFilter}
+              onChange={(event) => setPrimaryFilter(event.target.value)}
+              placeholder="Search sites..."
+            />
             <Select value={primarySiteId ?? ''} onValueChange={setPrimarySiteId}>
               <SelectTrigger id="primary-site">
                 <SelectValue placeholder="Select primary site" />
               </SelectTrigger>
               <SelectContent>
-                {sites.map((site) => (
+                {filteredPrimarySites.map((site) => (
                   <SelectItem key={site.site_id} value={site.site_id}>
                     {site.site_name}
                   </SelectItem>
@@ -152,18 +193,22 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
 
           <div className="space-y-2">
             <Label htmlFor="duplicate-site">Duplicate site</Label>
+            <Input
+              id="duplicate-site-search"
+              value={duplicateFilter}
+              onChange={(event) => setDuplicateFilter(event.target.value)}
+              placeholder="Search sites..."
+            />
             <Select value={duplicateSiteId ?? ''} onValueChange={setDuplicateSiteId}>
               <SelectTrigger id="duplicate-site">
                 <SelectValue placeholder="Select duplicate site" />
               </SelectTrigger>
               <SelectContent>
-                {sites
-                  .filter((site) => site.site_id !== primarySiteId)
-                  .map((site) => (
-                    <SelectItem key={site.site_id} value={site.site_id}>
-                      {site.site_name}
-                    </SelectItem>
-                  ))}
+                {filteredDuplicateSites.map((site) => (
+                  <SelectItem key={site.site_id} value={site.site_id}>
+                    {site.site_name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -178,14 +223,25 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="merge-confirmation">
+              Type MERGE or the primary site name to confirm
+            </Label>
+            <Input
+              id="merge-confirmation"
+              value={confirmationText}
+              onChange={(event) => setConfirmationText(event.target.value)}
+              placeholder="MERGE"
+            />
+          </div>
+
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {result && <p className="text-sm text-emerald-500">{result}</p>}
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
             Close
           </Button>
-          <Button onClick={handleMerge} disabled={saving}>
+          <Button onClick={handleMerge} disabled={disableMerge}>
             {saving ? 'Merging...' : 'Merge'}
           </Button>
         </DialogFooter>

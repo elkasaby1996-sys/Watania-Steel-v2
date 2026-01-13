@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { updateClientSite, type ClientSiteDetails, type ClientSitePatch } from '@/lib/clientsApi';
+import { updateSite, type ClientSiteDetails, type ClientSitePatch } from '@/lib/clientsApi';
 
 type EditSiteDialogProps = {
   site: ClientSiteDetails | null;
@@ -59,7 +59,7 @@ export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps
         notes: values.notes?.trim() || null
       };
 
-      const updated = await updateClientSite(site.site_id, patch);
+      const updated = await updateSite(site.site_id, patch);
       onUpdated({
         ...site,
         contact_name: updated.contact_name,
@@ -83,7 +83,7 @@ export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">Edit</Button>
+        <Button variant="outline">Edit Site</Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
