@@ -14,17 +14,6 @@ import {
   fetchClientAnalytics,
   type ClientSummary
 } from '../lib/clientsApi';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from 'recharts';
 
 type ClientOverviewSummary = {
   total_orders: number;
@@ -303,19 +292,17 @@ export function ClientProfilePage() {
 
     setOrdersPage(1);
 
-    // load summary + sites + analytics + first orders page
+    // load summary + sites + analytics
     (async () => {
       try {
         setLoadingSummary(true);
         setLoadingSites(true);
         setLoadingAnalytics(true);
-        setLoadingOrders(true);
 
-        const [summaryRes, sitesRes, analyticsRes, ordersRes] = await Promise.all([
+        const [summaryRes, sitesRes, analyticsRes] = await Promise.all([
           fetchClientSummary(clientId, signal),
           fetchClientSitesPerformance(clientId, signal),
-          fetchClientAnalytics(clientId, signal),
-          fetchClientOrdersPage(clientId, pageSize, 0, signal)
+          fetchClientAnalytics(clientId, signal)
         ]);
 
         if (signal.aborted) return;
@@ -323,9 +310,6 @@ export function ClientProfilePage() {
         setSummary(summaryRes);
         setSites(Array.isArray(sitesRes) ? sitesRes : []);
         setAnalyticsJson(analyticsRes ?? null);
-        const rows = Array.isArray(ordersRes?.rows) ? ordersRes.rows : [];
-        setOrders(rows);
-        setOrdersTotalCount(Number(rows[0]?.total_count ?? 0));
       } catch (err: any) {
         if (signal.aborted) return;
         const msg = err?.message || 'Failed to load client profile';
@@ -337,7 +321,6 @@ export function ClientProfilePage() {
         if (!signal.aborted) {
           setLoadingSummary(false);
           setLoadingSites(false);
-          setLoadingOrders(false);
           setLoadingAnalytics(false);
         }
       }
@@ -360,8 +343,11 @@ export function ClientProfilePage() {
         setLoadingOrders(true);
         setOrdersError(null);
 
-        const offset = (ordersPage - 1) * pageSize;
-        const ordersRes = await fetchClientOrdersPage(clientId, pageSize, offset, signal);
+        const params: ClientOrdersPageParams = {
+          limit: pageSize,
+          offset: (page - 1) * pageSize
+        };
+        const ordersRes = await fetchClientOrdersPage(clientId, params, signal);
 
         if (signal.aborted) return;
 
@@ -404,7 +390,43 @@ export function ClientProfilePage() {
     };
   }, [isAdmin]);
 
-  const onClientsMerged = (primaryId: string, duplicateId: string) => {
+  const handleClientsMerged = (primaryId: string, duplicateId: string) => {
+    setRefreshKey((prev) => prev + 1);
+    if (duplicateId === clientId) {
+      navigate(`/clients/${primaryId}`);
+    }
+  };
+
+  const handleSitesMerged = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    let isActive = true;
+    setMergeClientsLoading(true);
+    setMergeClientsError(null);
+
+    fetchClientsSummary()
+      .then((data) => {
+        if (!isActive) return;
+        setMergeClientsList(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!isActive) return;
+        setMergeClientsError(err instanceof Error ? err.message : 'Failed to load clients list');
+      })
+      .finally(() => {
+        if (isActive) setMergeClientsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAdmin]);
+
+  const handleClientsMerged = (primaryId: string, duplicateId: string) => {
     setRefreshKey((prev) => prev + 1);
     if (duplicateId === clientId) {
       navigate(`/clients/${primaryId}`);
@@ -448,7 +470,7 @@ export function ClientProfilePage() {
               defaultPrimaryId={clientId}
               loadingClients={mergeClientsLoading}
               loadError={mergeClientsError}
-              onMerged={onClientsMerged}
+              onMerged={handleClientsMerged}
               triggerLabel="Merge Clients"
             />
           )}
@@ -544,9 +566,6 @@ export function ClientProfilePage() {
                 onMerged={handleSitesMerged}
               />
             </div>
-            {sitesError && (
-              <div className="text-sm text-red-300 mb-2">{sitesError}</div>
-            )}
             {loadingSites ? (
               <div className="text-slate-400 text-sm">Loading…</div>
             ) : sites.length === 0 ? (
