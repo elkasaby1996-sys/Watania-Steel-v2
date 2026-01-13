@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,8 +11,6 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { mergeClientSites, type ClientSitePerformanceRow } from '@/lib/clientsApi';
-import { useToast } from '@/hooks/use-toast';
-import { useUserRole } from '@/hooks/useUserRole';
 
 type MergeSitesDialogProps = {
   clientId: string;
@@ -37,9 +35,6 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
-  const { role, isLoading } = useUserRole();
-  const { toast } = useToast();
-  const isAdmin = role === 'admin';
 
   const suggestions = useMemo<SuggestedGroup[]>(() => {
     const map = new Map<string, ClientSitePerformanceRow[]>();
@@ -74,13 +69,6 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
   }, [open, suggestions]);
 
   const handleMerge = async () => {
-    if (!isAdmin) {
-      toast({
-        title: 'Admin access required',
-        description: 'Only admins can merge client sites.'
-      });
-      return;
-    }
     if (!clientId || !primarySiteId || !duplicateSiteId) {
       setError('Select a primary and duplicate site.');
       return;
@@ -109,26 +97,13 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
       setResult(summary);
       onMerged();
     } catch (err) {
-      const errorMessage = (() => {
-        if (!err || typeof err !== 'object') return 'Failed to merge sites.';
-        const message = 'message' in err ? String((err as any).message) : '';
-        const status = 'status' in err ? Number((err as any).status) : null;
-        if (status === 404 || message.toLowerCase().includes('not found') || message.includes('404')) {
-          return 'Merge RPC not found. Apply the migration in supabase/migrations/20250927_client_site_management.sql.';
-        }
-        return message || 'Failed to merge sites.';
-      })();
-      setError(errorMessage);
+      setError(err instanceof Error ? err.message : 'Failed to merge sites.');
     } finally {
       setSaving(false);
     }
   };
 
-  if (isLoading) {
-    return null;
-  }
-
-  if (!canMerge || !isAdmin) {
+  if (!canMerge) {
     return null;
   }
 
@@ -140,9 +115,6 @@ export function MergeSitesDialog({ clientId, sites, canMerge, onMerged }: MergeS
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Merge Duplicate Sites</DialogTitle>
-          <DialogDescription>
-            Reassign orders to the primary site and delete the duplicate site permanently.
-          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {suggestions.length > 0 ? (

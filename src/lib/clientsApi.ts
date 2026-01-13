@@ -268,25 +268,6 @@ export async function mergeClientSites(
   return data ?? {};
 }
 
-export async function mergeClients(
-  primaryClientId: string,
-  duplicateClientId: string,
-  options?: { newPrimaryName?: string },
-  _signal?: AbortSignal
-): Promise<{ [key: string]: any }> {
-  const data = await rpc<{ [key: string]: any }>(
-    'merge_clients',
-    {
-      p_primary_client_id: primaryClientId,
-      p_duplicate_client_id: duplicateClientId,
-      p_new_primary_name: options?.newPrimaryName ?? null
-    },
-    _signal
-  );
-
-  return data ?? {};
-}
-
 /**
  * Optional convenience object (so imports like `clientsApi.fetchClientSummary` also work)
  */
@@ -300,6 +281,5 @@ export const clientsApi = {
   fetchClientAnalytics,
   updateClient,
   updateClientSite,
-  mergeClientSites,
-  mergeClients
+  mergeClientSites
 };
