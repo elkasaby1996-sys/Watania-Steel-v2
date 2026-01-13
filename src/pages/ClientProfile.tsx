@@ -15,20 +15,36 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EditClientDialog } from '@/components/EditClientDialog';
 import { MergeSitesDialog } from '@/components/MergeSitesDialog';
 import { hasPermission } from '@/lib/auth';
 import { formatNumber } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/useUserRole';
 import {
   fetchClientAnalytics,
   fetchClientOrdersPage,
   fetchClientSitesPerformance,
   fetchClientSummary,
+  fetchClientsSummary,
+  mergeClients,
   type ClientAnalytics,
   type ClientOrderRow,
   type ClientSitePerformanceRow,
+  type ClientSummary,
   type ClientTopSummary
 } from '@/lib/clientsApi';
 import { useAuthStore } from '@/stores/authStore';
@@ -88,6 +104,31 @@ export function ClientProfilePage() {
 
   const [page, setPage] = useState(1);
   const pageSize = 25;
+  const { role: userRole, isLoading: roleLoading } = useUserRole();
+  const { toast } = useToast();
+  const isAdmin = userRole === 'admin';
+
+  const [mergeSearch, setMergeSearch] = useState('');
+  const [mergeResults, setMergeResults] = useState<ClientSummary[]>([]);
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const [selectedDuplicate, setSelectedDuplicate] = useState<ClientSummary | null>(null);
+  const [mergePending, setMergePending] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const refreshSummaryAndSites = async () => {
+    if (!clientId) return;
+    try {
+      const [summaryResult, sitesResult] = await Promise.all([
+        fetchClientSummary(clientId),
+        fetchClientSitesPerformance(clientId)
+      ]);
+      setSummary(summaryResult);
+      setSites(sitesResult);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const refreshSummaryAndSites = async () => {
     if (!clientId) return;
@@ -191,6 +232,35 @@ export function ClientProfilePage() {
     return () => controller.abort();
   }, [clientId, page, pageSize]);
 
+  useEffect(() => {
+    if (!clientId || !isAdmin) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    setMergeLoading(true);
+    setMergeError(null);
+
+    const timeout = setTimeout(async () => {
+      try {
+        const data = await fetchClientsSummary(mergeSearch, signal);
+        if (signal.aborted) return;
+        const filtered = data.filter((client) => client.id !== clientId);
+        setMergeResults(filtered);
+      } catch (err) {
+        if (isAbortError(err)) return;
+        setMergeResults([]);
+        setMergeError(err instanceof Error ? err.message : 'Failed to load clients.');
+      } finally {
+        if (!signal.aborted) setMergeLoading(false);
+      }
+    }, mergeSearch ? 300 : 0);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [clientId, isAdmin, mergeSearch]);
+
   const handleRetryAnalytics = async () => {
     if (!clientId) return;
     const controller = new AbortController();
@@ -275,6 +345,42 @@ export function ClientProfilePage() {
       lastDate: summary?.last_order_date ?? null
     };
   }, [summary]);
+
+  const handleMergeClients = async () => {
+    if (!clientId || !selectedDuplicate) return;
+    if (!isAdmin) {
+      toast({
+        title: 'Admin access required',
+        description: 'Only admins can merge clients.'
+      });
+      return;
+    }
+
+    setMergePending(true);
+    setMergeError(null);
+
+    try {
+      await mergeClients(clientId, selectedDuplicate.id);
+      toast({
+        title: 'Merged successfully',
+        description: `Orders and sites moved from ${selectedDuplicate.name}.`
+      });
+      setSelectedDuplicate(null);
+      setMergeSearch('');
+      setConfirmOpen(false);
+      await refreshSummaryAndSites();
+      navigate(`/clients/${clientId}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to merge clients.';
+      setMergeError(message);
+      toast({
+        title: 'Merge failed',
+        description: message
+      });
+    } finally {
+      setMergePending(false);
+    }
+  };
 
   if (!clientId) {
     return (
