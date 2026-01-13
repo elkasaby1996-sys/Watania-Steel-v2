@@ -12,7 +12,6 @@ import {
   fetchClientSitesPerformance,
   fetchClientOrdersPage,
   fetchClientAnalytics,
-  type ClientOrdersPageParams,
   type ClientSummary
 } from '../lib/clientsApi';
 

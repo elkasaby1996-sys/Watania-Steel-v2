@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export type RpcError = {
+type RpcError = {
   message?: string;
   details?: string;
   hint?: string;
@@ -23,7 +23,7 @@ async function rpc<T>(fnName: string, args: Record<string, any>, _signal?: Abort
   return data as T;
 }
 
-export async function rpcWithRetry<T>(
+async function rpcWithRetry<T>(
   fnName: string,
   args: Record<string, any>,
   signal?: AbortSignal,
@@ -211,8 +211,7 @@ export async function fetchClientOrdersPage(
   params: ClientOrdersPageParams,
   signal?: AbortSignal
 ): Promise<ClientOrdersPageResult> {
-  const offset = Math.max(0, params.offset);
-  const limit = Math.max(1, params.limit);
+  const offset = Math.max(0, (page - 1) * pageSize);
   const data = await rpcWithRetry<ClientOrderRow[]>(
     'get_client_orders_page',
     { client_id: clientId, limit_count: limit, offset_count: offset },
@@ -300,26 +299,17 @@ export async function mergeClients(
   newPrimaryName?: string | null,
   _signal?: AbortSignal
 ): Promise<{ [key: string]: any }> {
-  try {
-    const data = await rpcWithRetry<{ [key: string]: any }>(
-      'merge_clients',
-      {
-        p_primary_client_id: primaryClientId,
-        p_duplicate_client_id: duplicateClientId,
-        p_new_primary_name: newPrimaryName ?? null
-      },
-      _signal
-    );
+  const data = await rpcWithRetry<{ [key: string]: any }>(
+    'merge_clients',
+    {
+      p_primary_client_id: primaryClientId,
+      p_duplicate_client_id: duplicateClientId,
+      p_new_primary_name: newPrimaryName ?? null
+    },
+    _signal
+  );
 
-    return data ?? {};
-  } catch (error) {
-    const err = error as RpcError;
-    const message = `${err.message ?? ''} ${err.details ?? ''}`.toLowerCase();
-    if (message.includes('merge_clients') && (message.includes('does not exist') || message.includes('not found'))) {
-      throw new Error('merge_clients RPC missing');
-    }
-    throw error;
-  }
+  return data ?? {};
 }
 
 export async function mergeClientSites(
