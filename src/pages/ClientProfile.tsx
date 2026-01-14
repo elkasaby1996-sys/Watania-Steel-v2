@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+// src/pages/ClientProfile.tsx
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  BarChart,
   Bar,
+  BarChart,
   CartesianGrid,
-  Cell,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -12,634 +12,676 @@ import {
   XAxis,
   YAxis
 } from 'recharts';
+import { MergeClientsDialog } from '@/components/MergeClientsDialog';
+import { MergeSitesDialog } from '@/components/MergeSitesDialog';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatNumber } from '@/lib/utils';
+// ✅ IMPORTANT: these must exist in src/lib/clientsApi.ts
 import {
-  fetchClientAnalytics,
-  fetchClientOrdersPage,
-  fetchClientSitesPerformance,
+  fetchClientsSummary,
   fetchClientSummary,
-  type ClientAnalytics,
-  type ClientOrderRow,
-  type ClientSitePerformanceRow,
-  type ClientTopSummary
-} from '@/lib/clientsApi';
+  fetchClientSitesPerformance,
+  fetchClientOrdersPage,
+  fetchClientAnalytics,
+  type ClientOrdersPageParams,
+  type ClientSummary
+} from '../lib/clientsApi';
 
-const COLORS = [
-  '#8B5CF6',
-  '#14B8A6',
-  '#F59E0B',
-  '#EC4899',
-  '#10B981',
-  '#F97316',
-  '#06B6D4',
-  '#EF4444'
-];
-
-const isAbortError = (err: unknown) => {
-  if (!err || typeof err !== 'object') return false;
-  const name = 'name' in err ? String((err as any).name) : '';
-  const message = 'message' in err ? String((err as any).message) : '';
-  return name === 'AbortError' || message.toLowerCase().includes('abort');
+type ClientOverviewSummary = {
+  total_orders: number;
+  total_tons: number;
+  unique_sites: number;
+  last_order_date: string | null;
 };
 
-const formatTons = (value: number | null | undefined) => {
-  if (value === null || value === undefined) return '—';
-  return `${formatNumber(value)} t`;
+type SitePerformanceRow = {
+  site_id: string;
+  site_name: string;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  location_text?: string | null;
+  google_maps_url?: string | null;
+  notes?: string | null;
+  total_orders: number;
+  total_tons: number;
+  last_order_date: string | null;
 };
 
-const formatMonthLabel = (value: string) => {
-  if (!value) return '—';
-  if (value.includes('-')) {
-    const date = new Date(`${value}-01T00:00:00Z`);
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    }
+type ClientOrderRow = {
+  id: string; // note: your RPC returns id text (sometimes "2601105/2601104")
+  date: string | null;
+  status: string | null;
+  tons: number | null;
+  company: string | null;
+  site: string | null;
+  order_type: string | null;
+  shift: string | null;
+  delivered_at: string | null;
+  signed_delivery_note: boolean | null;
+  delivery_number: string | null;
+  driver_name: string | null;
+  phone_number: string | null;
+  customer_name: string | null;
+  source: string | null; // 'orders' or 'history_orders'
+  total_count: number; // window count returned by RPC
+};
+
+function formatNumber(n: number | null | undefined, digits = 3) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '0.000';
+  return Number(n).toFixed(digits);
+}
+
+function safeDate(d: string | null | undefined) {
+  if (!d) return 'N/A';
+  return d;
+}
+
+type AnalyticsRow = {
+  label: string;
+  tons: number;
+};
+
+type AnalyticsSectionProps = {
+  analytics: any;
+};
+
+const toNumber = (value: unknown) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+};
+
+const normalizeBreakdown = (data: unknown, labelKey: string, valueKey: string): AnalyticsRow[] => {
+  if (!Array.isArray(data)) return [];
+  return data.map((entry) => ({
+    label: String((entry as Record<string, unknown>)[labelKey] ?? 'Unknown'),
+    tons: toNumber((entry as Record<string, unknown>)[valueKey])
+  })).filter((row) => row.tons > 0);
+};
+
+const getAnalyticsList = (analytics: any, keys: string[], labelKey: string, valueKey: string) => {
+  for (const key of keys) {
+    const list = normalizeBreakdown(analytics?.[key], labelKey, valueKey);
+    if (list.length > 0) return list;
   }
-  return value;
+  return [];
 };
+
+const getMonthlyTons = (analytics: any) => {
+  const candidates = analytics?.monthly_tons ?? analytics?.monthlyTons ?? analytics?.time_series ?? analytics?.timeSeries;
+  if (!Array.isArray(candidates)) return [];
+  return candidates.map((entry) => ({
+    label: String((entry as Record<string, unknown>).month ?? (entry as Record<string, unknown>).date ?? 'N/A'),
+    tons: toNumber((entry as Record<string, unknown>).tons)
+  })).filter((row) => row.tons > 0);
+};
+
+const chartTooltipStyle = {
+  backgroundColor: '#0f172a',
+  border: '1px solid rgba(148, 163, 184, 0.35)',
+  borderRadius: '8px',
+  color: '#f8fafc',
+  fontSize: '12px'
+};
+
+function AnalyticsSection({ analytics }: AnalyticsSectionProps) {
+  const monthlyTons = useMemo(() => getMonthlyTons(analytics), [analytics]);
+  const statusBreakdown = useMemo(
+    () => getAnalyticsList(analytics, ['status_breakdown', 'statusBreakdown'], 'status', 'tons'),
+    [analytics]
+  );
+  const typeBreakdown = useMemo(
+    () => getAnalyticsList(analytics, ['order_type_breakdown', 'orderTypeBreakdown'], 'order_type', 'tons'),
+    [analytics]
+  );
+  const shiftBreakdown = useMemo(
+    () => getAnalyticsList(analytics, ['shift_breakdown', 'shiftBreakdown'], 'shift', 'tons'),
+    [analytics]
+  );
+  const diameterBreakdown = useMemo(
+    () => getAnalyticsList(analytics, ['diameter_breakdown', 'diameterBreakdown', 'diameter_totals'], 'diameter', 'tons'),
+    [analytics]
+  );
+
+  if (
+    monthlyTons.length === 0 &&
+    statusBreakdown.length === 0 &&
+    typeBreakdown.length === 0 &&
+    shiftBreakdown.length === 0 &&
+    diameterBreakdown.length === 0
+  ) {
+    return <div className="text-slate-400 text-sm">No analytics data available for this client.</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-slate-800 p-4">
+        <div className="font-semibold mb-3">Monthly Tons</div>
+        {monthlyTons.length === 0 ? (
+          <div className="text-slate-400 text-sm">No monthly data available.</div>
+        ) : (
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyTons}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis dataKey="label" stroke="#94a3b8" fontSize={12} />
+                <YAxis stroke="#94a3b8" fontSize={12} />
+                <Tooltip contentStyle={chartTooltipStyle} />
+                <Bar dataKey="tons" fill="#38bdf8" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <BreakdownTable title="Status Breakdown" rows={statusBreakdown} />
+        <BreakdownTable title="Order Type Breakdown" rows={typeBreakdown} />
+        <BreakdownTable title="Shift Breakdown" rows={shiftBreakdown} />
+      </div>
+
+      <div className="rounded-lg border border-slate-800 p-4">
+        <div className="font-semibold mb-3">Diameter Breakdown</div>
+        {diameterBreakdown.length === 0 ? (
+          <div className="text-slate-400 text-sm">No diameter data available.</div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={diameterBreakdown}
+                    dataKey="tons"
+                    nameKey="label"
+                    innerRadius="50%"
+                    outerRadius="80%"
+                    fill="#38bdf8"
+                  />
+                  <Tooltip contentStyle={chartTooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <BreakdownTable title="" rows={diameterBreakdown} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type BreakdownTableProps = {
+  title: string;
+  rows: AnalyticsRow[];
+};
+
+function BreakdownTable({ title, rows }: BreakdownTableProps) {
+  return (
+    <div className="rounded-lg border border-slate-800 p-4">
+      {title && <div className="font-semibold mb-3">{title}</div>}
+      {rows.length === 0 ? (
+        <div className="text-slate-400 text-sm">No data available.</div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="text-slate-400">
+            <tr className="border-b border-slate-800">
+              <th className="text-left py-2">Label</th>
+              <th className="text-right py-2">Tons</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label} className="border-b border-slate-800/60">
+                <td className="py-2">{row.label}</td>
+                <td className="py-2 text-right">{formatNumber(row.tons)} t</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
 
 export function ClientProfilePage() {
-  const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const { clientId } = useParams<{ clientId: string }>();
+  const PAGE_SIZE = 50;
 
-  const [summary, setSummary] = useState<ClientTopSummary | null>(null);
-  const [sites, setSites] = useState<ClientSitePerformanceRow[]>([]);
+  const [activeTab, setActiveTab] = useState<'orders' | 'overview' | 'analytics'>('orders');
+
+  const [summary, setSummary] = useState<ClientOverviewSummary | null>(null);
+  const [sites, setSites] = useState<SitePerformanceRow[]>([]);
   const [orders, setOrders] = useState<ClientOrderRow[]>([]);
-  const [ordersTotal, setOrdersTotal] = useState<number>(0);
-  const [analytics, setAnalytics] = useState<ClientAnalytics | null>(null);
+  const [ordersTotalCount, setOrdersTotalCount] = useState<number>(0);
 
-  const [loading, setLoading] = useState(true);
-  const [ordersLoading, setOrdersLoading] = useState(false);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [loadingSites, setLoadingSites] = useState(false);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [sitesError, setSitesError] = useState<string | null>(null);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const [page, setPage] = useState(1);
-  const pageSize = 25;
+  const [analyticsJson, setAnalyticsJson] = useState<any>(null);
+  const [mergeClientsList, setMergeClientsList] = useState<ClientSummary[]>([]);
+  const [mergeClientsLoading, setMergeClientsLoading] = useState(false);
+  const [mergeClientsError, setMergeClientsError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { isAdmin } = useIsAdmin();
+
+  // pagination
+  const [ordersPage, setOrdersPage] = useState(1);
+
+  // abort controllers
+  const summaryAbortRef = useRef<AbortController | null>(null);
+  const ordersAbortRef = useRef<AbortController | null>(null);
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil((ordersTotalCount || 0) / PAGE_SIZE));
+  }, [PAGE_SIZE, ordersTotalCount]);
 
   useEffect(() => {
     if (!clientId) return;
 
+    // abort previous summary loads
+    summaryAbortRef.current?.abort();
     const controller = new AbortController();
+    summaryAbortRef.current = controller;
     const signal = controller.signal;
 
-    setLoading(true);
-    setError(null);
+    // reset state
+    setSummary(null);
+    setSites([]);
+    setOrders([]);
+    setOrdersTotalCount(0);
+    setAnalyticsJson(null);
+
+    setSummaryError(null);
+    setSitesError(null);
+    setOrdersError(null);
     setAnalyticsError(null);
 
-    const loadProfile = async () => {
-      setPage(1);
-      const [summaryResult, sitesResult, ordersResult, analyticsResult] = await Promise.allSettled([
-        fetchClientSummary(clientId, signal),
-        fetchClientSitesPerformance(clientId, signal),
-        fetchClientOrdersPage(clientId, 1, pageSize, signal),
-        fetchClientAnalytics(clientId, signal)
-      ]);
+    setOrdersPage(1);
 
-      if (signal.aborted) return;
-
-      let loadError: string | null = null;
-
-      if (summaryResult.status === 'fulfilled') {
-        setSummary(summaryResult.value);
-      } else {
-        loadError = summaryResult.reason instanceof Error ? summaryResult.reason.message : 'Failed to load summary.';
-      }
-
-      if (sitesResult.status === 'fulfilled') {
-        setSites(sitesResult.value);
-      } else {
-        loadError = loadError ?? (sitesResult.reason instanceof Error ? sitesResult.reason.message : 'Failed to load sites.');
-      }
-
-      if (ordersResult.status === 'fulfilled') {
-        setOrders(ordersResult.value.rows);
-        setOrdersTotal(ordersResult.value.totalCount);
-      } else {
-        loadError = loadError ?? (ordersResult.reason instanceof Error ? ordersResult.reason.message : 'Failed to load orders.');
-      }
-
-      if (analyticsResult.status === 'fulfilled') {
-        setAnalytics(analyticsResult.value);
-      } else {
-        setAnalytics(null);
-        setAnalyticsError(analyticsResult.reason instanceof Error ? analyticsResult.reason.message : 'Failed to load analytics.');
-      }
-
-      setLoading(false);
-      setOrdersLoading(false);
-      setAnalyticsLoading(false);
-      if (loadError) setError(loadError);
-    };
-
-    loadProfile();
-
-    return () => controller.abort();
-  }, [clientId]);
-
-  useEffect(() => {
-    if (!clientId) return;
-
-    const controller = new AbortController();
-    const signal = controller.signal;
-
-    const loadOrders = async () => {
-      setOrdersLoading(true);
+    // load summary + sites + analytics
+    (async () => {
       try {
-        const pageData = await fetchClientOrdersPage(clientId, page, pageSize, signal);
-        if (signal.aborted) return;
-        setOrders(pageData.rows);
-        setOrdersTotal(pageData.totalCount);
-      } catch (err) {
-        if (isAbortError(err)) return;
-        console.error(err);
-      } finally {
-        if (!signal.aborted) setOrdersLoading(false);
-      }
-    };
+        setLoadingSummary(true);
+        setLoadingSites(true);
+        setLoadingAnalytics(true);
 
-    if (page !== 1) {
-      loadOrders();
-    }
+        const [summaryRes, sitesRes, analyticsRes] = await Promise.all([
+          fetchClientSummary(clientId, signal),
+          fetchClientSitesPerformance(clientId, signal),
+          fetchClientAnalytics(clientId, signal)
+        ]);
+
+        if (signal.aborted) return;
+
+        setSummary(summaryRes);
+        setSites(Array.isArray(sitesRes) ? sitesRes : []);
+        setAnalyticsJson(analyticsRes ?? null);
+      } catch (err: any) {
+        if (signal.aborted) return;
+        const msg = err?.message || 'Failed to load client profile';
+        setSummaryError(msg);
+        setSitesError(msg);
+        setOrdersError(msg);
+        setAnalyticsError(msg);
+      } finally {
+        if (!signal.aborted) {
+          setLoadingSummary(false);
+          setLoadingSites(false);
+          setLoadingAnalytics(false);
+        }
+      }
+    })();
 
     return () => controller.abort();
-  }, [clientId, page, pageSize]);
+  }, [clientId, refreshKey]);
 
-  const handleRetryAnalytics = async () => {
+  useEffect(() => {
     if (!clientId) return;
+
+    // load orders page on page change
+    ordersAbortRef.current?.abort();
     const controller = new AbortController();
+    ordersAbortRef.current = controller;
     const signal = controller.signal;
 
-    setAnalyticsLoading(true);
-    setAnalyticsError(null);
+    (async () => {
+      try {
+        setLoadingOrders(true);
+        setOrdersError(null);
 
-    try {
-      const data = await fetchClientAnalytics(clientId, signal);
-      if (!signal.aborted) setAnalytics(data);
-    } catch (err) {
-      if (isAbortError(err)) return;
-      setAnalytics(null);
-      setAnalyticsError(err instanceof Error ? err.message : 'Failed to load analytics.');
-    } finally {
-      if (!signal.aborted) setAnalyticsLoading(false);
+        const params: ClientOrdersPageParams = {
+          limit: PAGE_SIZE,
+          offset: (ordersPage - 1) * PAGE_SIZE
+        };
+        const ordersRes = await fetchClientOrdersPage(clientId, params, signal);
+
+        if (signal.aborted) return;
+
+        const rows = Array.isArray(ordersRes?.rows) ? ordersRes.rows : [];
+        setOrders(rows);
+        setOrdersTotalCount(Number(rows[0]?.total_count ?? 0));
+      } catch (err: any) {
+        if (signal.aborted) return;
+        setOrdersError(err?.message || 'Failed to load orders');
+      } finally {
+        if (!signal.aborted) setLoadingOrders(false);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [clientId, ordersPage]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    let isActive = true;
+    setMergeClientsLoading(true);
+    setMergeClientsError(null);
+
+    fetchClientsSummary()
+      .then((data) => {
+        if (!isActive) return;
+        setMergeClientsList(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!isActive) return;
+        setMergeClientsError(err instanceof Error ? err.message : 'Failed to load clients list');
+      })
+      .finally(() => {
+        if (isActive) setMergeClientsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAdmin]);
+
+  const handleClientsMerged = (primaryId: string, duplicateId: string) => {
+    setRefreshKey((prev) => prev + 1);
+    if (duplicateId === clientId) {
+      navigate(`/clients/${primaryId}`);
     }
   };
 
-  const totalPages = useMemo(() => {
-    if (!ordersTotal) return 1;
-    return Math.max(1, Math.ceil(ordersTotal / pageSize));
-  }, [ordersTotal, pageSize]);
-
-  const monthlyTons = useMemo(() => {
-    const items = Array.isArray(analytics?.monthly_tons) ? analytics?.monthly_tons : [];
-    return items.map((entry: any) => ({
-      month: formatMonthLabel(String(entry?.month ?? entry?.label ?? entry?.month_label ?? '')),
-      tons: Number(entry?.tons ?? 0)
-    }));
-  }, [analytics]);
-
-  const normalizeBreakdown = (items: any[], labelKey: string) =>
-    items.map((item) => ({
-      label: String(item?.[labelKey] ?? item?.label ?? 'Unknown'),
-      orders: Number(item?.orders ?? item?.count ?? 0),
-      tons: Number(item?.tons ?? 0)
-    }));
-
-  const statusBreakdown = useMemo(() => {
-    const items = Array.isArray(analytics?.status_breakdown) ? analytics?.status_breakdown : [];
-    return normalizeBreakdown(items, 'status');
-  }, [analytics]);
-
-  const orderTypeBreakdown = useMemo(() => {
-    const items = Array.isArray(analytics?.order_type_breakdown) ? analytics?.order_type_breakdown : [];
-    return normalizeBreakdown(items, 'order_type');
-  }, [analytics]);
-
-  const shiftBreakdown = useMemo(() => {
-    const items = Array.isArray(analytics?.shift_breakdown) ? analytics?.shift_breakdown : [];
-    return normalizeBreakdown(items, 'shift');
-  }, [analytics]);
-
-  const diameterBreakdown = useMemo(() => {
-    const items = Array.isArray(analytics?.diameter_breakdown) ? analytics?.diameter_breakdown : [];
-    return items.map((item: any) => ({
-      label: String(item?.label ?? item?.diameter ?? 'Unknown'),
-      tons: Number(item?.tons ?? 0)
-    }));
-  }, [analytics]);
-
-  const diameterTotal = useMemo(
-    () => diameterBreakdown.reduce((sum, entry) => sum + entry.tons, 0),
-    [diameterBreakdown]
-  );
-
-  const diameterDetails = useMemo(() => {
-    if (!diameterTotal) return [];
-    return diameterBreakdown.map((entry) => ({
-      ...entry,
-      percentage: Math.round((entry.tons / diameterTotal) * 1000) / 10
-    }));
-  }, [diameterBreakdown, diameterTotal]);
-
-  const topStats = useMemo(() => {
-    return {
-      totalTons: summary?.total_tons ?? 0,
-      totalOrders: summary?.total_orders ?? 0,
-      uniqueSites: summary?.unique_sites ?? 0,
-      lastDate: summary?.last_order_date ?? null
-    };
-  }, [summary]);
+  const handleSitesMerged = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
 
   if (!clientId) {
     return (
       <div className="p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Client Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">Missing client id in route.</CardContent>
-        </Card>
+        <div className="text-red-400">Missing clientId in URL.</div>
+        <button className="mt-4 px-3 py-2 rounded bg-slate-700" onClick={() => navigate(-1)}>
+          Go Back
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm text-muted-foreground">Client Profile</div>
-          <div className="text-xl font-semibold">{summary?.client_name ?? clientId}</div>
-          <div className="text-xs text-muted-foreground">Client ID: {clientId}</div>
+          <div className="text-sm text-slate-400">
+            <Link to="/clients" className="hover:underline">
+              ← Back to Clients
+            </Link>
+          </div>
+          <h1 className="text-2xl font-semibold">Client profile and order history</h1>
+          <div className="text-xs text-slate-400 mt-1">Client ID: {clientId}</div>
         </div>
-        <Button variant="outline" onClick={() => navigate('/clients')}>
-          Back to Clients
-        </Button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <MergeClientsDialog
+              clients={mergeClientsList}
+              canMerge={isAdmin}
+              defaultPrimaryId={clientId}
+              loadingClients={mergeClientsLoading}
+              loadError={mergeClientsError}
+              onMerged={handleClientsMerged}
+              triggerLabel="Merge Clients"
+            />
+          )}
+          <div className="flex gap-2">
+            <button
+              className={`px-3 py-2 rounded ${activeTab === 'orders' ? 'bg-slate-700' : 'bg-slate-800'}`}
+              onClick={() => setActiveTab('orders')}
+            >
+              Orders
+            </button>
+            <button
+              className={`px-3 py-2 rounded ${activeTab === 'overview' ? 'bg-slate-700' : 'bg-slate-800'}`}
+              onClick={() => setActiveTab('overview')}
+            >
+              Overview
+            </button>
+            <button
+              className={`px-3 py-2 rounded ${activeTab === 'analytics' ? 'bg-slate-700' : 'bg-slate-800'}`}
+              onClick={() => setActiveTab('analytics')}
+            >
+              Analytics
+            </button>
+          </div>
+        </div>
       </div>
 
-      {error ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Failed to load client</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-red-500">{error}</CardContent>
-        </Card>
-      ) : null}
-
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="flex flex-wrap gap-2">
-          <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="orders">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Orders</CardTitle>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <div>Total Orders: {ordersTotal.toLocaleString()}</div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    disabled={page <= 1 || ordersLoading}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    Prev
-                  </Button>
-                  <div>
-                    Page {page} / {totalPages}
-                  </div>
-                  <Button
-                    variant="outline"
-                    disabled={page >= totalPages || ordersLoading}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loading || ordersLoading ? (
-                <div className="text-sm text-muted-foreground">Loading orders...</div>
-              ) : orders.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No orders found.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Site</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Shift</TableHead>
-                        <TableHead className="text-right">Tons</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {orders.map((order) => (
-                        <TableRow key={`${order.source}-${order.id}`}>
-                          <TableCell>{order.date ?? '—'}</TableCell>
-                          <TableCell>{order.site ?? '—'}</TableCell>
-                          <TableCell>{order.status ?? '—'}</TableCell>
-                          <TableCell>{order.order_type ?? '—'}</TableCell>
-                          <TableCell>{order.shift ?? '—'}</TableCell>
-                          <TableCell className="text-right">{formatTons(order.tons)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="overview">
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Client Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <div className="text-xs text-muted-foreground">Client Name</div>
-                    <div className="text-sm font-semibold">{summary?.client_name ?? '—'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Client ID</div>
-                    <div className="text-sm font-semibold">{clientId}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Total Orders</div>
-                    <div className="text-sm font-semibold">{loading ? '—' : topStats.totalOrders.toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Total Tons</div>
-                    <div className="text-sm font-semibold">{loading ? '—' : formatTons(topStats.totalTons)}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Sites</div>
-                    <div className="text-sm font-semibold">{loading ? '—' : topStats.uniqueSites.toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Last Order</div>
-                    <div className="text-sm font-semibold">{loading ? '—' : topStats.lastDate ?? '—'}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Sites Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="text-sm text-muted-foreground">Loading sites...</div>
-                ) : sites.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No sites found for this client.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Site</TableHead>
-                          <TableHead className="text-right">Orders</TableHead>
-                          <TableHead className="text-right">Tons</TableHead>
-                          <TableHead>Last Order</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {sites.map((site) => (
-                          <TableRow
-                            key={site.site_id}
-                            className="cursor-pointer hover:bg-muted/50"
-                            onClick={() => navigate(`/clients/${clientId}/sites/${site.site_id}`)}
-                          >
-                            <TableCell>
-                              <div className="font-medium">{site.site_name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {site.contact_name ?? 'No contact'} • {site.location_text ?? 'No location'}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">{site.total_orders.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{formatTons(site.total_tons)}</TableCell>
-                            <TableCell>{site.last_order_date ?? '—'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+      {/* Top cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+          <div className="text-xs text-slate-400">Total Orders</div>
+          <div className="text-2xl font-semibold">
+            {loadingSummary ? '…' : summary?.total_orders ?? 0}
           </div>
-        </TabsContent>
+        </div>
+        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+          <div className="text-xs text-slate-400">Total Tons</div>
+          <div className="text-2xl font-semibold">
+            {loadingSummary ? '…' : `${formatNumber(summary?.total_tons ?? 0)} t`}
+          </div>
+        </div>
+        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+          <div className="text-xs text-slate-400">Sites</div>
+          <div className="text-2xl font-semibold">
+            {loadingSummary ? '…' : summary?.unique_sites ?? 0}
+          </div>
+        </div>
+        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+          <div className="text-xs text-slate-400">Last Order</div>
+          <div className="text-2xl font-semibold">
+            {loadingSummary ? '…' : safeDate(summary?.last_order_date)}
+          </div>
+        </div>
+      </div>
 
-        <TabsContent value="analytics">
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Monthly Tons</CardTitle>
-              </CardHeader>
-              <CardContent className="h-72">
-                {analyticsLoading || loading ? (
-                  <div className="text-sm text-muted-foreground">Loading analytics...</div>
-                ) : monthlyTons.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No monthly data available.</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyTons} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="tons" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+      {(summaryError || sitesError || ordersError || analyticsError) && (
+        <div className="rounded-xl border border-red-800 bg-red-950/30 p-4 text-red-200 text-sm">
+          {summaryError || sitesError || ordersError || analyticsError}
+        </div>
+      )}
 
-            {!analytics && !analyticsLoading ? (
-              <Card>
-                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                  <p>{analyticsError ?? 'Analytics data is unavailable for this client.'}</p>
-                  <Button variant="outline" className="mt-4" onClick={handleRetryAnalytics}>
-                    Retry
-                  </Button>
-                </CardContent>
-              </Card>
+      {/* Tabs */}
+  {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+            <div className="font-semibold mb-3">Client Overview</div>
+            <div className="text-sm text-slate-300 space-y-2">
+              <div className="flex justify-between border-b border-slate-800 pb-2">
+                <span className="text-slate-400">Total Orders</span>
+                <span>{summary?.total_orders ?? 0}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800 pb-2">
+                <span className="text-slate-400">Total Tons</span>
+                <span>{formatNumber(summary?.total_tons ?? 0)} t</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800 pb-2">
+                <span className="text-slate-400">Sites</span>
+                <span>{summary?.unique_sites ?? 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Last Order</span>
+                <span>{safeDate(summary?.last_order_date)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div className="font-semibold">Sites Performance</div>
+              <MergeSitesDialog
+                clientId={clientId}
+                sites={sites}
+                canMerge={isAdmin}
+                onMerged={handleSitesMerged}
+              />
+            </div>
+            {loadingSites ? (
+              <div className="text-slate-400 text-sm">Loading…</div>
+            ) : sites.length === 0 ? (
+              <div className="text-slate-400 text-sm">No sites found.</div>
             ) : (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Status Breakdown</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {statusBreakdown.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No status breakdown available.</div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Status</TableHead>
-                              <TableHead className="text-right">Orders</TableHead>
-                              <TableHead className="text-right">Tons</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {statusBreakdown.map((row) => (
-                              <TableRow key={row.label}>
-                                <TableCell>{row.label}</TableCell>
-                                <TableCell className="text-right">{row.orders.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{formatTons(row.tons)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Order Type Breakdown</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {orderTypeBreakdown.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No order type breakdown available.</div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Order Type</TableHead>
-                              <TableHead className="text-right">Orders</TableHead>
-                              <TableHead className="text-right">Tons</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {orderTypeBreakdown.map((row) => (
-                              <TableRow key={row.label}>
-                                <TableCell>{row.label}</TableCell>
-                                <TableCell className="text-right">{row.orders.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{formatTons(row.tons)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Shift Breakdown</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {shiftBreakdown.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No shift breakdown available.</div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Shift</TableHead>
-                              <TableHead className="text-right">Orders</TableHead>
-                              <TableHead className="text-right">Tons</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {shiftBreakdown.map((row) => (
-                              <TableRow key={row.label}>
-                                <TableCell>{row.label}</TableCell>
-                                <TableCell className="text-right">{row.orders.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{formatTons(row.tons)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Diameter Breakdown</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {diameterBreakdown.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No diameter breakdown available.</div>
-                    ) : (
-                      <>
-                        <div className="h-64">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={diameterDetails}
-                                dataKey="tons"
-                                nameKey="label"
-                                innerRadius={50}
-                                outerRadius={90}
-                                paddingAngle={2}
-                              >
-                                {diameterDetails.map((entry, index) => (
-                                  <Cell key={`cell-${entry.label}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip formatter={(value: number) => formatTons(value)} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Diameter</TableHead>
-                                <TableHead className="text-right">Tons</TableHead>
-                                <TableHead className="text-right">Share</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {diameterDetails.map((row) => (
-                                <TableRow key={row.label}>
-                                  <TableCell>{row.label}</TableCell>
-                                  <TableCell className="text-right">{formatTons(row.tons)}</TableCell>
-                                  <TableCell className="text-right">{row.percentage}%</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                        {Math.abs(diameterTotal - topStats.totalTons) > 0.1 && topStats.totalTons > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            Breakdown total differs from total tons by {formatNumber(Math.abs(diameterTotal - topStats.totalTons))} t.
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </>
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-slate-400">
+                    <tr className="border-b border-slate-800">
+                      <th className="text-left py-2">Site</th>
+                      <th className="text-right py-2">Orders</th>
+                      <th className="text-right py-2">Tons</th>
+                      <th className="text-right py-2">Last Order</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sites.map((s) => (
+                      <tr
+                        key={s.site_id}
+                        className="border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/40"
+                        onClick={() => navigate(`/clients/${clientId}/sites/${s.site_id}`)}
+                      >
+                        <td className="py-2">
+                          <Link
+                            className="hover:underline"
+                            to={`/clients/${clientId}/sites/${s.site_id}`}
+                          >
+                            {s.site_name}
+                          </Link>
+                          {(s.contact_name || s.contact_phone || s.location_text) && (
+                            <div className="text-xs text-slate-500 mt-1">
+                              {s.contact_name ? `Contact: ${s.contact_name}` : ''}
+                              {s.contact_phone ? ` • ${s.contact_phone}` : ''}
+                              {s.location_text ? ` • ${s.location_text}` : ''}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2 text-right">{s.total_orders}</td>
+                        <td className="py-2 text-right">{formatNumber(s.total_tons)} t</td>
+                        <td className="py-2 text-right">{safeDate(s.last_order_date)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
+
+      {activeTab === 'orders' && (
+        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-semibold">Order History</div>
+            <div className="flex items-center gap-2 text-sm">
+              <button
+                className="px-3 py-1 rounded bg-slate-800 disabled:opacity-50"
+                onClick={() => setOrdersPage((current) => Math.max(1, current - 1))}
+                disabled={ordersPage <= 1 || loadingOrders}
+              >
+                Prev
+              </button>
+              <div className="text-slate-400">
+                Page {ordersPage} / {totalPages}
+              </div>
+              <button
+                className="px-3 py-1 rounded bg-slate-800 disabled:opacity-50"
+                onClick={() => setOrdersPage((current) => Math.min(totalPages, current + 1))}
+                disabled={ordersPage >= totalPages || loadingOrders}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+
+          {ordersError && (
+            <div className="text-sm text-red-300 mb-2">{ordersError}</div>
+          )}
+          {loadingOrders ? (
+            <div className="text-slate-400 text-sm">Loading…</div>
+          ) : orders.length === 0 ? (
+            <div className="text-slate-400 text-sm">No orders found.</div>
+          ) : (
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="text-slate-400">
+                  <tr className="border-b border-slate-800">
+                    <th className="text-left py-2">ID</th>
+                    <th className="text-left py-2">Date</th>
+                    <th className="text-left py-2">Status</th>
+                    <th className="text-left py-2">Type</th>
+                    <th className="text-left py-2">Shift</th>
+                    <th className="text-left py-2">Site</th>
+                    <th className="text-right py-2">Tons</th>
+                    <th className="text-left py-2">Driver</th>
+                    <th className="text-left py-2">Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o) => (
+                    <tr key={`${o.source}-${o.id}-${o.date ?? ''}`} className="border-b border-slate-800/60">
+                      <td className="py-2">{o.id}</td>
+                      <td className="py-2">{safeDate(o.date)}</td>
+                      <td className="py-2">{o.status ?? '—'}</td>
+                      <td className="py-2">{o.order_type ?? '—'}</td>
+                      <td className="py-2">{o.shift ?? '—'}</td>
+                      <td className="py-2">{o.site ?? '—'}</td>
+                      <td className="py-2 text-right">{formatNumber(o.tons)} t</td>
+                      <td className="py-2">{o.driver_name ?? '—'}</td>
+                      <td className="py-2">{o.source ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'analytics' && (
+        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+          <div className="font-semibold mb-3">Analytics</div>
+          {loadingAnalytics ? (
+            <div className="text-slate-400 text-sm">Loading…</div>
+          ) : (
+            <div className="space-y-6">
+              {analyticsError && (
+                <div className="text-sm text-red-300">{analyticsError}</div>
+              )}
+              {analyticsJson ? (
+                <AnalyticsSection analytics={analyticsJson} />
+              ) : (
+                <div className="text-slate-400 text-sm">
+                  No analytics data available for this client.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-
-export default ClientProfilePage;

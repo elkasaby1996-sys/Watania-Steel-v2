@@ -14,7 +14,6 @@ type Order = {
   customerName: string;
   date: string;
   status: 'pending' | 'in-progress' | 'completed' | 'delayed' | 'delivered';
-  amount: number;
   tons: number;
   shift: 'morning' | 'night';
   deliveryNumber?: string;
