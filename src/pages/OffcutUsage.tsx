@@ -38,10 +38,6 @@ import { AddOffcutEntriesModal } from '@/components/AddOffcutEntriesModal';
 import { EditOffcutEntryModal } from '@/components/EditOffcutEntryModal';
 import { useAuthStore } from '@/stores/authStore';
 import { hasPermission } from '@/lib/auth';
-import {
-  buildExecutiveOffcutReportData
-} from '@/reports/offcut/buildExecutiveOffcutReportData';
-import { exportExecutiveOffcutPdf } from '@/reports/offcut/exportExecutiveOffcutPdf';
 
 type ViewMode = 'daily' | 'monthly' | 'range';
 
@@ -87,7 +83,8 @@ export function OffcutUsage() {
   // Data state - filtered dataset stored in state for later calculations
   const [filteredEntries, setFilteredEntries] = useState<OffcutUsageEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [exportingPdf, setExportingPdf] = useState<boolean>(false);
+  const canExportExecutive =
+    user?.profile?.role === 'admin' || user?.profile?.role === 'executive';
 
   // Modal state
   const [addModalOpen, setAddModalOpen] = useState<boolean>(false);
@@ -201,40 +198,10 @@ export function OffcutUsage() {
     }
   };
 
-  const handleExportExecutivePdf = async () => {
-    if (filteredEntries.length === 0) {
-      toast({
-        title: 'No data in selected range',
-        description: 'Adjust the filters to include offcut usage records.',
-      });
-      return;
-    }
-
-    setExportingPdf(true);
-    try {
-      const reportData = buildExecutiveOffcutReportData(filteredEntries);
-      const dateRange = getDateRange();
-      const meta = {
-        dateRange,
-        generatedAt: new Date().toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      };
-      await exportExecutiveOffcutPdf(reportData, meta);
-    } catch (error) {
-      console.error('Failed to generate executive report:', error);
-      toast({
-        title: 'Failed to generate report',
-        description: 'Please try again in a moment.',
-        variant: 'destructive'
-      });
-    } finally {
-      setExportingPdf(false);
-    }
+  const handleExportExecutivePdf = () => {
+    const dateRange = getDateRange();
+    const url = `/reports/offcut/executive?from=${dateRange.start}&to=${dateRange.end}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Handle edit action
@@ -328,23 +295,25 @@ export function OffcutUsage() {
               <Filter className="h-5 w-5" />
               Filter Options
             </CardTitle>
-            <div
-              className="flex"
-              title={
-                filteredEntries.length === 0
-                  ? 'No data in selected range'
-                  : undefined
-              }
-            >
-              <Button
-                onClick={handleExportExecutivePdf}
-                disabled={filteredEntries.length === 0 || exportingPdf}
-                className="bg-slate-900 text-white hover:bg-slate-800"
+            {canExportExecutive && (
+              <div
+                className="flex"
+                title={
+                  filteredEntries.length === 0
+                    ? 'No data in selected range'
+                    : undefined
+                }
               >
-                <FileDown size={18} className="mr-2" />
-                {exportingPdf ? 'Generating…' : 'Export Executive PDF'}
-              </Button>
-            </div>
+                <Button
+                  onClick={handleExportExecutivePdf}
+                  disabled={filteredEntries.length === 0}
+                  className="bg-slate-900 text-white hover:bg-slate-800"
+                >
+                  <FileDown size={18} className="mr-2" />
+                  Export Executive PDF
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

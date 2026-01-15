@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import './styles/print.css';
 
 // Make environment variables available globally
 if (typeof window !== 'undefined') {
