@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Calendar, Filter, Trophy, Plus, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Filter, Trophy, Plus, Edit, Trash2, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,6 +38,10 @@ import { AddOffcutEntriesModal } from '@/components/AddOffcutEntriesModal';
 import { EditOffcutEntryModal } from '@/components/EditOffcutEntryModal';
 import { useAuthStore } from '@/stores/authStore';
 import { hasPermission } from '@/lib/auth';
+import {
+  buildExecutiveOffcutReportData
+} from '@/reports/offcut/buildExecutiveOffcutReportData';
+import { exportExecutiveOffcutPdf } from '@/reports/offcut/exportExecutiveOffcutPdf';
 
 type ViewMode = 'daily' | 'monthly' | 'range';
 
@@ -83,6 +87,7 @@ export function OffcutUsage() {
   // Data state - filtered dataset stored in state for later calculations
   const [filteredEntries, setFilteredEntries] = useState<OffcutUsageEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [exportingPdf, setExportingPdf] = useState<boolean>(false);
 
   // Modal state
   const [addModalOpen, setAddModalOpen] = useState<boolean>(false);
@@ -180,6 +185,58 @@ export function OffcutUsage() {
     });
   };
 
+  const getDateRange = () => {
+    switch (viewMode) {
+      case 'daily':
+        return { start: selectedDate, end: selectedDate };
+      case 'monthly': {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const start = `${year}-${String(month).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        return { start, end };
+      }
+      case 'range':
+        return { start: startDate, end: endDate };
+    }
+  };
+
+  const handleExportExecutivePdf = async () => {
+    if (filteredEntries.length === 0) {
+      toast({
+        title: 'No data in selected range',
+        description: 'Adjust the filters to include offcut usage records.',
+      });
+      return;
+    }
+
+    setExportingPdf(true);
+    try {
+      const reportData = buildExecutiveOffcutReportData(filteredEntries);
+      const dateRange = getDateRange();
+      const meta = {
+        dateRange,
+        generatedAt: new Date().toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      };
+      await exportExecutiveOffcutPdf(reportData, meta);
+    } catch (error) {
+      console.error('Failed to generate executive report:', error);
+      toast({
+        title: 'Failed to generate report',
+        description: 'Please try again in a moment.',
+        variant: 'destructive'
+      });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   // Handle edit action
   const handleEdit = (entry: OffcutUsageEntry) => {
     setEditingEntry(entry);
@@ -266,10 +323,29 @@ export function OffcutUsage() {
       {/* Filter Controls */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filter Options
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filter Options
+            </CardTitle>
+            <div
+              className="flex"
+              title={
+                filteredEntries.length === 0
+                  ? 'No data in selected range'
+                  : undefined
+              }
+            >
+              <Button
+                onClick={handleExportExecutivePdf}
+                disabled={filteredEntries.length === 0 || exportingPdf}
+                className="bg-slate-900 text-white hover:bg-slate-800"
+              >
+                <FileDown size={18} className="mr-2" />
+                {exportingPdf ? 'Generating…' : 'Export Executive PDF'}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* View Mode Tabs */}
