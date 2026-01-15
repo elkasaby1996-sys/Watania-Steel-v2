@@ -19,7 +19,6 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useDashboardStore } from './stores/dashboardStore';
 import { useAuthStore } from './stores/authStore';
-import { OffcutExecutiveReport } from './pages/reports/OffcutExecutiveReport';
 
 function App() {
   const { sidebarCollapsed, loadOrders, loadDashboardMetrics } = useDashboardStore();
@@ -48,16 +47,12 @@ function App() {
         <ProtectedRoute>
           <div className="min-h-screen bg-background text-foreground">
             <ImageAssets />
-            <div className="print-hidden">
-              <Sidebar />
-            </div>
-            <main className={`app-main transition-all duration-300 ${
+            <Sidebar />
+            <main className={`transition-all duration-300 ${
               sidebarCollapsed ? 'ml-16' : 'ml-64'
             }`}>
-              <div className="print-hidden">
-                <TopBar />
-              </div>
-              <div className="app-content pt-16 p-6">
+              <TopBar />
+              <div className="pt-16 p-6">
                 <div className="max-w-7xl mx-auto">
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
@@ -70,7 +65,6 @@ function App() {
                     <Route path="/clients/:clientId/sites/:siteId" element={<ClientSiteDetailsPage />} />
                     <Route path="/inventory" element={<Inventory />} />
                     <Route path="/offcut-usage" element={<OffcutUsage />} />
-                    <Route path="/reports/offcut/executive" element={<OffcutExecutiveReport />} />
                     <Route path="/steel-analytics" element={<SteelAnalytics />} />
                     {/* Catch all route - redirect to dashboard */}
                     <Route path="*" element={<Navigate to="/" replace />} />

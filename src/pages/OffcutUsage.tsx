@@ -38,6 +38,7 @@ import { AddOffcutEntriesModal } from '@/components/AddOffcutEntriesModal';
 import { EditOffcutEntryModal } from '@/components/EditOffcutEntryModal';
 import { useAuthStore } from '@/stores/authStore';
 import { hasPermission } from '@/lib/auth';
+import { exportExecutiveOffcutPdf } from '@/reports/offcut/exportExecutiveOffcutPdf';
 
 type ViewMode = 'daily' | 'monthly' | 'range';
 
@@ -83,6 +84,7 @@ export function OffcutUsage() {
   // Data state - filtered dataset stored in state for later calculations
   const [filteredEntries, setFilteredEntries] = useState<OffcutUsageEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [exportingPdf, setExportingPdf] = useState<boolean>(false);
   const canExportExecutive =
     user?.profile?.role === 'admin' || user?.profile?.role === 'executive';
 
@@ -198,10 +200,39 @@ export function OffcutUsage() {
     }
   };
 
-  const handleExportExecutivePdf = () => {
-    const dateRange = getDateRange();
-    const url = `/reports/offcut/executive?from=${dateRange.start}&to=${dateRange.end}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const handleExportExecutivePdf = async () => {
+    if (filteredEntries.length === 0) {
+      toast({
+        title: 'No data in selected range',
+        description: 'Adjust the filters to include offcut usage records.',
+      });
+      return;
+    }
+    setExportingPdf(true);
+    try {
+      const dateRange = getDateRange();
+      const meta = {
+        dateRange,
+        generatedAt: new Date().toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        preparedBy: user?.profile?.email || user?.email || 'Executive User'
+      };
+      await exportExecutiveOffcutPdf(filteredEntries, meta);
+    } catch (error) {
+      console.error('Failed to generate executive report:', error);
+      toast({
+        title: 'Failed to generate report',
+        description: 'Please try again in a moment.',
+        variant: 'destructive'
+      });
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   // Handle edit action
@@ -298,6 +329,14 @@ export function OffcutUsage() {
             {canExportExecutive && (
               <div
                 className="flex"
+                onClick={() => {
+                  if (filteredEntries.length === 0) {
+                    toast({
+                      title: 'No data in selected range',
+                      description: 'Adjust the filters to include offcut usage records.',
+                    });
+                  }
+                }}
                 title={
                   filteredEntries.length === 0
                     ? 'No data in selected range'
@@ -306,11 +345,11 @@ export function OffcutUsage() {
               >
                 <Button
                   onClick={handleExportExecutivePdf}
-                  disabled={filteredEntries.length === 0}
+                  disabled={filteredEntries.length === 0 || exportingPdf}
                   className="bg-slate-900 text-white hover:bg-slate-800"
                 >
                   <FileDown size={18} className="mr-2" />
-                  Export Executive PDF
+                  {exportingPdf ? 'Generating…' : 'Export Executive PDF'}
                 </Button>
               </div>
             )}
