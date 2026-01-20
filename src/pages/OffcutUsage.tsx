@@ -38,7 +38,11 @@ import { AddOffcutEntriesModal } from '@/components/AddOffcutEntriesModal';
 import { EditOffcutEntryModal } from '@/components/EditOffcutEntryModal';
 import { useAuthStore } from '@/stores/authStore';
 import { hasPermission } from '@/lib/auth';
-import { exportExecutiveOffcutPdf } from '@/reports/offcut/exportExecutiveOffcutPdf';
+import { supabase } from '@/lib/supabase';
+import {
+  buildExecutiveOffcutReportData,
+  ProductionRow
+} from '@/reports/offcut/buildExecutiveOffcutReportData';
 
 type ViewMode = 'daily' | 'monthly' | 'range';
 
@@ -84,7 +88,7 @@ export function OffcutUsage() {
   // Data state - filtered dataset stored in state for later calculations
   const [filteredEntries, setFilteredEntries] = useState<OffcutUsageEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [exportingPdf, setExportingPdf] = useState<boolean>(false);
+  const [openingExecutiveReport, setOpeningExecutiveReport] = useState<boolean>(false);
   const canExportExecutive =
     user?.profile?.role === 'admin' || user?.profile?.role === 'executive';
 
@@ -200,6 +204,38 @@ export function OffcutUsage() {
     }
   };
 
+  const fetchProductionRows = async (dateRange: { start: string; end: string }) => {
+    const selectFields =
+      'date,tons,order_type,company,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm';
+
+    const [ordersResponse, historyResponse] = await Promise.all([
+      supabase
+        .from('orders')
+        .select(selectFields)
+        .gte('date', dateRange.start)
+        .lte('date', dateRange.end)
+        .eq('order_type', 'cut-and-bend'),
+      supabase
+        .from('history_orders')
+        .select(selectFields)
+        .gte('date', dateRange.start)
+        .lte('date', dateRange.end)
+        .eq('order_type', 'cut-and-bend')
+    ]);
+
+    if (ordersResponse.error) {
+      throw ordersResponse.error;
+    }
+    if (historyResponse.error) {
+      throw historyResponse.error;
+    }
+
+    return [
+      ...(ordersResponse.data || []),
+      ...(historyResponse.data || [])
+    ] as ProductionRow[];
+  };
+
   const handleExportExecutivePdf = async () => {
     if (filteredEntries.length === 0) {
       toast({
@@ -208,21 +244,46 @@ export function OffcutUsage() {
       });
       return;
     }
-    setExportingPdf(true);
+    setOpeningExecutiveReport(true);
     try {
       const dateRange = getDateRange();
-      const meta = {
-        dateRange,
-        generatedAt: new Date().toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        preparedBy: user?.profile?.email || user?.email || 'Executive User'
-      };
-      await exportExecutiveOffcutPdf(filteredEntries, meta);
+      const ytdStart = `${new Date(dateRange.end).getFullYear()}-01-01`;
+      let ytdRows = filteredEntries;
+      if (dateRange.start > ytdStart) {
+        try {
+          ytdRows = await offcutUsageService.getByDateRange(ytdStart, dateRange.end);
+        } catch (error) {
+          console.error('Failed to fetch YTD offcut usage:', error);
+          ytdRows = filteredEntries;
+        }
+      }
+
+      let productionRows: ProductionRow[] = [];
+      try {
+        productionRows = await fetchProductionRows(dateRange);
+      } catch (error) {
+        console.error('Failed to fetch production data:', error);
+        toast({
+          title: 'Production data unavailable',
+          description: 'The report will note production data as unavailable.',
+        });
+      }
+
+      const reportData = buildExecutiveOffcutReportData({
+        startDate: dateRange.start,
+        endDate: dateRange.end,
+        offcutRows: filteredEntries,
+        productionRows,
+        ytdOffcutRows: ytdRows,
+        now: new Date()
+      });
+
+      sessionStorage.setItem('offcutExecutiveReport', JSON.stringify(reportData));
+      const reportUrl = `${window.location.origin}/reports/offcut/executive`;
+      const reportWindow = window.open(reportUrl, '_blank', 'noopener,noreferrer');
+      if (!reportWindow) {
+        navigate('/reports/offcut/executive');
+      }
     } catch (error) {
       console.error('Failed to generate executive report:', error);
       toast({
@@ -231,7 +292,7 @@ export function OffcutUsage() {
         variant: 'destructive'
       });
     } finally {
-      setExportingPdf(false);
+      setOpeningExecutiveReport(false);
     }
   };
 
@@ -345,11 +406,11 @@ export function OffcutUsage() {
               >
                 <Button
                   onClick={handleExportExecutivePdf}
-                  disabled={filteredEntries.length === 0 || exportingPdf}
+                  disabled={filteredEntries.length === 0 || openingExecutiveReport}
                   className="bg-slate-900 text-white hover:bg-slate-800"
                 >
                   <FileDown size={18} className="mr-2" />
-                  {exportingPdf ? 'Generating…' : 'Export Executive PDF'}
+                  {openingExecutiveReport ? 'Opening…' : 'Open Executive Report'}
                 </Button>
               </div>
             )}
