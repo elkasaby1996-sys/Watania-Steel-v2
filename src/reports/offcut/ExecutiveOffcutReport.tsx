@@ -18,6 +18,7 @@ export interface ExecutiveReportMeta {
   };
   generatedAt: string;
   preparedBy: string;
+  plantName?: string;
   includeAppendix?: boolean;
 }
 
@@ -65,102 +66,142 @@ export interface ExecutiveReportData {
   mismatchDetected: boolean;
 }
 
+const palette = {
+  slate: '#0f172a',
+  slateMuted: '#475569',
+  border: '#e2e8f0',
+  surface: '#ffffff',
+  header: '#0b1b3a',
+  highlight: '#e2e8f0',
+  accent: '#1d4ed8',
+  positive: '#15803d',
+  negative: '#b91c1c'
+};
+
 const styles = StyleSheet.create({
   page: {
-    padding: 28,
+    paddingTop: 36,
+    paddingHorizontal: 34,
+    paddingBottom: 44,
     fontSize: 10,
     fontFamily: 'Helvetica',
-    color: '#0f172a',
-    backgroundColor: '#ffffff'
+    color: palette.slate,
+    backgroundColor: palette.surface
   },
   header: {
+    marginBottom: 18
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: palette.header
+  },
+  headerSubtitle: {
+    fontSize: 11,
+    color: palette.slateMuted,
+    marginTop: 4
+  },
+  headerMetaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16
+    justifyContent: 'space-between',
+    marginTop: 10
   },
-  headerLeft: {
-    width: '22%',
-    justifyContent: 'center'
+  headerMetaBlock: {
+    flexDirection: 'column'
   },
-  logoBox: {
-    width: 60,
-    height: 28,
-    borderWidth: 1,
-    borderColor: '#94a3b8',
-    alignItems: 'center',
-    justifyContent: 'center'
+  headerMetaLabel: {
+    fontSize: 8,
+    textTransform: 'uppercase',
+    color: palette.slateMuted,
+    marginBottom: 2
   },
-  headerCenter: {
-    width: '56%',
-    alignItems: 'center'
-  },
-  headerRight: {
-    width: '22%',
-    alignItems: 'flex-end'
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: 700
-  },
-  subtitle: {
-    fontSize: 9,
-    color: '#475569',
-    marginTop: 2
+  headerMetaValue: {
+    fontSize: 9
   },
   section: {
-    marginBottom: 14
+    marginBottom: 18
   },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 600,
     marginBottom: 8
   },
+  subSectionTitle: {
+    fontSize: 10,
+    fontWeight: 600,
+    marginBottom: 6
+  },
+  bodyText: {
+    fontSize: 9,
+    color: palette.slate
+  },
+  footnote: {
+    fontSize: 7,
+    color: palette.slateMuted,
+    marginTop: 6
+  },
   gridRow: {
     flexDirection: 'row',
-    gap: 8
+    gap: 10
   },
   kpiCard: {
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 6,
-    padding: 8,
-    flex: 1
+    borderColor: palette.border,
+    borderRadius: 8,
+    padding: 10,
+    flex: 1,
+    minHeight: 56,
+    justifyContent: 'space-between'
   },
   kpiLabel: {
     fontSize: 8,
     textTransform: 'uppercase',
-    color: '#64748b',
-    marginBottom: 4
+    color: palette.slateMuted
   },
   kpiValue: {
     fontSize: 13,
     fontWeight: 700
   },
+  kpiDelta: {
+    fontSize: 8,
+    color: palette.slateMuted
+  },
+  highlightCard: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#f8fafc'
+  },
   chartCard: {
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 6,
-    padding: 8,
+    borderColor: palette.border,
+    borderRadius: 8,
+    padding: 12,
     flex: 1
   },
-  insightsCard: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 6,
-    padding: 10,
-    flex: 1
-  },
-  bulletRow: {
+  chartMetaRow: {
     flexDirection: 'row',
-    marginBottom: 4
+    justifyContent: 'space-between',
+    marginBottom: 6
   },
-  bulletSymbol: {
-    width: 10
+  chartLegend: {
+    fontSize: 8,
+    color: palette.slateMuted
+  },
+  chartAxisRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6
+  },
+  axisLabel: {
+    fontSize: 7,
+    color: palette.slateMuted
   },
   table: {
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 6,
+    borderColor: palette.border,
+    borderRadius: 8,
     overflow: 'hidden'
   },
   tableHeader: {
@@ -172,31 +213,36 @@ const styles = StyleSheet.create({
   tableRow: {
     flexDirection: 'row',
     paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0'
+    paddingHorizontal: 8
+  },
+  tableRowStriped: {
+    backgroundColor: '#f8fafc'
   },
   cell: {
     flex: 1,
     fontSize: 9
   },
   cellRight: {
-    flex: 0.4,
-    textAlign: 'right',
-    fontSize: 9
+    textAlign: 'right'
   },
-  cellSmallRight: {
-    flex: 0.3,
-    textAlign: 'right',
-    fontSize: 9
+  cellEmphasis: {
+    color: palette.negative,
+    fontWeight: 600
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    marginBottom: 4
+  },
+  bulletSymbol: {
+    width: 10
   },
   footer: {
     position: 'absolute',
     bottom: 18,
-    left: 28,
-    right: 28,
+    left: 34,
+    right: 34,
     fontSize: 8,
-    color: '#94a3b8',
+    color: palette.slateMuted,
     flexDirection: 'row',
     justifyContent: 'space-between'
   }
@@ -215,10 +261,23 @@ const SectionTitle = ({ children }: { children: string }) => (
   <Text style={styles.sectionTitle}>{children}</Text>
 );
 
-const KpiCard = ({ label, value }: { label: string; value: string }) => (
+const SubSectionTitle = ({ children }: { children: string }) => (
+  <Text style={styles.subSectionTitle}>{children}</Text>
+);
+
+const KpiCard = ({
+  label,
+  value,
+  delta
+}: {
+  label: string;
+  value: string;
+  delta?: string;
+}) => (
   <View style={styles.kpiCard}>
     <Text style={styles.kpiLabel}>{label}</Text>
     <Text style={styles.kpiValue}>{value}</Text>
+    {delta ? <Text style={styles.kpiDelta}>{delta}</Text> : null}
   </View>
 );
 
@@ -227,7 +286,7 @@ const InsightList = ({ items }: { items: string[] }) => (
     {items.map((item) => (
       <View key={item} style={styles.bulletRow}>
         <Text style={styles.bulletSymbol}>•</Text>
-        <Text>{item}</Text>
+        <Text style={styles.bodyText}>{item}</Text>
       </View>
     ))}
   </View>
@@ -235,22 +294,23 @@ const InsightList = ({ items }: { items: string[] }) => (
 
 const Header = ({ meta }: { meta: ExecutiveReportMeta }) => (
   <View style={styles.header}>
-    <View style={styles.headerLeft}>
-      <View style={styles.logoBox}>
-        <Text style={{ fontSize: 7, color: '#94a3b8' }}>Logo</Text>
+    <Text style={styles.headerTitle}>Offcut Performance – Executive Summary</Text>
+    <Text style={styles.headerSubtitle}>
+      {`${formatDate(meta.dateRange.start)} – ${formatDate(meta.dateRange.end)}`}
+    </Text>
+    <View style={styles.headerMetaRow}>
+      <View style={styles.headerMetaBlock}>
+        <Text style={styles.headerMetaLabel}>Company / Plant</Text>
+        <Text style={styles.headerMetaValue}>{meta.plantName || '—'}</Text>
       </View>
-    </View>
-    <View style={styles.headerCenter}>
-      <Text style={styles.title}>Offcut Executive Report</Text>
-      <Text style={styles.subtitle}>Factory Management System</Text>
-    </View>
-    <View style={styles.headerRight}>
-      <Text style={styles.subtitle}>Range</Text>
-      <Text>{`${meta.dateRange.start} → ${meta.dateRange.end}`}</Text>
-      <Text style={styles.subtitle}>Generated</Text>
-      <Text>{meta.generatedAt}</Text>
-      <Text style={styles.subtitle}>Prepared By</Text>
-      <Text>{meta.preparedBy}</Text>
+      <View style={styles.headerMetaBlock}>
+        <Text style={styles.headerMetaLabel}>Generated</Text>
+        <Text style={styles.headerMetaValue}>{meta.generatedAt}</Text>
+      </View>
+      <View style={styles.headerMetaBlock}>
+        <Text style={styles.headerMetaLabel}>Prepared by</Text>
+        <Text style={styles.headerMetaValue}>{meta.preparedBy}</Text>
+      </View>
     </View>
   </View>
 );
@@ -266,13 +326,13 @@ const Footer = () => (
 );
 
 const SimpleLineChartSvg = ({ data }: { data: TrendPoint[] }) => {
-  const width = 260;
-  const height = 110;
-  const padding = 18;
+  const width = 250;
+  const height = 120;
+  const padding = 20;
   if (!data.length) {
     return (
       <View>
-        <Text>No trend data available.</Text>
+        <Text style={styles.bodyText}>No trend data available.</Text>
       </View>
     );
   }
@@ -294,7 +354,21 @@ const SimpleLineChartSvg = ({ data }: { data: TrendPoint[] }) => {
 
   return (
     <Svg width={width} height={height}>
-      <Rect width={width} height={height} fill="#ffffff" stroke="#e2e8f0" />
+      <Rect width={width} height={height} fill="#ffffff" stroke={palette.border} />
+      {[0, 1, 2, 3].map((line) => {
+        const y = padding + (line / 3) * (height - padding * 2);
+        return (
+          <Line
+            key={`grid-${line}`}
+            x1={padding}
+            y1={y}
+            x2={width - padding}
+            y2={y}
+            stroke="#e2e8f0"
+            strokeWidth={0.6}
+          />
+        );
+      })}
       <Line
         x1={padding}
         y1={height - padding}
@@ -311,19 +385,19 @@ const SimpleLineChartSvg = ({ data }: { data: TrendPoint[] }) => {
         stroke="#cbd5f5"
         strokeWidth={1}
       />
-      <Polyline points={points} fill="none" stroke="#2563eb" strokeWidth={2} />
+      <Polyline points={points} fill="none" stroke={palette.accent} strokeWidth={2} />
     </Svg>
   );
 };
 
 const SimpleBarChartSvg = ({ data }: { data: BreakdownRow[] }) => {
-  const width = 200;
-  const height = 140;
-  const padding = 12;
+  const width = 230;
+  const height = 130;
+  const padding = 16;
   if (!data.length) {
     return (
       <View>
-        <Text>Diameter breakdown not available.</Text>
+        <Text style={styles.bodyText}>Data not available.</Text>
       </View>
     );
   }
@@ -331,7 +405,7 @@ const SimpleBarChartSvg = ({ data }: { data: BreakdownRow[] }) => {
   const barWidth = (width - padding * 2) / data.length;
   return (
     <Svg width={width} height={height}>
-      <Rect width={width} height={height} fill="#ffffff" stroke="#e2e8f0" />
+      <Rect width={width} height={height} fill="#ffffff" stroke={palette.border} />
       {data.map((row, index) => {
         const barHeight = max > 0 ? (row.tons / max) * (height - padding * 2) : 0;
         const x = padding + index * barWidth + 4;
@@ -351,6 +425,37 @@ const SimpleBarChartSvg = ({ data }: { data: BreakdownRow[] }) => {
   );
 };
 
+const ChartBlock = ({
+  title,
+  subtitle,
+  xLabel,
+  yLabel,
+  legend,
+  children
+}: {
+  title: string;
+  subtitle?: string;
+  xLabel: string;
+  yLabel: string;
+  legend: string;
+  children: React.ReactNode;
+}) => (
+  <View style={styles.chartCard}>
+    <View style={styles.chartMetaRow}>
+      <View>
+        <Text style={styles.subSectionTitle}>{title}</Text>
+        {subtitle ? <Text style={styles.chartLegend}>{subtitle}</Text> : null}
+      </View>
+      <Text style={styles.chartLegend}>{legend}</Text>
+    </View>
+    {children}
+    <View style={styles.chartAxisRow}>
+      <Text style={styles.axisLabel}>{yLabel}</Text>
+      <Text style={styles.axisLabel}>{xLabel}</Text>
+    </View>
+  </View>
+);
+
 const Table = ({
   columns,
   rows
@@ -365,7 +470,7 @@ const Table = ({
           key={column.label}
           style={[
             styles.cell,
-            column.align === 'right' && { textAlign: 'right' },
+            column.align === 'right' && styles.cellRight,
             column.width ? { flex: column.width } : null
           ]}
         >
@@ -374,7 +479,10 @@ const Table = ({
       ))}
     </View>
     {rows.map((row, index) => (
-      <View key={`${row[0]}-${index}`} style={styles.tableRow}>
+      <View
+        key={`${row[0]}-${index}`}
+        style={[styles.tableRow, index % 2 === 1 && styles.tableRowStriped]}
+      >
         {row.map((cell, cellIndex) => {
           const column = columns[cellIndex];
           return (
@@ -382,7 +490,7 @@ const Table = ({
               key={`${cell}-${cellIndex}`}
               style={[
                 styles.cell,
-                column?.align === 'right' && { textAlign: 'right' },
+                column?.align === 'right' && styles.cellRight,
                 column?.width ? { flex: column.width } : null
               ]}
             >
@@ -395,6 +503,59 @@ const Table = ({
   </View>
 );
 
+const SitePerformanceTable = ({ rows }: { rows: RankedRow[] }) => (
+  <View style={styles.table}>
+    <View style={styles.tableHeader}>
+      {[
+        { label: 'Site Name', width: 1.4 },
+        { label: 'Orders', align: 'right', width: 0.5 },
+        { label: 'Production (t)', align: 'right', width: 0.6 },
+        { label: 'Offcut (t)', align: 'right', width: 0.6 },
+        { label: 'Offcut %', align: 'right', width: 0.5 }
+      ].map((column) => (
+        <Text
+          key={column.label}
+          style={[
+            styles.cell,
+            column.align === 'right' && styles.cellRight,
+            column.width ? { flex: column.width } : null
+          ]}
+        >
+          {column.label}
+        </Text>
+      ))}
+    </View>
+    {rows.map((row, index) => {
+      const offcutPct = row.share;
+      return (
+        <View
+          key={`${row.name}-${index}`}
+          style={[styles.tableRow, index % 2 === 1 && styles.tableRowStriped]}
+        >
+          <Text style={[styles.cell, { flex: 1.4 }]}>{row.name}</Text>
+          <Text style={[styles.cell, styles.cellRight, { flex: 0.5 }]}>
+            {row.orders.toLocaleString()}
+          </Text>
+          <Text style={[styles.cell, styles.cellRight, { flex: 0.6 }]}>—</Text>
+          <Text style={[styles.cell, styles.cellRight, { flex: 0.6 }]}>
+            {formatTons(row.tons)} t
+          </Text>
+          <Text
+            style={[
+              styles.cell,
+              styles.cellRight,
+              { flex: 0.5 },
+              offcutPct > 15 ? styles.cellEmphasis : null
+            ]}
+          >
+            {formatPct(offcutPct)}
+          </Text>
+        </View>
+      );
+    })}
+  </View>
+);
+
 export const ExecutiveOffcutReport = ({
   data,
   meta
@@ -403,35 +564,32 @@ export const ExecutiveOffcutReport = ({
   meta: ExecutiveReportMeta;
 }) => {
   const kpiCards = [
-    { label: 'Total Offcut Tons', value: `${formatTons(data.totalTons)} tons` },
+    { label: 'Total Production (t)', value: '—' },
+    { label: 'Total Offcut (t)', value: formatTons(data.totalTons) },
     data.offcutPercent !== undefined
-      ? { label: 'Offcut %', value: formatPct(data.offcutPercent) }
-      : null,
-    { label: 'Total Entries', value: data.entryCount.toLocaleString() },
-    {
-      label: 'Active Days',
-      value: `${data.activeDays} • ${formatTons(data.averagePerDay)} / day`
-    }
-  ].filter(Boolean) as { label: string; value: string }[];
+      ? { label: 'Offcut Rate (%)', value: formatPct(data.offcutPercent) }
+      : { label: 'Offcut Rate (%)', value: '—' },
+    { label: 'Estimated Cost of Offcut', value: '—' },
+    { label: 'MoM Change', value: '—' }
+  ].slice(0, 5);
+  const kpiRows = [kpiCards.slice(0, 3), kpiCards.slice(3)];
+
+  const executiveHighlights = data.insights.length
+    ? data.insights.slice(0, 3)
+    : [
+        'Offcut trend insights will appear once trend data is available.',
+        'Top driver analysis requires complete operation metadata.'
+      ];
+
+  const trendInsight = data.trend.length
+    ? `Offcut peaked at ${formatTons(
+        Math.max(...data.trend.map((point) => point.tons), 0)
+      )} t, with volatility stabilizing toward period end.`
+    : 'Trend analysis not available for this period.';
 
   const diameterRows = data.diameterBreakdown.map((row) => [
     row.label,
-    formatTons(row.tons),
-    formatPct(row.share)
-  ]);
-
-  const clientRows = data.topClients.map((row) => [
-    row.name,
-    row.orders.toLocaleString(),
-    formatTons(row.tons),
-    formatPct(row.share)
-  ]);
-
-  const siteRows = data.topSites.map((row) => [
-    row.name,
-    row.clientName || '-',
-    row.orders.toLocaleString(),
-    formatTons(row.tons),
+    `${formatTons(row.tons)} t`,
     formatPct(row.share)
   ]);
 
@@ -441,25 +599,26 @@ export const ExecutiveOffcutReport = ({
         <Header meta={meta} />
         <View style={styles.section}>
           <SectionTitle>Executive Summary</SectionTitle>
-          <View style={styles.gridRow}>
-            {kpiCards.map((card) => (
-              <KpiCard key={card.label} label={card.label} value={card.value} />
-            ))}
-          </View>
+          {kpiRows.map((row, index) => (
+            <View
+              key={`kpi-row-${index}`}
+              style={[styles.gridRow, index > 0 && { marginTop: 10 }]}
+            >
+              {row.map((card) => (
+                <KpiCard key={card.label} label={card.label} value={card.value} />
+              ))}
+            </View>
+          ))}
+          <Text style={styles.footnote}>
+            Production, cost, and month-over-month metrics require production ledger
+            integration.
+          </Text>
         </View>
 
-        <View style={[styles.section, styles.gridRow]}>
-          <View style={styles.chartCard}>
-            <SectionTitle>Offcut Tons Over Time</SectionTitle>
-            <SimpleLineChartSvg data={data.trend} />
-          </View>
-          <View style={styles.insightsCard}>
-            <SectionTitle>Key Insights</SectionTitle>
-            <InsightList items={data.insights} />
-            <View style={{ marginTop: 8 }}>
-              <SectionTitle>Actions / Recommendations</SectionTitle>
-              <InsightList items={data.actions} />
-            </View>
+        <View style={styles.section}>
+          <SectionTitle>Executive Highlights</SectionTitle>
+          <View style={styles.highlightCard}>
+            <InsightList items={executiveHighlights} />
           </View>
         </View>
         <Footer />
@@ -467,69 +626,151 @@ export const ExecutiveOffcutReport = ({
 
       <Page size="A4" style={styles.page} wrap>
         <Header meta={meta} />
-        <View style={[styles.section, styles.gridRow]}>
-          <View style={{ flex: 1 }}>
-            <SectionTitle>Diameter Breakdown</SectionTitle>
-            {data.diameterBreakdown.length === 0 ? (
-              <Text>Diameter breakdown not available.</Text>
-            ) : (
-              <Table
-                columns={[
-                  { label: 'Diameter' },
-                  { label: 'Offcut Tons', align: 'right' },
-                  { label: '% of Total', align: 'right' }
-                ]}
-                rows={diameterRows}
-              />
-            )}
+        <View style={styles.section}>
+          <SectionTitle>Offcut Trend Analysis</SectionTitle>
+          <View style={styles.gridRow}>
+            <ChartBlock
+              title="Offcut Over Time"
+              subtitle="Smoothed daily / weekly trend"
+              xLabel="Date"
+              yLabel="Offcut (t)"
+              legend="Series: Offcut"
+            >
+              <SimpleLineChartSvg data={data.trend} />
+            </ChartBlock>
+            <ChartBlock
+              title="Offcut Rate Over Time"
+              subtitle="Benchmark vs actual"
+              xLabel="Date"
+              yLabel="Offcut (%)"
+              legend="Series: Offcut Rate"
+            >
+              <View>
+                <Text style={styles.bodyText}>Offcut rate trend not available.</Text>
+              </View>
+            </ChartBlock>
           </View>
-          <View style={styles.chartCard}>
-            <SectionTitle>Distribution</SectionTitle>
-            <SimpleBarChartSvg data={data.diameterBreakdown} />
-          </View>
         </View>
-
         <View style={styles.section}>
-          <SectionTitle>Top Clients</SectionTitle>
-          <Table
-            columns={[
-              { label: 'Client', width: 1.4 },
-              { label: 'Orders', align: 'right', width: 0.5 },
-              { label: 'Offcut Tons', align: 'right', width: 0.7 },
-              { label: '% of Total', align: 'right', width: 0.6 }
-            ]}
-            rows={clientRows}
-          />
-        </View>
-
-        <View style={styles.section}>
-          <SectionTitle>Top Sites</SectionTitle>
-          <Table
-            columns={[
-              { label: 'Site', width: 1.2 },
-              { label: 'Client', width: 1.2 },
-              { label: 'Orders', align: 'right', width: 0.5 },
-              { label: 'Offcut Tons', align: 'right', width: 0.7 },
-              { label: '% of Total', align: 'right', width: 0.6 }
-            ]}
-            rows={siteRows}
-          />
-        </View>
-
-        <View style={styles.section}>
-          <SectionTitle>Exceptions</SectionTitle>
-          <Text>
-            Missing client: {data.exceptions.missingClient} • Missing site:{' '}
-            {data.exceptions.missingSite} • Missing shift:{' '}
-            {data.exceptions.missingShift} • Missing diameter:{' '}
-            {data.exceptions.missingDiameter} • Mismatch count:{' '}
-            {data.exceptions.mismatchCount}
-          </Text>
-          {data.mismatchDetected && (
-            <Text style={{ marginTop: 4, color: '#b91c1c' }}>
-              Total tons differ from diameter totals beyond tolerance.
+          <SectionTitle>Insight</SectionTitle>
+          <View style={styles.highlightCard}>
+            <Text style={styles.bodyText}>{trendInsight}</Text>
+            <Text style={styles.bodyText}>
+              Focus on week-to-week variance drivers once operation metadata is
+              available.
             </Text>
+          </View>
+        </View>
+        <Footer />
+      </Page>
+
+      <Page size="A4" style={styles.page} wrap>
+        <Header meta={meta} />
+        <View style={styles.section}>
+          <SectionTitle>Operational Breakdown</SectionTitle>
+          <View style={styles.gridRow}>
+            <ChartBlock
+              title="Offcut by Operation Type"
+              subtitle="Cut & Bend vs Straight Bar"
+              xLabel="Operation Type"
+              yLabel="Offcut (t)"
+              legend="Series: Offcut"
+            >
+              <View>
+                <Text style={styles.bodyText}>
+                  Operation-type data not available for this period.
+                </Text>
+              </View>
+            </ChartBlock>
+            <ChartBlock
+              title="Offcut by Diameter"
+              subtitle="Top diameters by volume"
+              xLabel="Diameter (mm)"
+              yLabel="Offcut (t)"
+              legend="Series: Offcut"
+            >
+              <SimpleBarChartSvg data={data.diameterBreakdown} />
+            </ChartBlock>
+          </View>
+        </View>
+        <View style={styles.section}>
+          <SubSectionTitle>Diameter Mix (Top Sizes)</SubSectionTitle>
+          {data.diameterBreakdown.length === 0 ? (
+            <Text style={styles.bodyText}>Diameter breakdown not available.</Text>
+          ) : (
+            <Table
+              columns={[
+                { label: 'Diameter (mm)' },
+                { label: 'Offcut (t)', align: 'right' },
+                { label: '% of Offcut', align: 'right' }
+              ]}
+              rows={diameterRows}
+            />
           )}
+        </View>
+        <Footer />
+      </Page>
+
+      <Page size="A4" style={styles.page} wrap>
+        <Header meta={meta} />
+        <View style={styles.section}>
+          <SectionTitle>Site Performance</SectionTitle>
+          {data.topSites.length === 0 ? (
+            <Text style={styles.bodyText}>Site performance data not available.</Text>
+          ) : (
+            <SitePerformanceTable rows={data.topSites} />
+          )}
+          <Text style={styles.footnote}>
+            Production totals unavailable; offcut % reflects share of total offcut.
+          </Text>
+        </View>
+        <Footer />
+      </Page>
+
+      <Page size="A4" style={styles.page} wrap>
+        <Header meta={meta} />
+        <View style={styles.section}>
+          <SectionTitle>Root Cause Indicators</SectionTitle>
+          <View style={styles.highlightCard}>
+            <Text style={styles.bodyText}>Data not available for this period.</Text>
+            <Text style={styles.bodyText}>
+              Capture shift, machine, and operator metadata to surface root cause
+              patterns.
+            </Text>
+          </View>
+        </View>
+        <Footer />
+      </Page>
+
+      <Page size="A4" style={styles.page} wrap>
+        <Header meta={meta} />
+        <View style={styles.section}>
+          <SectionTitle>Executive Recommendations</SectionTitle>
+          <View style={styles.highlightCard}>
+            <SubSectionTitle>Immediate Actions (Next 30 Days)</SubSectionTitle>
+            <InsightList items={data.actions.slice(0, 2)} />
+            <SubSectionTitle>Process Improvements</SubSectionTitle>
+            <InsightList
+              items={[
+                'Align cutting schedules to top diameter demand.',
+                'Introduce weekly offcut review with production leadership.'
+              ]}
+            />
+            <SubSectionTitle>Data Gaps Identified</SubSectionTitle>
+            <InsightList
+              items={[
+                'Production tonnage per site and order.',
+                'Operation type, shift, and machine attribution.'
+              ]}
+            />
+            <SubSectionTitle>Management Decisions Required</SubSectionTitle>
+            <InsightList
+              items={[
+                'Approve data capture enhancements in the shop floor system.',
+                'Confirm offcut cost assumptions for financial reporting.'
+              ]}
+            />
+          </View>
         </View>
         <Footer />
       </Page>
@@ -539,7 +780,7 @@ export const ExecutiveOffcutReport = ({
           <Header meta={meta} />
           <View style={styles.section}>
             <SectionTitle>Appendix</SectionTitle>
-            <Text>
+            <Text style={styles.bodyText}>
               Supplemental data available on request. This appendix is reserved for
               operational notes, variance explanations, and supporting data extracts.
             </Text>
