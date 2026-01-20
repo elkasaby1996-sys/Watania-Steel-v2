@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Calendar, Filter, Trophy, Plus, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Filter, Trophy, Plus, Edit, Trash2, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,6 +38,11 @@ import { AddOffcutEntriesModal } from '@/components/AddOffcutEntriesModal';
 import { EditOffcutEntryModal } from '@/components/EditOffcutEntryModal';
 import { useAuthStore } from '@/stores/authStore';
 import { hasPermission } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import {
+  buildExecutiveOffcutReportData,
+  ProductionRow
+} from '@/reports/offcut/buildExecutiveOffcutReportData';
 
 type ViewMode = 'daily' | 'monthly' | 'range';
 
@@ -83,6 +88,9 @@ export function OffcutUsage() {
   // Data state - filtered dataset stored in state for later calculations
   const [filteredEntries, setFilteredEntries] = useState<OffcutUsageEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [openingExecutiveReport, setOpeningExecutiveReport] = useState<boolean>(false);
+  const canExportExecutive =
+    user?.profile?.role === 'admin' || user?.profile?.role === 'executive';
 
   // Modal state
   const [addModalOpen, setAddModalOpen] = useState<boolean>(false);
@@ -180,6 +188,114 @@ export function OffcutUsage() {
     });
   };
 
+  const getDateRange = () => {
+    switch (viewMode) {
+      case 'daily':
+        return { start: selectedDate, end: selectedDate };
+      case 'monthly': {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const start = `${year}-${String(month).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        return { start, end };
+      }
+      case 'range':
+        return { start: startDate, end: endDate };
+    }
+  };
+
+  const fetchProductionRows = async (dateRange: { start: string; end: string }) => {
+    const selectFields =
+      'date,tons,order_type,company,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm';
+
+    const [ordersResponse, historyResponse] = await Promise.all([
+      supabase
+        .from('orders')
+        .select(selectFields)
+        .gte('date', dateRange.start)
+        .lte('date', dateRange.end)
+        .eq('order_type', 'cut-and-bend'),
+      supabase
+        .from('history_orders')
+        .select(selectFields)
+        .gte('date', dateRange.start)
+        .lte('date', dateRange.end)
+        .eq('order_type', 'cut-and-bend')
+    ]);
+
+    if (ordersResponse.error) {
+      throw ordersResponse.error;
+    }
+    if (historyResponse.error) {
+      throw historyResponse.error;
+    }
+
+    return [
+      ...(ordersResponse.data || []),
+      ...(historyResponse.data || [])
+    ] as ProductionRow[];
+  };
+
+  const handleExportExecutivePdf = async () => {
+    if (filteredEntries.length === 0) {
+      toast({
+        title: 'No data in selected range',
+        description: 'Adjust the filters to include offcut usage records.',
+      });
+      return;
+    }
+    setOpeningExecutiveReport(true);
+    try {
+      const dateRange = getDateRange();
+      const ytdStart = `${new Date(dateRange.end).getFullYear()}-01-01`;
+      let ytdRows = filteredEntries;
+      if (dateRange.start > ytdStart) {
+        try {
+          ytdRows = await offcutUsageService.getByDateRange(ytdStart, dateRange.end);
+        } catch (error) {
+          console.error('Failed to fetch YTD offcut usage:', error);
+          ytdRows = filteredEntries;
+        }
+      }
+
+      let productionRows: ProductionRow[] = [];
+      try {
+        productionRows = await fetchProductionRows(dateRange);
+      } catch (error) {
+        console.error('Failed to fetch production data:', error);
+        toast({
+          title: 'Production data unavailable',
+          description: 'The report will note production data as unavailable.',
+        });
+      }
+
+      const reportData = buildExecutiveOffcutReportData({
+        startDate: dateRange.start,
+        endDate: dateRange.end,
+        offcutRows: filteredEntries,
+        productionRows,
+        ytdOffcutRows: ytdRows,
+        now: new Date()
+      });
+
+      sessionStorage.setItem('offcutExecutiveReport', JSON.stringify(reportData));
+      const reportUrl = `${window.location.origin}/reports/offcut/executive`;
+      const reportWindow = window.open(reportUrl, '_blank', 'noopener,noreferrer');
+      if (!reportWindow) {
+        navigate('/reports/offcut/executive');
+      }
+    } catch (error) {
+      console.error('Failed to generate executive report:', error);
+      toast({
+        title: 'Failed to generate report',
+        description: 'Please try again in a moment.',
+        variant: 'destructive'
+      });
+    } finally {
+      setOpeningExecutiveReport(false);
+    }
+  };
+
   // Handle edit action
   const handleEdit = (entry: OffcutUsageEntry) => {
     setEditingEntry(entry);
@@ -266,10 +382,39 @@ export function OffcutUsage() {
       {/* Filter Controls */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filter Options
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filter Options
+            </CardTitle>
+            {canExportExecutive && (
+              <div
+                className="flex"
+                onClick={() => {
+                  if (filteredEntries.length === 0) {
+                    toast({
+                      title: 'No data in selected range',
+                      description: 'Adjust the filters to include offcut usage records.',
+                    });
+                  }
+                }}
+                title={
+                  filteredEntries.length === 0
+                    ? 'No data in selected range'
+                    : undefined
+                }
+              >
+                <Button
+                  onClick={handleExportExecutivePdf}
+                  disabled={filteredEntries.length === 0 || openingExecutiveReport}
+                  className="bg-slate-900 text-white hover:bg-slate-800"
+                >
+                  <FileDown size={18} className="mr-2" />
+                  {openingExecutiveReport ? 'Opening…' : 'Open Executive Report'}
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* View Mode Tabs */}
