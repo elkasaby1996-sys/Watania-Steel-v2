@@ -20,10 +20,13 @@ import { useIsAdmin } from '@/hooks/useIsAdmin';
 import {
   fetchClientsSummary,
   fetchClientSummary,
+  fetchClientSitesMaster,
   fetchClientSitesPerformance,
   fetchClientOrdersPage,
   fetchClientAnalytics,
   type ClientOrdersPageParams,
+  type ClientSiteMaster,
+  type ClientSitePerformanceRow,
   type ClientSummary
 } from '../lib/clientsApi';
 
@@ -113,6 +116,43 @@ const getMonthlyTons = (analytics: any) => {
     label: String((entry as Record<string, unknown>).month ?? (entry as Record<string, unknown>).date ?? 'N/A'),
     tons: toNumber((entry as Record<string, unknown>).tons)
   })).filter((row) => row.tons > 0);
+};
+
+const mergeSites = (masterSites: ClientSiteMaster[], performanceSites: ClientSitePerformanceRow[]): SitePerformanceRow[] => {
+  const performanceMap = new Map(performanceSites.map((site) => [site.site_id, site]));
+  const merged: SitePerformanceRow[] = masterSites.map((site) => {
+    const performance = performanceMap.get(site.id);
+    return {
+      site_id: site.id,
+      site_name: site.name ?? 'Unnamed Site',
+      contact_name: site.contact_name ?? performance?.contact_name ?? null,
+      contact_phone: site.contact_phone ?? performance?.contact_phone ?? null,
+      location_text: site.location_text ?? performance?.location_text ?? null,
+      google_maps_url: site.google_maps_url ?? performance?.google_maps_url ?? null,
+      notes: site.notes ?? performance?.notes ?? null,
+      total_orders: Number(performance?.total_orders ?? 0),
+      total_tons: toNumber(performance?.total_tons ?? 0),
+      last_order_date: performance?.last_order_date ?? null
+    };
+  });
+
+  const masterIds = new Set(masterSites.map((site) => site.id));
+  const performanceOnly = performanceSites
+    .filter((site) => !masterIds.has(site.site_id))
+    .map((site) => ({
+      site_id: site.site_id,
+      site_name: site.site_name ?? 'Unknown Site',
+      contact_name: site.contact_name ?? null,
+      contact_phone: site.contact_phone ?? null,
+      location_text: site.location_text ?? null,
+      google_maps_url: site.google_maps_url ?? null,
+      notes: site.notes ?? null,
+      total_orders: Number(site.total_orders ?? 0),
+      total_tons: toNumber(site.total_tons ?? 0),
+      last_order_date: site.last_order_date ?? null
+    }));
+
+  return [...merged, ...performanceOnly].sort((a, b) => a.site_name.localeCompare(b.site_name));
 };
 
 const chartTooltipStyle = {
@@ -311,8 +351,9 @@ export function ClientProfilePage() {
         setLoadingSites(true);
         setLoadingAnalytics(true);
 
-        const [summaryRes, sitesRes, analyticsRes] = await Promise.all([
+        const [summaryRes, masterSitesRes, sitesRes, analyticsRes] = await Promise.all([
           fetchClientSummary(clientId, signal),
+          fetchClientSitesMaster(clientId, signal),
           fetchClientSitesPerformance(clientId, signal),
           fetchClientAnalytics(clientId, signal)
         ]);
@@ -320,7 +361,9 @@ export function ClientProfilePage() {
         if (signal.aborted) return;
 
         setSummary(summaryRes);
-        setSites(Array.isArray(sitesRes) ? sitesRes : []);
+        const masterSites = Array.isArray(masterSitesRes) ? masterSitesRes : [];
+        const performanceSites = Array.isArray(sitesRes) ? sitesRes : [];
+        setSites(mergeSites(masterSites, performanceSites));
         setAnalyticsJson(analyticsRes ?? null);
       } catch (err: any) {
         if (signal.aborted) return;
