@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { orderService, activityService, historyService, supabase, type Order as DBOrder, type Activity as DBActivity, type HistoryOrder } from '../lib/supabase';
+import { orderService, activityService, historyService, supabase, ensureOrderClientSite, verifyHistoryOrderClientLink, type Order as DBOrder, type Activity as DBActivity, type HistoryOrder } from '../lib/supabase';
 import { roundTo3Decimals } from '../lib/utils';
 
 // Transform database types to frontend types
@@ -13,6 +13,8 @@ interface Order {
   deliveryNumber?: string;
   company?: string;
   site?: string;
+  clientId?: string | null;
+  siteId?: string | null;
   driverName?: string;
   phoneNumber?: string;
   deliveredAt?: string;
@@ -439,6 +441,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const dbOrder = frontendToDb(order);
       
       if (order.status === 'delivered') {
+        const { clientId, siteId } = await ensureOrderClientSite({
+          clientId: order.clientId,
+          siteId: order.siteId,
+          company: order.company,
+          site: order.site
+        });
+
         const historyOrderData = {
           id: order.id,
           customer_name: order.customerName,
@@ -449,6 +458,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           delivery_number: order.deliveryNumber || order.id,
           company: order.company || '',
           site: order.site || '',
+          client_id: clientId,
+          site_id: siteId,
           driver_name: order.driverName || '',
           phone_number: order.phoneNumber || '',
           delivered_at: new Date().toISOString(),
@@ -476,6 +487,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         if (historyError) {
           throw new Error(`Failed to create order in history: ${historyError.message}`);
         }
+
+        await verifyHistoryOrderClientLink(order.id);
         
         set(state => ({
           historyOrders: [historyOrder, ...state.historyOrders.filter(h => h.id !== order.id)],

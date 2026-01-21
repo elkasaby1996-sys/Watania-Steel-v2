@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { toast } from '@/hooks/use-toast'
 import { getEnvVar } from './env'
 import { roundTo3Decimals } from './utils'
 
@@ -23,6 +24,8 @@ export interface Order {
   delivery_number?: string;
   company?: string;
   site?: string;
+  client_id?: string | null;
+  site_id?: string | null;
   driver_id?: string;
   driver_name?: string;
   phone_number?: string;
@@ -81,6 +84,8 @@ export interface HistoryOrder {
   delivery_number?: string;
   company?: string;
   site?: string;
+  client_id?: string | null;
+  site_id?: string | null;
   driver_name?: string;
   phone_number?: string;
   delivered_at?: string;
@@ -111,6 +116,74 @@ export interface HistoryOrderPage {
   data: HistoryOrder[];
   count: number;
   aborted?: boolean;
+}
+
+type EnsureClientSiteResponse = {
+  out_client_id?: string | null;
+  out_site_id?: string | null;
+};
+
+type OrderClientSiteInput = {
+  clientId?: string | null;
+  client_id?: string | null;
+  siteId?: string | null;
+  site_id?: string | null;
+  company?: string | null;
+  site?: string | null;
+};
+
+const parseEnsureClientSiteResponse = (data: unknown): EnsureClientSiteResponse => {
+  if (Array.isArray(data)) {
+    return (data[0] ?? {}) as EnsureClientSiteResponse;
+  }
+  return (data ?? {}) as EnsureClientSiteResponse;
+};
+
+export async function ensureOrderClientSite(
+  order: OrderClientSiteInput
+): Promise<{ clientId: string | null; siteId: string | null }> {
+  const existingClientId = order.clientId ?? order.client_id ?? null;
+  const existingSiteId = order.siteId ?? order.site_id ?? null;
+
+  if (existingClientId && existingSiteId) {
+    return { clientId: existingClientId, siteId: existingSiteId };
+  }
+
+  const { data, error } = await supabase.rpc('ensure_client_site', {
+    company_value: order.company ?? null,
+    site_value: order.site ?? null
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const resolved = parseEnsureClientSiteResponse(data);
+  return {
+    clientId: resolved.out_client_id ?? existingClientId ?? null,
+    siteId: resolved.out_site_id ?? existingSiteId ?? null
+  };
+}
+
+export async function verifyHistoryOrderClientLink(orderId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('history_orders')
+    .select('client_id, site_id')
+    .eq('id', orderId)
+    .single();
+
+  if (error) {
+    console.error('❌ Failed to verify history order client link:', error);
+    return;
+  }
+
+  if (!data?.client_id || !data?.site_id) {
+    toast({
+      title: 'Client linking failed',
+      description: `Order ${orderId} is missing client/site links.`,
+      variant: 'destructive'
+    });
+  }
 }
 
 // Helper functions to transform between DB and frontend formats
@@ -669,6 +742,15 @@ export const historyService = {
         .select('id')
         .eq('id', order.id)
         .single();
+
+      const { clientId, siteId } = await ensureOrderClientSite({
+        clientId: order.clientId,
+        client_id: order.client_id,
+        siteId: order.siteId,
+        site_id: order.site_id,
+        company: order.company,
+        site: order.site
+      });
       
       const historyOrderData = {
         id: order.id,
@@ -680,6 +762,8 @@ export const historyService = {
         delivery_number: order.deliveryNumber || order.id,
         company: order.company || '',
         site: order.site || '',
+        client_id: clientId,
+        site_id: siteId,
         driver_name: order.driverName || '',
         phone_number: order.phoneNumber || '',
         delivered_at: new Date().toISOString(),
@@ -697,6 +781,14 @@ export const historyService = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+
+      if (import.meta.env.DEV) {
+        console.log('🔗 History move client link:', {
+          orderId: order.id,
+          clientId,
+          siteId
+        });
+      }
       
       if (existingHistory) {
         await supabase
@@ -708,6 +800,8 @@ export const historyService = {
           .from('history_orders')
           .insert([historyOrderData]);
       }
+
+      await verifyHistoryOrderClientLink(order.id);
       
       await supabase
         .from('orders')
