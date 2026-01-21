@@ -118,6 +118,17 @@ export type ClientSiteRecord = {
   notes: string | null;
 };
 
+export type ClientSiteMaster = {
+  id: string;
+  client_id: string | null;
+  name: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  location_text: string | null;
+  google_maps_url: string | null;
+  notes: string | null;
+};
+
 export type ClientOrderRow = {
   id: string;
   date: string | null; // date
@@ -170,6 +181,22 @@ export async function fetchClientSitesPerformance(clientId: string, signal?: Abo
     { client_id: clientId },
     signal
   );
+  return data ?? [];
+}
+
+export async function fetchClientSitesMaster(clientId: string, signal?: AbortSignal) {
+  let query = supabase
+    .from('client_sites')
+    .select('id, client_id, name, contact_name, contact_phone, location_text, google_maps_url, notes')
+    .eq('client_id', clientId)
+    .order('name');
+
+  if (signal) {
+    query = query.abortSignal(signal);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
   return data ?? [];
 }
 

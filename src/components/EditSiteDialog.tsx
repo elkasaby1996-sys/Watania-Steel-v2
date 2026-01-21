@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { updateSite, type ClientSiteDetails, type ClientSitePatch } from '@/lib/clientsApi';
+import { useToast } from '@/hooks/use-toast';
 
 type EditSiteDialogProps = {
   site: ClientSiteDetails | null;
@@ -24,6 +25,7 @@ export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const { register, handleSubmit, reset } = useForm<SiteFormValues>({
     defaultValues: {
@@ -68,9 +70,19 @@ export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps
         google_maps_url: updated.google_maps_url,
         notes: updated.notes
       });
+      toast({
+        title: 'Site updated',
+        description: 'Site contact details were saved successfully.'
+      });
       setOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update site details.');
+      const message = err instanceof Error ? err.message : 'Failed to update site details.';
+      setError(message);
+      toast({
+        title: 'Failed to update site',
+        description: message,
+        variant: 'destructive'
+      });
     } finally {
       setSaving(false);
     }

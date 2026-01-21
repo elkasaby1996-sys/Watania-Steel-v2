@@ -551,7 +551,7 @@ export const driverService = {
 };
 
 const HISTORY_ORDER_LIST_COLUMNS =
-  'id,customer_name,date,status,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at,signed_delivery_note,order_type';
+  'id,customer_name,date,status,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at,signed_delivery_note,order_type,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm';
 
 export const historyService = {
   async getAll(): Promise<HistoryOrder[]> {

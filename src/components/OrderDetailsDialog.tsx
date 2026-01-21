@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -102,6 +102,7 @@ export function OrderDetailsDialog({
   
   const userRole = user?.profile?.role;
   const canEdit = hasPermission(userRole, 'edit') && !readOnly;
+  const breakdownLogRef = useRef<string | null>(null);
   
   // Check if this is a history order
   const isHistoryOrder = order && (
@@ -115,6 +116,37 @@ export function OrderDetailsDialog({
 
   // Get active drivers safely
   const [activeDrivers, setActiveDrivers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!open) {
+      breakdownLogRef.current = null;
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !order || !import.meta.env.DEV) {
+      return;
+    }
+    const orderId = order.id ?? null;
+    if (breakdownLogRef.current === orderId) {
+      return;
+    }
+    breakdownLogRef.current = orderId;
+    const breakdownPayload = isHistoryOrder
+      ? {
+          breakdown_8mm: order.breakdown_8mm,
+          breakdown_10mm: order.breakdown_10mm,
+          breakdown_12mm: order.breakdown_12mm,
+          breakdown_14mm: order.breakdown_14mm,
+          breakdown_16mm: order.breakdown_16mm,
+          breakdown_18mm: order.breakdown_18mm,
+          breakdown_20mm: order.breakdown_20mm,
+          breakdown_25mm: order.breakdown_25mm,
+          breakdown_32mm: order.breakdown_32mm
+        }
+      : order.breakdown;
+    console.debug('[OrderDetailsDialog] breakdown payload:', breakdownPayload);
+  }, [open, order, isHistoryOrder]);
 
   useEffect(() => {
     if (open && isEditing) {
@@ -855,18 +887,20 @@ export function OrderDetailsDialog({
               <h4 className="font-semibold text-foreground">Steel Breakdown</h4>
               <div className="grid grid-cols-3 gap-3">
                 {['8mm', '10mm', '12mm', '14mm', '16mm', '18mm', '20mm', '25mm', '32mm'].map((size) => {
-                  let tons = 0;
-                  if (isHistoryOrder) {
-                    tons = Number(order[`breakdown_${size}`]) || 0;
-                  } else {
-                    tons = order.breakdown?.[size] || 0;
-                  }
+                  const rawValue = isHistoryOrder
+                    ? order[`breakdown_${size}`]
+                    : order.breakdown?.[size];
+                  const isMissing = rawValue === null || rawValue === undefined;
+                  const numericValue = Number(rawValue);
+                  const displayValue = isMissing
+                    ? '—'
+                    : `${Number.isFinite(numericValue) ? numericValue : 0} tons`;
                   
                   return (
                     <div key={size} className="flex items-center justify-between p-2 bg-muted/30 rounded">
                       <span className="text-sm font-medium text-foreground">{size}</span>
                       <span className="text-sm text-muted-foreground">
-                        {tons > 0 ? `${tons} tons` : '0 tons'}
+                        {displayValue}
                       </span>
                     </div>
                   );
