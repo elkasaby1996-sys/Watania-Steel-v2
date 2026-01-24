@@ -1,4 +1,4 @@
-import { User, LogOut, Shield } from 'lucide-react';
+import { User, LogOut, Shield, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,10 @@ export function TopBar() {
 
   const handleRefreshProfile = async () => {
     await refreshProfile();
+  };
+
+  const handleAppRefresh = () => {
+    window.location.reload();
   };
 
   const getRoleBadgeVariant = (role: string) => {
@@ -50,6 +54,16 @@ export function TopBar() {
                 {getRoleDisplayName(user.profile.role)}
               </Badge>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleAppRefresh}
+              className="h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground"
+              aria-label="Refresh app"
+              title="Refresh app"
+            >
+              <RefreshCw size={16} />
+            </Button>
           </div>
 
           <DropdownMenu>
