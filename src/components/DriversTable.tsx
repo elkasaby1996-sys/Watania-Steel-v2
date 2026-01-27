@@ -10,6 +10,7 @@ import { useDriversStore } from '@/stores/driversStore';
 import { EditDriverDialog } from './EditDriverDialog';
 import { RoleBasedComponent } from './RoleBasedComponent';
 import { useToast } from '../hooks/use-toast';
+import { routeTo } from '@/routes/routes';
 
 // PhoneLink component inline to avoid import issues
 const PhoneLink = ({ phoneNumber }: { phoneNumber: string }) => {
@@ -110,7 +111,7 @@ export function DriversTable() {
   };
 
   const handleViewDriverDetails = (driver: Driver) => {
-    navigate(`/drivers/${driver.id}`);
+    navigate(routeTo.driverDetail(driver.id));
   };
 
   const handleStatusToggle = async (driver: Driver) => {

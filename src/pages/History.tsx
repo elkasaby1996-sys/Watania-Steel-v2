@@ -26,6 +26,7 @@ import { type HistoryOrder, historyService, type HistoryOrderFilters } from '../
 import { useToast } from '../hooks/use-toast';
 import { RoleBasedComponent } from '../components/RoleBasedComponent';
 import { roundTo3Decimals, formatNumber } from '../lib/utils';
+import { ROUTES } from '@/routes/routes';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const HISTORY_REFRESH_DEBOUNCE_MS = 300;
@@ -271,11 +272,11 @@ export function History() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/')}
-          className="text-foreground hover:bg-accent"
-        >
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(ROUTES.dashboard)}
+            className="text-foreground hover:bg-accent"
+          >
           <ArrowLeft size={16} />
           Back to Dashboard
         </Button>

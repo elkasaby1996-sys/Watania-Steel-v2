@@ -137,7 +137,10 @@ interface DashboardState {
   activities: ActivityItem[];
   searchQuery: string;
   loading: boolean;
-  metricsLoading: boolean;
+  isLoadingOrders: boolean;
+  ordersError: string | null;
+  isLoadingMetrics: boolean;
+  metricsError: string | null;
   error: string | null;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSearchQuery: (query: string) => void;
@@ -192,13 +195,20 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
   activities: [],
   loading: false,
-  metricsLoading: false,
+  isLoadingOrders: false,
+  ordersError: null,
+  isLoadingMetrics: false,
+  metricsError: null,
   error: null,
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   
   loadOrders: async () => {
-    set({ loading: true, error: null });
+    if (get().isLoadingOrders) {
+      return;
+    }
+
+    set({ isLoadingOrders: true, ordersError: null });
     try {
       const dbOrders = await orderService.getAll();
       const orders = dbOrders.map(dbToFrontend);
@@ -223,10 +233,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         delivered: get().stats?.delivered || 0
       };
       
-      set({ orders: activeOrders, stats, loading: false });
+      set({ orders: activeOrders, stats });
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       console.error('Failed to load orders:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to load orders', loading: false });
+      set({ ordersError: error instanceof Error ? error.message : 'Failed to load orders' });
+    } finally {
+      set({ isLoadingOrders: false });
     }
   },
 
@@ -268,7 +283,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   loadDashboardMetrics: async () => {
-    set({ metricsLoading: true });
+    if (get().isLoadingMetrics) {
+      return;
+    }
+
+    set({ isLoadingMetrics: true, metricsError: null });
     const todayDate = new Date().toISOString().split('T')[0];
 
     try {
@@ -351,16 +370,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           signedOrders,
           totalOrders,
           steelMix: steelMixTotals
-        },
-        metricsLoading: false
+        }
       });
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        set({ metricsLoading: false });
         return;
       }
       console.error('Failed to load dashboard metrics:', error);
-      set({ metricsLoading: false });
+      set({ metricsError: error instanceof Error ? error.message : 'Failed to load dashboard metrics' });
+    } finally {
+      set({ isLoadingMetrics: false });
     }
   },
 

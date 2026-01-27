@@ -16,6 +16,7 @@ import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ROUTES } from '@/routes/routes';
 
 export function Sidebar() {
   const { sidebarCollapsed, setSidebarCollapsed } = useDashboardStore();
@@ -24,14 +25,14 @@ export function Sidebar() {
   const location = useLocation();
 
   const menuItems = [
-    { icon: Home, label: 'Dashboard', path: '/', active: location.pathname === '/' },
-    { icon: History, label: 'History', path: '/history', active: location.pathname === '/history' },
-    { icon: Users, label: 'Users', path: '/users', active: location.pathname === '/users', adminOnly: true },
-    { icon: Truck, label: 'Drivers', path: '/drivers', active: location.pathname === '/drivers' || location.pathname.startsWith('/drivers/') },
-    { icon: Building2, label: 'Clients', path: '/clients', active: location.pathname === '/clients' || location.pathname.startsWith('/clients/') },
-    { icon: Warehouse, label: 'Inventory', path: '/inventory', active: location.pathname === '/inventory' },
-    { icon: Scissors, label: 'Offcut Usage', path: '/offcut-usage', active: location.pathname === '/offcut-usage' },
-    { icon: BarChart3, label: 'Steel Analytics', path: '/steel-analytics', active: location.pathname === '/steel-analytics' },
+    { icon: Home, label: 'Dashboard', path: ROUTES.dashboard, active: location.pathname === ROUTES.dashboard },
+    { icon: History, label: 'History', path: ROUTES.history, active: location.pathname === ROUTES.history },
+    { icon: Users, label: 'Users', path: ROUTES.users, active: location.pathname === ROUTES.users, adminOnly: true },
+    { icon: Truck, label: 'Drivers', path: ROUTES.drivers, active: location.pathname === ROUTES.drivers || location.pathname.startsWith(`${ROUTES.drivers}/`) },
+    { icon: Building2, label: 'Clients', path: ROUTES.clients, active: location.pathname === ROUTES.clients || location.pathname.startsWith(`${ROUTES.clients}/`) },
+    { icon: Warehouse, label: 'Inventory', path: ROUTES.inventory, active: location.pathname === ROUTES.inventory },
+    { icon: Scissors, label: 'Offcut Usage', path: ROUTES.offcutUsage, active: location.pathname === ROUTES.offcutUsage },
+    { icon: BarChart3, label: 'Steel Analytics', path: ROUTES.steelAnalytics, active: location.pathname === ROUTES.steelAnalytics },
   ];
 
   const handleNavigation = (path: string) => {

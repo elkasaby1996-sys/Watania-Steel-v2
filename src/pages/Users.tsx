@@ -3,6 +3,7 @@ import { UserManagement } from '@/components/UserManagement';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '@/routes/routes';
 
 export function Users() {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export function Users() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/')}
+          onClick={() => navigate(ROUTES.dashboard)}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />

@@ -15,6 +15,7 @@ import {
 import { MergeClientsDialog } from '@/components/MergeClientsDialog';
 import { MergeSitesDialog } from '@/components/MergeSitesDialog';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { ROUTES, routeTo } from '@/routes/routes';
 
 // ✅ IMPORTANT: these must exist in src/lib/clientsApi.ts
 import {
@@ -448,7 +449,7 @@ export function ClientProfilePage() {
   const handleClientsMerged = (primaryId: string, duplicateId: string) => {
     setRefreshKey((prev) => prev + 1);
     if (duplicateId === clientId) {
-      navigate(`/clients/${primaryId}`);
+      navigate(routeTo.clientProfile(primaryId));
     }
   };
 
@@ -473,7 +474,7 @@ export function ClientProfilePage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="text-sm text-slate-400">
-            <Link to="/clients" className="hover:underline">
+            <Link to={ROUTES.clients} className="hover:underline">
               ← Back to Clients
             </Link>
           </div>
@@ -605,12 +606,12 @@ export function ClientProfilePage() {
                       <tr
                         key={s.site_id}
                         className="border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/40"
-                        onClick={() => navigate(`/clients/${clientId}/sites/${s.site_id}`)}
+                        onClick={() => clientId && navigate(routeTo.clientSite(clientId, s.site_id))}
                       >
                         <td className="py-2">
                           <Link
                             className="hover:underline"
-                            to={`/clients/${clientId}/sites/${s.site_id}`}
+                            to={clientId ? routeTo.clientSite(clientId, s.site_id) : ROUTES.clients}
                           >
                             {s.site_name}
                           </Link>

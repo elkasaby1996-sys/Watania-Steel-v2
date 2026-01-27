@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useDashboardStore } from '@/stores/dashboardStore';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 
@@ -30,7 +31,7 @@ const formatTons = (value: number) =>
   }).format(value);
 
 export function DiameterDistributionChart() {
-  const { dashboardMetrics, metricsLoading } = useDashboardStore();
+  const { dashboardMetrics, isLoadingMetrics, metricsError, loadDashboardMetrics } = useDashboardStore();
   const { steelMix } = dashboardMetrics;
 
   const data: ChartDatum[] = DIAMETERS.map((diameter) => ({
@@ -50,8 +51,18 @@ export function DiameterDistributionChart() {
       <h3 className="text-lg font-headline font-semibold text-gray-50 mb-4">
         Diameter Distribution
       </h3>
-      {metricsLoading ? (
-        <p className="text-sm text-muted-foreground">Loading distribution...</p>
+      {isLoadingMetrics ? (
+        <div className="space-y-4 animate-pulse">
+          <div className="h-6 w-32 rounded bg-muted" />
+          <div className="h-72 rounded bg-muted" />
+        </div>
+      ) : metricsError ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-red-400">{metricsError}</p>
+          <Button variant="secondary" className="w-fit" onClick={() => loadDashboardMetrics()}>
+            Retry
+          </Button>
+        </div>
       ) : data.length === 0 ? (
         <p className="text-sm text-muted-foreground">No working orders to display.</p>
       ) : (

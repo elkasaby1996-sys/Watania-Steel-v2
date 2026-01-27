@@ -15,6 +15,7 @@ import {
   type ClientOrderRow,
   type ClientSiteDetails
 } from '@/lib/clientsApi';
+import { ROUTES, routeTo } from '@/routes/routes';
 
 export function ClientSiteDetailsPage() {
   const { clientId, siteId } = useParams<{ clientId: string; siteId: string }>();
@@ -130,7 +131,7 @@ export function ClientSiteDetailsPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/clients')}
+          onClick={() => navigate(ROUTES.clients)}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />
@@ -149,7 +150,7 @@ export function ClientSiteDetailsPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(`/clients/${clientId}`)}
+          onClick={() => clientId && navigate(routeTo.clientProfile(clientId))}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />
