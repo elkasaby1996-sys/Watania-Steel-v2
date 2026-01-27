@@ -33,6 +33,7 @@ import {
   type AnalyticsSummary,
   type FilterMode,
 } from '@/lib/steelAnalytics';
+import { ROUTES } from '@/routes/routes';
 
 const RANGE_OPTIONS = [30, 60, 90, 180, 365] as const;
 
@@ -163,11 +164,11 @@ export function SteelAnalytics() {
       {/* Header */}
       <div className="flex flex-wrap items-center gap-4">
         <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/')}
-          className="text-foreground hover:bg-accent"
-        >
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(ROUTES.dashboard)}
+            className="text-foreground hover:bg-accent"
+          >
           <ArrowLeft size={16} />
           Back to Dashboard
         </Button>

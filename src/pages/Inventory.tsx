@@ -15,6 +15,7 @@ import { useInventoryStore, InventoryTableName } from '../stores/inventoryStore'
 import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
 import { InventoryEditModal } from '../components/InventoryEditModal';
+import { ROUTES } from '@/routes/routes';
 
 // Table configuration for each inventory section
 interface TableConfig {
@@ -316,7 +317,7 @@ export function Inventory() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/')}
+          onClick={() => navigate(ROUTES.dashboard)}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />

@@ -14,7 +14,7 @@ import { hasPermission } from '@/lib/auth';
 import { orderService } from '@/lib/supabase';
 
 export function OrderTable() {
-  const { getFilteredTodayOrders, deleteOrder } = useDashboardStore();
+  const { getFilteredTodayOrders, deleteOrder, isLoadingOrders, ordersError, loadOrders } = useDashboardStore();
   const { user } = useAuthStore();
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -89,31 +89,49 @@ export function OrderTable() {
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-foreground">Today's Orders</h3>
           <p className="text-sm text-muted-foreground">
-            {todayOrders.length} active orders
+            {isLoadingOrders ? 'Loading...' : `${todayOrders.length} active orders`}
           </p>
         </div>
 
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border">
-                <TableHead className="text-foreground">Delivery Number</TableHead>
-                <TableHead className="text-foreground">Delivery Name</TableHead>
-                <TableHead className="text-foreground">Company</TableHead>
-                <TableHead className="text-foreground">Site</TableHead>
-                <TableHead className="text-foreground">Date</TableHead>
-                <TableHead className="text-foreground">Status</TableHead>
-                <TableHead className="text-foreground">Tons</TableHead>
-                <TableHead className="text-foreground">Shift</TableHead>
-                <TableHead className="text-foreground">Delivery Note</TableHead>
-                <TableHead className="text-foreground">Contact</TableHead>
-                <TableHead className="text-foreground">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {todayOrders.length > 0 ? (
-                todayOrders.map((order) => (
-                  <TableRow key={order.id} className="border-border hover:bg-muted/50">
+        {ordersError ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-red-400">{ordersError}</p>
+            <Button variant="secondary" className="w-fit" onClick={() => loadOrders()}>
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border">
+                  <TableHead className="text-foreground">Delivery Number</TableHead>
+                  <TableHead className="text-foreground">Delivery Name</TableHead>
+                  <TableHead className="text-foreground">Company</TableHead>
+                  <TableHead className="text-foreground">Site</TableHead>
+                  <TableHead className="text-foreground">Date</TableHead>
+                  <TableHead className="text-foreground">Status</TableHead>
+                  <TableHead className="text-foreground">Tons</TableHead>
+                  <TableHead className="text-foreground">Shift</TableHead>
+                  <TableHead className="text-foreground">Delivery Note</TableHead>
+                  <TableHead className="text-foreground">Contact</TableHead>
+                  <TableHead className="text-foreground">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoadingOrders ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`} className="border-border">
+                      {Array.from({ length: 11 }).map((_, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : todayOrders.length > 0 ? (
+                  todayOrders.map((order) => (
+                    <TableRow key={order.id} className="border-border hover:bg-muted/50">
                     <TableCell className="font-mono text-foreground">{order.id}</TableCell>
                     <TableCell className="text-foreground">{order.customerName}</TableCell>
                     <TableCell className="text-foreground">{order.company || 'N/A'}</TableCell>
@@ -310,6 +328,7 @@ export function OrderTable() {
             </TableBody>
           </Table>
         </div>
+        )}
       </div>
       
       <OrderDetailsDialog 

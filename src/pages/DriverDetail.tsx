@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { driverService } from '../lib/supabase';
 import { useDriversStore } from '../stores/driversStore';
+import { ROUTES } from '@/routes/routes';
 
 interface Driver {
   id: string;
@@ -109,7 +110,7 @@ export function DriverDetail() {
       // Load driver details
       const driverData = await driverService.getById(driverId);
       if (!driverData) {
-        navigate('/drivers');
+        navigate(ROUTES.drivers);
         return;
       }
       setDriver(driverData);
@@ -189,7 +190,7 @@ export function DriverDetail() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <h2 className="text-2xl font-bold text-foreground">Driver Not Found</h2>
-          <Button onClick={() => navigate('/drivers')}>
+          <Button onClick={() => navigate(ROUTES.drivers)}>
             <ArrowLeft size={16} />
             Back to Drivers
           </Button>
@@ -205,7 +206,7 @@ export function DriverDetail() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/drivers')}
+          onClick={() => navigate(ROUTES.drivers)}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />

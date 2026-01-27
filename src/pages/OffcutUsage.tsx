@@ -43,6 +43,7 @@ import {
   buildExecutiveOffcutReportData,
   ProductionRow
 } from '@/reports/offcut/buildExecutiveOffcutReportData';
+import { ROUTES } from '@/routes/routes';
 
 type ViewMode = 'daily' | 'monthly' | 'range';
 
@@ -279,10 +280,10 @@ export function OffcutUsage() {
       });
 
       sessionStorage.setItem('offcutExecutiveReport', JSON.stringify(reportData));
-      const reportUrl = `${window.location.origin}/reports/offcut/executive`;
+      const reportUrl = `${window.location.origin}${ROUTES.offcutExecutiveReport}`;
       const reportWindow = window.open(reportUrl, '_blank', 'noopener,noreferrer');
       if (!reportWindow) {
-        navigate('/reports/offcut/executive');
+        navigate(ROUTES.offcutExecutiveReport);
       }
     } catch (error) {
       console.error('Failed to generate executive report:', error);
@@ -356,7 +357,7 @@ export function OffcutUsage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/')}
+          onClick={() => navigate(ROUTES.dashboard)}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />

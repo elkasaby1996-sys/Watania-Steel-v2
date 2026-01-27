@@ -1,30 +1,35 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
-import { Dashboard } from './pages/Dashboard';
-import { History } from './pages/History';
-import { Users } from './pages/Users';
-import { Drivers } from './pages/Drivers';
-import { DriverDetail } from './pages/DriverDetail';
-import { SteelAnalytics } from './pages/SteelAnalytics';
-import { Clients } from './pages/Clients';
-import { ClientProfilePage } from './pages/ClientProfile';
-import { ClientSiteDetailsPage } from './pages/ClientSiteDetails';
-import { Inventory } from './pages/Inventory';
-import { OffcutUsage } from './pages/OffcutUsage';
-import { OffcutExecutivePrintPage } from './reports/offcut/OffcutExecutivePrintPage';
 import { ImageAssets } from './components/ImageAssets';
 import { Toaster } from './components/ui/toaster';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useDashboardStore } from './stores/dashboardStore';
 import { useAuthStore } from './stores/authStore';
+import { ROUTES } from './routes/routes';
+import { RouteSkeleton } from './components/RouteSkeleton';
+
+const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
+const History = lazy(() => import('./pages/History').then((module) => ({ default: module.History })));
+const Users = lazy(() => import('./pages/Users').then((module) => ({ default: module.Users })));
+const Drivers = lazy(() => import('./pages/Drivers').then((module) => ({ default: module.Drivers })));
+const DriverDetail = lazy(() => import('./pages/DriverDetail').then((module) => ({ default: module.DriverDetail })));
+const SteelAnalytics = lazy(() => import('./pages/SteelAnalytics').then((module) => ({ default: module.SteelAnalytics })));
+const Clients = lazy(() => import('./pages/Clients').then((module) => ({ default: module.Clients })));
+const ClientProfilePage = lazy(() => import('./pages/ClientProfile').then((module) => ({ default: module.ClientProfilePage })));
+const ClientSiteDetailsPage = lazy(() => import('./pages/ClientSiteDetails').then((module) => ({ default: module.ClientSiteDetailsPage })));
+const Inventory = lazy(() => import('./pages/Inventory').then((module) => ({ default: module.Inventory })));
+const OffcutUsage = lazy(() => import('./pages/OffcutUsage').then((module) => ({ default: module.OffcutUsage })));
+const OffcutExecutivePrintPage = lazy(() =>
+  import('./reports/offcut/OffcutExecutivePrintPage').then((module) => ({ default: module.OffcutExecutivePrintPage }))
+);
 
 function AppShell() {
   const { sidebarCollapsed } = useDashboardStore();
   const location = useLocation();
-  const isReportRoute = location.pathname.startsWith('/reports/offcut/executive');
+  const isReportRoute = location.pathname.startsWith(ROUTES.offcutExecutiveReport);
 
   return (
     <ProtectedRoute>
@@ -37,22 +42,24 @@ function AppShell() {
           {!isReportRoute && <TopBar />}
           <div className={isReportRoute ? '' : 'pt-16 p-6'}>
             <div className={isReportRoute ? '' : 'max-w-7xl mx-auto'}>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/history" element={<History />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/drivers" element={<Drivers />} />
-                <Route path="/drivers/:driverId" element={<DriverDetail />} />
-                <Route path="/clients" element={<Clients />} />
-                <Route path="/clients/:clientId" element={<ClientProfilePage />} />
-                <Route path="/clients/:clientId/sites/:siteId" element={<ClientSiteDetailsPage />} />
-                <Route path="/inventory" element={<Inventory />} />
-                <Route path="/offcut-usage" element={<OffcutUsage />} />
-                <Route path="/steel-analytics" element={<SteelAnalytics />} />
-                <Route path="/reports/offcut/executive" element={<OffcutExecutivePrintPage />} />
-                {/* Catch all route - redirect to dashboard */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              <Suspense fallback={<RouteSkeleton />}>
+                <Routes>
+                  <Route path={ROUTES.dashboard} element={<Dashboard />} />
+                  <Route path={ROUTES.history} element={<History />} />
+                  <Route path={ROUTES.users} element={<Users />} />
+                  <Route path={ROUTES.drivers} element={<Drivers />} />
+                  <Route path={ROUTES.driverDetail} element={<DriverDetail />} />
+                  <Route path={ROUTES.clients} element={<Clients />} />
+                  <Route path={ROUTES.clientProfile} element={<ClientProfilePage />} />
+                  <Route path={ROUTES.clientSite} element={<ClientSiteDetailsPage />} />
+                  <Route path={ROUTES.inventory} element={<Inventory />} />
+                  <Route path={ROUTES.offcutUsage} element={<OffcutUsage />} />
+                  <Route path={ROUTES.steelAnalytics} element={<SteelAnalytics />} />
+                  <Route path={ROUTES.offcutExecutiveReport} element={<OffcutExecutivePrintPage />} />
+                  {/* Catch all route - redirect to dashboard */}
+                  <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />
+                </Routes>
+              </Suspense>
             </div>
           </div>
         </main>

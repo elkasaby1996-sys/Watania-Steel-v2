@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { formatNumber } from '@/lib/utils';
 import { fetchClientsSummary, type ClientSummary } from '@/lib/clientsApi';
+import { ROUTES, routeTo } from '@/routes/routes';
 
 export function Clients() {
   const navigate = useNavigate();
@@ -58,7 +59,7 @@ export function Clients() {
   }, [fetchClients, searchQuery]);
 
   const handleClientClick = (clientId: string) => {
-    navigate(`/clients/${clientId}`);
+    navigate(routeTo.clientProfile(clientId));
   };
 
   const lastUpdatedLabel = lastUpdated ? lastUpdated.toLocaleString() : '—';
@@ -75,7 +76,7 @@ export function Clients() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/')}
+          onClick={() => navigate(ROUTES.dashboard)}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />

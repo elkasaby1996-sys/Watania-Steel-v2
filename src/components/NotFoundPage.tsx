@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Home, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '@/routes/routes';
 
 export function NotFoundPage() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export function NotFoundPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Button 
-              onClick={() => navigate('/')}
+              onClick={() => navigate(ROUTES.dashboard)}
               className="w-full"
             >
               <Home className="h-4 w-4 mr-2" />
@@ -42,19 +43,19 @@ export function NotFoundPage() {
             <p className="mb-2">Available pages:</p>
             <div className="space-y-1 text-left">
               <button 
-                onClick={() => navigate('/')}
+                onClick={() => navigate(ROUTES.dashboard)}
                 className="block w-full text-left px-2 py-1 hover:bg-accent rounded text-primary hover:text-primary/80"
               >
                 • Dashboard
               </button>
               <button 
-                onClick={() => navigate('/history')}
+                onClick={() => navigate(ROUTES.history)}
                 className="block w-full text-left px-2 py-1 hover:bg-accent rounded text-primary hover:text-primary/80"
               >
                 • Delivery History
               </button>
               <button 
-                onClick={() => navigate('/drivers')}
+                onClick={() => navigate(ROUTES.drivers)}
                 className="block w-full text-left px-2 py-1 hover:bg-accent rounded text-primary hover:text-primary/80"
               >
                 • Drivers Management

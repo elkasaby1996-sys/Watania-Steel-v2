@@ -10,6 +10,7 @@ import { DriversTable } from '../components/DriversTable';
 import { DriversMetrics } from '../components/DriversMetrics';
 import { DatabaseSchemaAlert } from '../components/DatabaseSchemaAlert';
 import { RoleBasedComponent } from '../components/RoleBasedComponent';
+import { ROUTES } from '@/routes/routes';
 
 export function Drivers() {
   const navigate = useNavigate();
@@ -45,7 +46,7 @@ export function Drivers() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/')}
+          onClick={() => navigate(ROUTES.dashboard)}
           className="text-foreground hover:bg-accent"
         >
           <ArrowLeft size={16} />
