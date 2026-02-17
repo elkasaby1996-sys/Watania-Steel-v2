@@ -20,7 +20,7 @@
     "@radix-ui/react-progress": "1.1.0",
     "recharts": "2.12.7",
     "zustand": "^5.0.8",
-    "react-router-dom": "^6.8.1",
+    "react-router-dom": "^6.30.3",
     "clsx": "^2.0.0",
     "lucide-react": "^0.544.0",
     "react": "^18.2.0",
