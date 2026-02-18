@@ -6,7 +6,7 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto rounded-lg">
+  <div className="relative w-full overflow-auto rounded-xl border border-border/60 bg-card/60 shadow-sm">
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
@@ -22,7 +22,7 @@ const TableHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <thead
     ref={ref}
-    className={cn("sticky top-0 z-10 bg-muted/50 [&_tr]:border-b", className)}
+    className={cn("sticky top-0 z-10 bg-muted/70 backdrop-blur supports-[backdrop-filter]:bg-muted/55 [&_tr]:border-b", className)}
     {...props}
   />
 ))
@@ -35,7 +35,7 @@ const TableBody = React.forwardRef<
   <tbody
     ref={ref}
     className={cn(
-      "[&_tr:last-child]:border-0 [&_tr:nth-child(even)]:bg-muted/20",
+      "[&_tr:last-child]:border-0 [&_tr:nth-child(even)]:bg-muted/15",
       className
     )}
     {...props}
@@ -65,7 +65,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b border-border/50 transition-colors hover:bg-accent/50 data-[state=selected]:bg-accent",
+      "border-b border-border/40 transition-colors duration-150 hover:bg-accent/45 data-[state=selected]:bg-accent",
       className
     )}
     {...props}
@@ -80,7 +80,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-11 px-3 text-left align-middle font-semibold text-xs uppercase tracking-wider text-gray-300 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      "h-12 px-4 text-left align-middle font-semibold text-[11px] uppercase tracking-[0.08em] text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
       className
     )}
     {...props}
@@ -95,7 +95,7 @@ const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      "p-3 align-middle text-card-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      "px-4 py-3 align-middle text-card-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
       className
     )}
     {...props}
