@@ -10,6 +10,7 @@ import { useDashboardStore } from './stores/dashboardStore';
 import { useAuthStore } from './stores/authStore';
 import { ROUTES } from './routes/routes';
 import { RouteSkeleton } from './components/RouteSkeleton';
+import { useIsMobile } from './hooks/use-mobile';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const History = lazy(() => import('./pages/History').then((module) => ({ default: module.History })));
@@ -27,9 +28,16 @@ const OffcutExecutivePrintPage = lazy(() =>
 );
 
 function AppShell() {
-  const { sidebarCollapsed } = useDashboardStore();
+  const { sidebarCollapsed, setSidebarCollapsed } = useDashboardStore();
   const location = useLocation();
   const isReportRoute = location.pathname.startsWith(ROUTES.offcutExecutiveReport);
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarCollapsed(true);
+    }
+  }, [isMobile, setSidebarCollapsed]);
 
   return (
     <ProtectedRoute>
@@ -37,10 +45,12 @@ function AppShell() {
         <ImageAssets />
         {!isReportRoute && <Sidebar />}
         <main
-          className={`transition-all duration-300 ${isReportRoute ? 'ml-0' : sidebarCollapsed ? 'ml-16' : 'ml-64'}`}
+          className={`transition-all duration-300 ${
+            isReportRoute ? 'ml-0' : isMobile ? 'ml-0' : sidebarCollapsed ? 'ml-16' : 'ml-64'
+          }`}
         >
           {!isReportRoute && <TopBar />}
-          <div className={isReportRoute ? '' : 'pt-16 p-6'}>
+          <div className={isReportRoute ? '' : 'pt-16 px-4 pb-6 sm:p-6'}>
             <div className={isReportRoute ? '' : 'max-w-7xl mx-auto'}>
               <Suspense fallback={<RouteSkeleton />}>
                 <Routes>
