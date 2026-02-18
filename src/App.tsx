@@ -50,7 +50,7 @@ function AppShell() {
           }`}
         >
           {!isReportRoute && <TopBar />}
-          <div className={isReportRoute ? '' : 'pt-16 px-4 pb-6 sm:p-6'}>
+          <div className={isReportRoute ? '' : 'pt-16 px-4 pb-6 sm:px-6 sm:pb-6'}>
             <div className={isReportRoute ? '' : 'max-w-7xl mx-auto'}>
               <Suspense fallback={<RouteSkeleton />}>
                 <Routes>

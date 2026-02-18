@@ -42,23 +42,25 @@ export function Drivers() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.dashboard)}
-          className="text-foreground hover:bg-accent"
-        >
-          <ArrowLeft size={16} />
-          Back to Dashboard
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
-            Drivers Management
-          </h1>
-          <p className="text-muted-foreground">
-            Manage drivers and track their performance metrics
-          </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(ROUTES.dashboard)}
+            className="text-foreground hover:bg-accent"
+          >
+            <ArrowLeft size={16} />
+            Back to Dashboard
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-3xl font-headline font-bold text-foreground">
+              Drivers Management
+            </h1>
+            <p className="text-muted-foreground">
+              Manage drivers and track their performance metrics
+            </p>
+          </div>
         </div>
         <RoleBasedComponent action="create">
           <AddDriverDialog />

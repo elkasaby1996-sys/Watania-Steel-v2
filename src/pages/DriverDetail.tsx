@@ -202,23 +202,25 @@ export function DriverDetail() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.drivers)}
-          className="text-foreground hover:bg-accent"
-        >
-          <ArrowLeft size={16} />
-          Back to Drivers
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
-            {driver.name}
-          </h1>
-          <p className="text-muted-foreground">
-            Driver performance and order history
-          </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(ROUTES.drivers)}
+            className="text-foreground hover:bg-accent"
+          >
+            <ArrowLeft size={16} />
+            Back to Drivers
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-3xl font-headline font-bold text-foreground">
+              {driver.name}
+            </h1>
+            <p className="text-muted-foreground">
+              Driver performance and order history
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Badge className={driver.is_active ? 'bg-success text-success-foreground' : 'bg-gray-400 text-white'}>
