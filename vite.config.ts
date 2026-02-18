@@ -23,22 +23,7 @@ export default defineConfig({
   build: {
     target: 'es2015',
     minify: 'esbuild',
-    sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return;
-          if (
-            /node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)
-          ) return 'vendor-react';
-          if (/node_modules[\\/]react-router/.test(id)) return 'vendor-router';
-          if (id.includes('@supabase')) return 'vendor-supabase';
-          if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
-          if (id.includes('@radix-ui')) return 'vendor-radix';
-          return 'vendor';
-        }
-      }
-    }
+    sourcemap: false
   },
   optimizeDeps: {
     include: ['@supabase/supabase-js', 'react', 'react-dom']
