@@ -2,6 +2,10 @@
   command = "npm install --include=optional --no-audit --no-fund && npm run build"
   publish = "dist"
 
+[build.environment]
+  NODE_VERSION = "20.20.0"
+  NPM_FLAGS = "--include=optional --no-audit --no-fund"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
