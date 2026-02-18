@@ -1,4 +1,4 @@
-import { User, LogOut, Shield, RefreshCw } from 'lucide-react';
+import { User, LogOut, Shield, RefreshCw, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -6,10 +6,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
 import { getRoleDisplayName } from '../lib/auth';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function TopBar() {
-  const { sidebarCollapsed } = useDashboardStore();
+  const { sidebarCollapsed, setSidebarCollapsed } = useDashboardStore();
   const { user, signOut, refreshProfile } = useAuthStore();
+  const isMobile = useIsMobile();
 
 
   const handleSignOut = async () => {
@@ -38,12 +40,26 @@ export function TopBar() {
   };
 
   return (
-    <header className={`fixed top-0 right-0 h-16 bg-card border-b border-border z-40 transition-all duration-300 ease-in-out ${
-      sidebarCollapsed ? 'left-16' : 'left-64'
-    }`}>
-      <div className="flex items-center justify-between h-full px-6">
-        <div className="flex-1 flex items-center">
-          <h1 className="font-headline font-bold text-xl text-gray-50">Factory Management System</h1>
+    <header
+      className={`fixed top-0 right-0 h-16 bg-card border-b border-border z-40 transition-all duration-300 ease-in-out ${
+        isMobile ? 'left-0' : sidebarCollapsed ? 'left-16' : 'left-64'
+      }`}
+    >
+      <div className="flex items-center justify-between h-full px-4 sm:px-6">
+        <div className="flex-1 flex items-center gap-3">
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground"
+              aria-label="Toggle navigation menu"
+              title="Toggle navigation menu"
+            >
+              <Menu size={18} />
+            </Button>
+          )}
+          <h1 className="font-headline font-bold text-lg sm:text-xl text-gray-50">Factory Management System</h1>
         </div>
 
         <div className="flex items-center gap-4">
