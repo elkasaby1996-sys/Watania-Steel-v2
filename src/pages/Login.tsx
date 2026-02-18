@@ -62,6 +62,7 @@ export function Login() {
                   id="signin-email"
                   name="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -75,6 +76,7 @@ export function Login() {
                   id="signin-password"
                   name="password"
                   type="password"
+                  autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
