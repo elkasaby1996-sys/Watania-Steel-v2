@@ -2,15 +2,22 @@ import { createClient } from '@supabase/supabase-js'
 import { toast } from '@/hooks/use-toast'
 import { getEnvVar } from './env'
 import { roundTo3Decimals } from './utils'
+import { logger } from './logger'
 
 // Get Supabase credentials from environment variables
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL')
 const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY')
 
-// Create Supabase client with the actual credentials
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Netlify and local .env.'
+  );
+}
+
+// Create Supabase client with the environment credentials
 export const supabase = createClient(
-  supabaseUrl || 'https://lzjzdogiuxenlojeudjt.supabase.co',
-  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6anpkb2dpdXhlbmxvamV1ZGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg2MTMyMjksImV4cCI6MjA3NDE4OTIyOX0.q3kAu-fEJbcYel_H8vxcc0RP3QxAWgCkTF6aqpSCZH4'
+  supabaseUrl,
+  supabaseAnonKey
 );
 
 // Database types
@@ -249,7 +256,7 @@ export const frontendToDb = (order: any): any => {
 export const orderService = {
   async getAll(): Promise<Order[]> {
     try {
-      console.log('Fetching all orders from database...');
+      logger.debug('Fetching all orders from database...');
       const { data, error } = await supabase
         .from('orders')
         .select('*')
@@ -260,7 +267,7 @@ export const orderService = {
         throw error;
       }
       
-      console.log('Raw data from database:', data);
+      logger.debug('Raw data from database:', data);
       return data || [];
     } catch (error) {
       console.error('Failed to fetch orders:', error);
@@ -295,7 +302,7 @@ export const orderService = {
 
   async update(id: string, updates: any): Promise<Order> {
     try {
-      console.log('🔄 Service: Updating active order:', id, updates);
+      logger.debug('🔄 Service: Updating active order:', id, updates);
       
       const { data, error } = await supabase
         .from('orders')
@@ -315,7 +322,7 @@ export const orderService = {
         throw error;
       }
       
-      console.log('✅ Active order updated successfully');
+      logger.debug('✅ Active order updated successfully');
       return data;
     } catch (error) {
       console.error('❌ Failed to update active order:', error);
@@ -735,7 +742,7 @@ export const historyService = {
 
   async moveOrderToHistory(order: any): Promise<void> {
     try {
-      console.log('🔄 Moving order to history:', order.id);
+      logger.debug('🔄 Moving order to history:', order.id);
       
       const { data: existingHistory } = await supabase
         .from('history_orders')
@@ -783,7 +790,7 @@ export const historyService = {
       };
 
       if (import.meta.env.DEV) {
-        console.log('🔗 History move client link:', {
+        logger.debug('🔗 History move client link:', {
           orderId: order.id,
           clientId,
           siteId
@@ -808,7 +815,7 @@ export const historyService = {
         .delete()
         .eq('id', order.id);
       
-      console.log('✅ Order moved to history successfully');
+      logger.debug('✅ Order moved to history successfully');
     } catch (error) {
       console.error('❌ Failed to move order to history:', error);
       throw error;
@@ -817,7 +824,7 @@ export const historyService = {
 
   async moveOrderToActive(order: any): Promise<void> {
     try {
-      console.log('🔄 Service: Moving order back to active:', order.id);
+      logger.debug('🔄 Service: Moving order back to active:', order.id);
       
       const activeOrderData = {
         id: order.id,
@@ -856,7 +863,7 @@ export const historyService = {
         .delete()
         .eq('id', order.id);
       
-      console.log('✅ Service: Order moved back to active successfully');
+      logger.debug('✅ Service: Order moved back to active successfully');
     } catch (error) {
       console.error('❌ Service: Failed to move order to active:', error);
       throw error;
@@ -1275,3 +1282,4 @@ export const activityService = {
     }
   }
 };
+

@@ -9,12 +9,6 @@ interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
-declare global {
-  interface Window {
-    __VITE_ENV__?: ImportMetaEnv
-  }
-}
-
 // Suppress unused variable warnings for build
 declare module '*.svg' {
   const content: any;

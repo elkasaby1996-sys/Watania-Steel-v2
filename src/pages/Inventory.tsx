@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Edit2, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -283,6 +283,35 @@ export function Inventory() {
   // Check if user can edit (Admin or Editor)
   const canEdit = hasPermission(user?.profile?.role, 'edit');
 
+  // Latest row-level timestamp across all inventory tables.
+  const lastUpdatedAt = useMemo(() => {
+    let latestMs: number | null = null;
+
+    for (const config of tableConfigs) {
+      const rows = data[config.tableName] || [];
+      for (const row of rows) {
+        const rawTimestamp = row?.updated_at || row?.created_at;
+        if (!rawTimestamp) continue;
+
+        const ms = new Date(rawTimestamp).getTime();
+        if (Number.isNaN(ms)) continue;
+        if (latestMs === null || ms > latestMs) {
+          latestMs = ms;
+        }
+      }
+    }
+
+    return latestMs !== null ? new Date(latestMs) : null;
+  }, [data]);
+
+  const lastUpdatedLabel = useMemo(() => {
+    if (!lastUpdatedAt) return 'No updates yet';
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(lastUpdatedAt);
+  }, [lastUpdatedAt]);
+
   // Load inventory data on mount
   useEffect(() => {
     loadAllInventory();
@@ -329,6 +358,9 @@ export function Inventory() {
           </h1>
           <p className="text-muted-foreground">
             View and manage steel inventory across all categories
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Last updated: {lastUpdatedLabel}
           </p>
         </div>
       </div>

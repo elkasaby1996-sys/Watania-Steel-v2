@@ -84,10 +84,8 @@ export function HistoryTableDebug() {
             onClick={async () => {
               setLoading(true);
               try {
-                const { orderService } = await import('../lib/supabase');
-                await orderService.forceCleanupDeliveredOrders();
-                // Refresh the check after cleanup
-                setTimeout(() => checkHistoryTable(), 1000);
+                // Legacy cleanup RPC has been removed; just rerun diagnostics.
+                await checkHistoryTable();
               } catch (error) {
                 console.error('Cleanup failed:', error);
               } finally {

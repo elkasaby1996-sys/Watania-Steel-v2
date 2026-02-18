@@ -124,7 +124,9 @@ export type ClientSiteMaster = {
   name: string | null;
   contact_name: string | null;
   contact_phone: string | null;
+  contact_email: string | null;
   location_text: string | null;
+  address: string | null;
   google_maps_url: string | null;
   notes: string | null;
 };
@@ -187,7 +189,7 @@ export async function fetchClientSitesPerformance(clientId: string, signal?: Abo
 export async function fetchClientSitesMaster(clientId: string, signal?: AbortSignal) {
   let query = supabase
     .from('client_sites')
-    .select('id, client_id, name, contact_name, contact_phone, location_text, google_maps_url, notes')
+    .select('id, client_id, name, contact_name, contact_phone, contact_email, location_text, address, google_maps_url, notes')
     .eq('client_id', clientId)
     .order('name');
 

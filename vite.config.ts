@@ -6,7 +6,10 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
   publicDir: "./static",
-  base: "./",
+  base: "/",
+  esbuild: {
+    pure: ['console.log', 'console.debug', 'console.info']
+  },
   css: {
     postcss: {
       plugins: [tailwind()],
@@ -23,7 +26,15 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: undefined
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
+          if (id.includes('react-router')) return 'vendor-router';
+          if (id.includes('@supabase')) return 'vendor-supabase';
+          if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
+          if (id.includes('@radix-ui')) return 'vendor-radix';
+          return 'vendor';
+        }
       }
     }
   },

@@ -68,6 +68,8 @@ export function CalculatorInput({
     if (inputValue.startsWith('=')) {
       setIsCalculating(true);
       setError(null);
+      // Keep formula text in parent state so blur/enter can evaluate it.
+      onChange(inputValue);
     } else {
       setIsCalculating(false);
       setError(null);

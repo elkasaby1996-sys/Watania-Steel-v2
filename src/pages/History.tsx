@@ -27,6 +27,7 @@ import { useToast } from '../hooks/use-toast';
 import { RoleBasedComponent } from '../components/RoleBasedComponent';
 import { roundTo3Decimals, formatNumber } from '../lib/utils';
 import { ROUTES } from '@/routes/routes';
+import { logger } from '@/lib/logger';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const HISTORY_REFRESH_DEBOUNCE_MS = 300;
@@ -247,7 +248,7 @@ export function History() {
   }, []);
 
   const handleViewOrder = useCallback((order: any) => {
-    console.log('🔍 History - Selected order:', order);
+    logger.debug('🔍 History - Selected order:', order);
     setSelectedOrder(order);
     setDetailsDialogOpen(true);
   }, []);
@@ -501,8 +502,8 @@ export function History() {
                                         e.stopPropagation();
 
                                         try {
-                                          console.log('🔄 Toggling delivery note for history order:', order.id);
-                                          console.log('📋 Current status:', order.signed_delivery_note);
+                                          logger.debug('🔄 Toggling delivery note for history order:', order.id);
+                                          logger.debug('📋 Current status:', order.signed_delivery_note);
 
                                           // Toggle signed delivery note status for history order
                                           const newStatus = !order.signed_delivery_note;
@@ -634,3 +635,4 @@ export function History() {
     </div>
   );
 }
+

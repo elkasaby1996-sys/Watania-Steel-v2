@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { logger } from './logger';
 
 export interface UserProfile {
   id: string;
@@ -176,14 +177,14 @@ export const authService = {
       return { error: null };
     }
 
-    console.log('Signing out...');
+    logger.debug('Signing out...');
     
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Sign out error:', error);
       } else {
-        console.log('Sign out successful');
+        logger.debug('Sign out successful');
       }
       return { error };
     } catch (error) {

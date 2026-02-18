@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { hasPermission } from '@/lib/auth';
 import { orderService } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 export function OrderTable() {
   const { getFilteredTodayOrders, deleteOrder, isLoadingOrders, ordersError, loadOrders } = useDashboardStore();
@@ -41,21 +42,21 @@ export function OrderTable() {
   };
 
   const handleMarkAsDelivered = async (orderId: string) => {
-    console.log('🚚 Truck button clicked for order:', orderId);
+    logger.debug('🚚 Truck button clicked for order:', orderId);
     
     const order = todayOrders.find(o => o.id === orderId);
     if (!order) {
       throw new Error('Order not found');
     }
     
-    console.log('📦 Order details:', { id: order.id, date: order.date, status: order.status });
+    logger.debug('📦 Order details:', { id: order.id, date: order.date, status: order.status });
     
     try {
       // Use the store's markAsDelivered method which handles everything properly
       const { markAsDelivered } = useDashboardStore.getState();
       await markAsDelivered(orderId);
       
-      console.log('✅ Order moved to history successfully');
+      logger.debug('✅ Order moved to history successfully');
       
     } catch (error) {
       console.error('❌ Failed to move order to history:', error);
@@ -64,13 +65,7 @@ export function OrderTable() {
   };
 
   const handleViewOrder = (order: any) => {
-    console.log('🔍 OrderTable - Selected order:', order);
-    alert(`Debug: Order data = ${JSON.stringify({
-      id: order.id,
-      orderType: order.orderType,
-      signedDeliveryNote: order.signedDeliveryNote,
-      breakdown: order.breakdown
-    }, null, 2)}`);
+    logger.debug('OrderTable selected order:', order);
     setSelectedOrder(order);
     setDetailsDialogOpen(true);
   };
@@ -163,6 +158,7 @@ export function OrderTable() {
                           size="sm"
                           onClick={async () => {
                             try {
+                              const newStatus = !order.signedDeliveryNote;
                               // Toggle signed delivery note status
                               // Create updated order object and use store function
                               const updatedOrder = {
@@ -254,8 +250,8 @@ export function OrderTable() {
                               size="sm"
                               onClick={async () => {
                                 try {
-                                  console.log('🚚 Truck button clicked for order:', order.id);
-                                  console.log('📦 Order details:', { id: order.id, date: order.date, status: order.status });
+                                  logger.debug('🚚 Truck button clicked for order:', order.id);
+                                  logger.debug('📦 Order details:', { id: order.id, date: order.date, status: order.status });
                                   
                                   await handleMarkAsDelivered(order.id);
                                   
@@ -339,3 +335,5 @@ export function OrderTable() {
     </Card>
   );
 }
+
+

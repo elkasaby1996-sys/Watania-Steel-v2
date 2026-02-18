@@ -13,6 +13,7 @@ import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
 import { useToast } from '../hooks/use-toast';
 import { CalculatorInput } from './CalculatorInput';
+import { logger } from '@/lib/logger';
 
 interface OrderFormData {
   deliveryNumber: string;
@@ -223,6 +224,7 @@ export function AddOrderDialog() {
         shift: 'morning',
         signedDeliveryNote: false,
         orderType: 'straight-bar',
+        orderDate: new Date().toISOString().split('T')[0],
         breakdown: {
           '8mm': '',
           '10mm': '',
@@ -334,7 +336,7 @@ export function AddOrderDialog() {
           className="space-y-6" 
           id="add-order-form"
           onReset={() => {
-            console.log('🔄 Form reset triggered');
+            logger.debug('🔄 Form reset triggered');
             setErrors({});
             setLoading(false);
           }}
@@ -618,7 +620,6 @@ export function AddOrderDialog() {
                     onChange={(newValue) => handleBreakdownChange(size as keyof OrderFormData['breakdown'], newValue)}
                     placeholder="0.0 or =10+5"
                     className="bg-background text-foreground border-border text-sm h-8"
-                    step="0.1"
                   />
                 </div>
               ))}
@@ -652,3 +653,4 @@ export function AddOrderDialog() {
     </Dialog>
   );
 }
+

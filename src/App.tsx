@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { ImageAssets } from './components/ImageAssets';
@@ -71,24 +71,30 @@ function AppShell() {
 
 function App() {
   const { loadOrders, loadDashboardMetrics } = useDashboardStore();
-  const { initialize } = useAuthStore();
+  const { initialize, user, loading: authLoading, initialized } = useAuthStore();
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Initialize auth first
+    // Guard against React StrictMode double-invoking effects in development.
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     initialize();
   }, [initialize]);
 
   useEffect(() => {
-    // Load initial data after auth is initialized
+    if (!initialized || authLoading || !user) {
+      return;
+    }
+
+    // Load initial app data only after auth is ready.
     loadOrders();
     loadDashboardMetrics();
-    
-    // Load history orders for the history page
+
     const dashboardStore = useDashboardStore.getState();
     if (dashboardStore.loadHistoryOrders) {
       dashboardStore.loadHistoryOrders();
     }
-  }, [loadOrders, loadDashboardMetrics]);
+  }, [initialized, authLoading, user, loadOrders, loadDashboardMetrics]);
 
   return (
     <ErrorBoundary>

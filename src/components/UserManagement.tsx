@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
 import { useToast } from '../hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 interface UserProfile {
   id: string;
@@ -61,7 +62,7 @@ export function UserManagement() {
 
   const createUser = async () => {
     try {
-      console.log('Creating user:', newUser.email, 'with role:', newUser.role);
+      logger.debug('Creating user:', newUser.email, 'with role:', newUser.role);
 
       // Note: supabase.auth.admin requires service role key, which we don't have in the browser
       // This is a limitation - we'll show instructions instead
@@ -308,3 +309,4 @@ export function UserManagement() {
     </div>
   );
 }
+

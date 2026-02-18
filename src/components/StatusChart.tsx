@@ -10,7 +10,7 @@ const chartData = [
   { name: 'Jun', orders: 110 }
 ];
 
-export function OrderChart() {
+export function StatusChart() {
   return (
     <Card className="p-6">
       <h3 className="text-lg font-semibold text-foreground mb-4">Order Trends</h3>

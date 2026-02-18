@@ -41,11 +41,13 @@ type ClientOverviewSummary = {
 type SitePerformanceRow = {
   site_id: string;
   site_name: string;
-  contact_name?: string | null;
-  contact_phone?: string | null;
-  location_text?: string | null;
-  google_maps_url?: string | null;
-  notes?: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  address: string | null;
+  location_text: string | null;
+  google_maps_url: string | null;
+  notes: string | null;
   total_orders: number;
   total_tons: number;
   last_order_date: string | null;
@@ -128,6 +130,8 @@ const mergeSites = (masterSites: ClientSiteMaster[], performanceSites: ClientSit
       site_name: site.name ?? 'Unnamed Site',
       contact_name: site.contact_name ?? performance?.contact_name ?? null,
       contact_phone: site.contact_phone ?? performance?.contact_phone ?? null,
+      contact_email: site.contact_email ?? performance?.contact_email ?? null,
+      address: site.address ?? performance?.address ?? null,
       location_text: site.location_text ?? performance?.location_text ?? null,
       google_maps_url: site.google_maps_url ?? performance?.google_maps_url ?? null,
       notes: site.notes ?? performance?.notes ?? null,
@@ -145,6 +149,8 @@ const mergeSites = (masterSites: ClientSiteMaster[], performanceSites: ClientSit
       site_name: site.site_name ?? 'Unknown Site',
       contact_name: site.contact_name ?? null,
       contact_phone: site.contact_phone ?? null,
+      contact_email: site.contact_email ?? null,
+      address: site.address ?? null,
       location_text: site.location_text ?? null,
       google_maps_url: site.google_maps_url ?? null,
       notes: site.notes ?? null,

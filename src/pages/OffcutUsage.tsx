@@ -91,7 +91,7 @@ export function OffcutUsage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [openingExecutiveReport, setOpeningExecutiveReport] = useState<boolean>(false);
   const canExportExecutive =
-    user?.profile?.role === 'admin' || user?.profile?.role === 'executive';
+    user?.profile?.role === 'admin';
 
   // Modal state
   const [addModalOpen, setAddModalOpen] = useState<boolean>(false);

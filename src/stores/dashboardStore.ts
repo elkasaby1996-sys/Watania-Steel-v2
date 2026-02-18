@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { orderService, activityService, historyService, supabase, ensureOrderClientSite, verifyHistoryOrderClientLink, type Order as DBOrder, type Activity as DBActivity, type HistoryOrder } from '../lib/supabase';
 import { roundTo3Decimals } from '../lib/utils';
+import { logger } from '../lib/logger';
 
 // Transform database types to frontend types
 interface Order {
@@ -216,7 +217,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Show ALL non-delivered orders in today's orders
       const activeOrders = orders.filter(o => o.status !== 'delivered');
       
-      console.log('📊 Loaded orders:', {
+      logger.debug('📊 Loaded orders:', {
         total: orders.length,
         active: activeOrders.length,
         statuses: orders.reduce((acc: any, o) => {
@@ -247,9 +248,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   loadHistoryOrders: async () => {
     try {
-      console.log('📚 Loading history orders...');
+      logger.debug('📚 Loading history orders...');
       const historyOrders = await historyService.getAll();
-      console.log('📊 History orders loaded:', historyOrders.length, 'orders');
+      logger.debug('📊 History orders loaded:', historyOrders.length, 'orders');
       
       set(state => ({
         historyOrders,
@@ -555,15 +556,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   updateOrder: async (updatedOrder) => {
     try {
-      console.log('🔄 Store: Updating ACTIVE order:', updatedOrder.id, 'status:', updatedOrder.status);
+      logger.debug('🔄 Store: Updating ACTIVE order:', updatedOrder.id, 'status:', updatedOrder.status);
       
       if (updatedOrder.status === 'delivered') {
-        console.log('📤 Status changed to delivered, moving to history');
+        logger.debug('📤 Status changed to delivered, moving to history');
         await historyService.moveOrderToHistory(updatedOrder);
         await get().loadOrders();
         await get().loadHistoryOrders();
       } else {
-        console.log('📝 Updating in active orders');
+        logger.debug('📝 Updating in active orders');
         const dbOrder = frontendToDb(updatedOrder);
         await orderService.update(updatedOrder.id, dbOrder);
         await get().loadOrders();
@@ -747,10 +748,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   updateHistoryOrder: async (order: HistoryOrder) => {
     try {
-      console.log('🔄 Store: Updating history order:', order.id, 'status:', order.status);
+      logger.debug('🔄 Store: Updating history order:', order.id, 'status:', order.status);
       
       if (order.status === 'in-progress') {
-        console.log('📤 Store: Moving order back to active orders');
+        logger.debug('📤 Store: Moving order back to active orders');
         
         await historyService.moveOrderToActive(order);
         
@@ -780,7 +781,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           console.warn('Failed to create activity:', activityError);
         }
       } else {
-        console.log('📝 Store: Updating order in history');
+        logger.debug('📝 Store: Updating order in history');
         
         const updatedOrder = await historyService.update(order.id, order);
         
@@ -806,3 +807,4 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   }
 }));
+

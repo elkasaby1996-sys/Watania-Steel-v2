@@ -15,6 +15,7 @@ import { hasPermission } from '../lib/auth';
 import { useToast } from '../hooks/use-toast';
 import { historyService, orderService, type HistoryOrder } from '../lib/supabase';
 import { CalculatorInput } from './CalculatorInput';
+import { logger } from '@/lib/logger';
 
 interface OrderDetailsDialogProps {
   order: any;
@@ -145,7 +146,7 @@ export function OrderDetailsDialog({
           breakdown_32mm: order.breakdown_32mm
         }
       : order.breakdown;
-    console.debug('[OrderDetailsDialog] breakdown payload:', breakdownPayload);
+    logger.debug('[OrderDetailsDialog] breakdown payload:', breakdownPayload);
   }, [open, order, isHistoryOrder]);
 
   useEffect(() => {
@@ -306,7 +307,7 @@ export function OrderDetailsDialog({
       const tons = Number(formData.tons);
       
       if (isHistoryOrder) {
-        console.log('📝 Dialog: Handling HISTORY order update for:', order.id);
+        logger.debug('📝 Dialog: Handling HISTORY order update for:', order.id);
         
         const updatedHistoryOrder: any = {
           ...order,
@@ -334,7 +335,7 @@ export function OrderDetailsDialog({
         };
 
         if (formData.status === 'in-progress') {
-          console.log('📤 Dialog: Moving history order to active orders');
+          logger.debug('📤 Dialog: Moving history order to active orders');
           await historyService.moveOrderToActive(order);
           
           toast({
@@ -355,7 +356,7 @@ export function OrderDetailsDialog({
           
           return;
         } else {
-          console.log('📝 Dialog: Updating history order in place');
+          logger.debug('📝 Dialog: Updating history order in place');
           await historyService.update(order.id, updatedHistoryOrder);
           
           toast({
@@ -368,7 +369,7 @@ export function OrderDetailsDialog({
           }, 500);
         }
       } else {
-        console.log('📝 Dialog: Handling ACTIVE order update for:', order.id);
+        logger.debug('📝 Dialog: Handling ACTIVE order update for:', order.id);
         
         const updatedOrder = {
           ...order,
@@ -398,7 +399,7 @@ export function OrderDetailsDialog({
         };
 
         if (formData.status === 'delivered') {
-          console.log('📤 Dialog: Active order marked as delivered, moving to history');
+          logger.debug('📤 Dialog: Active order marked as delivered, moving to history');
           await historyService.moveOrderToHistory(updatedOrder);
           
           toast({
@@ -406,7 +407,7 @@ export function OrderDetailsDialog({
             description: `Order ${order.id} has been marked as delivered and moved to history.`,
           });
         } else {
-          console.log('📝 Dialog: Updating active order in place');
+          logger.debug('📝 Dialog: Updating active order in place');
           
           const updateData = {
             customer_name: formData.deliveryName,
@@ -676,7 +677,7 @@ export function OrderDetailsDialog({
                   name="status"
                   value={formData.status}
                   onValueChange={(value: 'in-progress' | 'delivered') => {
-                    console.log('📊 Status change:', formData.status, '→', value);
+                    logger.debug('📊 Status change:', formData.status, '→', value);
                     handleInputChange('status', value);
                   }}
                 >
@@ -726,17 +727,16 @@ export function OrderDetailsDialog({
                     <Label htmlFor={`edit-breakdown-${size}`} className="text-xs text-foreground">
                       {size}
                     </Label>
-                    <CalculatorInput
-                      id={`edit-breakdown-${size}`}
-                      name={`edit-breakdown-${size}`}
-                      value={value}
-                      onChange={(newValue) => handleBreakdownChange(size as keyof OrderFormData['breakdown'], newValue)}
-                      placeholder="0.0 or =10+5"
-                      className="bg-background text-foreground border-border text-sm h-8"
-                      step="0.1"
-                    />
-                  </div>
-                ))}
+                  <CalculatorInput
+                    id={`edit-breakdown-${size}`}
+                    name={`edit-breakdown-${size}`}
+                    value={value}
+                    onChange={(newValue) => handleBreakdownChange(size as keyof OrderFormData['breakdown'], newValue)}
+                    placeholder="0.0 or =10+5"
+                    className="bg-background text-foreground border-border text-sm h-8"
+                  />
+                </div>
+              ))}
               </div>
               
             </div>
@@ -971,3 +971,4 @@ export function OrderDetailsDialog({
     </Dialog>
   );
 }
+

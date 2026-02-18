@@ -4,6 +4,7 @@ import { authService, type AuthUser } from '../lib/auth';
 interface AuthState {
   user: AuthUser | null;
   loading: boolean;
+  initialized: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
@@ -13,9 +14,12 @@ interface AuthState {
   clearError: () => void;
 }
 
+let authSubscription: { unsubscribe: () => void } | null = null;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   loading: true,
+  initialized: false,
   error: null,
 
   signIn: async (email: string, password: string) => {
@@ -84,16 +88,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     
     try {
       const user = await authService.getCurrentUser();
-      set({ user, loading: false });
-      
-      // Listen for auth state changes
-      authService.onAuthStateChange((user) => {
-        set({ user });
+      set({ user, loading: false, initialized: true });
+
+      // Prevent duplicate listeners across re-initializations (e.g. React StrictMode).
+      authSubscription?.unsubscribe();
+      authSubscription = null;
+
+      const {
+        data: { subscription }
+      } = authService.onAuthStateChange((nextUser) => {
+        set({ user: nextUser, loading: false, initialized: true });
       });
+      authSubscription = subscription;
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Initialization failed', 
-        loading: false 
+        loading: false,
+        initialized: true
       });
     }
   },
