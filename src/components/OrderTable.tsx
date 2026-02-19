@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { hasPermission } from '@/lib/auth';
 import { orderService } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 export function OrderTable() {
   const { getFilteredTodayOrders, deleteOrder, isLoadingOrders, ordersError, loadOrders } = useDashboardStore();
@@ -20,6 +21,7 @@ export function OrderTable() {
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const { isMobile } = useDeviceInfo();
 
   const todayOrders = getFilteredTodayOrders();
   const userRole = user?.profile?.role;
@@ -78,6 +80,32 @@ export function OrderTable() {
     });
   };
 
+  const toggleSignedDeliveryNote = async (order: any) => {
+    const newStatus = !order.signedDeliveryNote;
+    const updatedOrder = {
+      ...order,
+      signedDeliveryNote: newStatus
+    };
+
+    const dashboardState = useDashboardStore.getState();
+    if (dashboardState.updateOrder) {
+      await dashboardState.updateOrder(updatedOrder);
+    } else {
+      const updateData = {
+        signed_delivery_note: newStatus
+      };
+      await orderService.update(order.id, updateData);
+      if (dashboardState.loadOrders) {
+        await dashboardState.loadOrders();
+      }
+    }
+
+    toast({
+      title: "Delivery Note Updated",
+      description: `Delivery note marked as ${!order.signedDeliveryNote ? 'signed' : 'not signed'}.`,
+    });
+  };
+
   return (
     <Card>
       <div className="p-6">
@@ -96,6 +124,137 @@ export function OrderTable() {
             </Button>
           </div>
         ) : (
+          isMobile ? (
+            <div className="space-y-3">
+              {isLoadingOrders ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <div key={`skeleton-${index}`} className="rounded-lg border border-border p-4 space-y-2">
+                    <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+                    <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                  </div>
+                ))
+              ) : todayOrders.length > 0 ? (
+                todayOrders.map((order) => (
+                  <div key={order.id} className="rounded-xl border border-border/80 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-mono text-sm text-foreground">{order.id}</p>
+                      {getStatusBadge(order.status)}
+                    </div>
+                    <p className="font-semibold text-base text-foreground">{order.customerName}</p>
+                    <p className="text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
+                    <p className="text-sm text-muted-foreground">Site: {order.site || 'N/A'}</p>
+                    <p className="text-sm text-muted-foreground">Date: {order.date}</p>
+                    <p className="text-sm text-muted-foreground">Tons: {order.tons} tons</p>
+                    <div className="text-sm text-muted-foreground">
+                      <p>Driver: {order.driverName || 'N/A'}</p>
+                      {order.phoneNumber ? (
+                        <a
+                          href={`tel:${order.phoneNumber.replace(/[\s\-\(\)]/g, '')}`}
+                          className="text-primary hover:text-primary/80 underline"
+                          title="Click to call"
+                        >
+                          {order.phoneNumber}
+                        </a>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-10 px-3"
+                        onClick={() => handleViewOrder(order)}
+                      >
+                        {hasPermission(userRole, 'edit') ? <Edit size={14} className="mr-1" /> : <Eye size={14} className="mr-1" />}
+                        {hasPermission(userRole, 'edit') ? 'Edit' : 'View'}
+                      </Button>
+                      <RoleBasedComponent action="edit">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-10 px-3"
+                          onClick={async () => {
+                            try {
+                              await toggleSignedDeliveryNote(order);
+                            } catch (error) {
+                              console.error('Failed to update delivery note:', error);
+                              toast({
+                                title: "Error",
+                                description: "Failed to update delivery note. Please try again.",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                        >
+                          {order.signedDeliveryNote ? 'Signed' : 'Not Signed'}
+                        </Button>
+                      </RoleBasedComponent>
+                      <RoleBasedComponent action="edit">
+                        {order.status !== 'delivered' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-10 px-3"
+                            onClick={async () => {
+                              try {
+                                await handleMarkAsDelivered(order.id);
+                                toast({
+                                  title: "Order Delivered",
+                                  description: `Order ${order.id} has been marked as delivered and moved to history.`,
+                                });
+                              } catch (error) {
+                                console.error('❌ Mark as delivered failed:', error);
+                                toast({
+                                  title: "Error",
+                                  description: error instanceof Error ? error.message : "Failed to mark order as delivered. Please try again.",
+                                  variant: "destructive"
+                                });
+                              }
+                            }}
+                          >
+                            <Truck size={14} className="mr-1" />
+                            Deliver
+                          </Button>
+                        )}
+                      </RoleBasedComponent>
+                      <RoleBasedComponent action="delete">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-10 px-3 text-destructive hover:text-destructive">
+                              <Trash2 size={14} className="mr-1" />
+                              Delete
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-background text-foreground" aria-describedby="delete-order-description">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription id="delete-order-description" className="text-muted-foreground">
+                                This action cannot be undone. This will permanently delete order {order.id}.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="bg-background text-foreground border-border hover:bg-accent">
+                                Cancel
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteOrder(order.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </RoleBasedComponent>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  No orders for today yet. Create your first order!
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -158,35 +317,7 @@ export function OrderTable() {
                           size="sm"
                           onClick={async () => {
                             try {
-                              const newStatus = !order.signedDeliveryNote;
-                              // Toggle signed delivery note status
-                              // Create updated order object and use store function
-                              const updatedOrder = {
-                                ...order,
-                                signedDeliveryNote: newStatus
-                              };
-                              
-                              // Use store's updateOrder function
-                              const dashboardState = useDashboardStore.getState();
-                              if (dashboardState.updateOrder) {
-                                await dashboardState.updateOrder(updatedOrder);
-                              } else {
-                                // Fallback to direct service call
-                                const updateData = {
-                                  signed_delivery_note: newStatus
-                                };
-                                await orderService.update(order.id, updateData);
-                                
-                                // Reload orders
-                                if (dashboardState.loadOrders) {
-                                  await dashboardState.loadOrders();
-                                }
-                              }
-                              
-                              toast({
-                                title: "Delivery Note Updated",
-                                description: `Delivery note marked as ${!order.signedDeliveryNote ? 'signed' : 'not signed'}.`,
-                              });
+                              await toggleSignedDeliveryNote(order);
                             } catch (error) {
                               console.error('Failed to update delivery note:', error);
                               toast({
@@ -324,7 +455,7 @@ export function OrderTable() {
             </TableBody>
           </Table>
         </div>
-        )}
+        ))}
       </div>
       
       <OrderDetailsDialog 
@@ -335,5 +466,3 @@ export function OrderTable() {
     </Card>
   );
 }
-
-

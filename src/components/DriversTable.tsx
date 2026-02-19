@@ -11,6 +11,7 @@ import { EditDriverDialog } from './EditDriverDialog';
 import { RoleBasedComponent } from './RoleBasedComponent';
 import { useToast } from '../hooks/use-toast';
 import { routeTo } from '@/routes/routes';
+import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 // PhoneLink component inline to avoid import issues
 const PhoneLink = ({ phoneNumber }: { phoneNumber: string }) => {
@@ -46,6 +47,7 @@ export function DriversTable() {
   const { toast } = useToast();
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const { isMobile } = useDeviceInfo();
 
   // Safe access to store functions and data
   const getFilteredDrivers = driversStore?.getFilteredDrivers || (() => []);
@@ -143,8 +145,84 @@ export function DriversTable() {
           </p>
         </div>
 
-        <div className="overflow-x-auto">
-          <Table>
+        {isMobile ? (
+          <div className="space-y-3">
+            {Array.isArray(drivers) && drivers.length > 0 ? (
+              drivers.map((driver) => {
+                if (!driver || !driver.id) return null;
+                const driverMetrics = getDriverMetrics(driver.name);
+                return (
+                  <div key={driver.id} className="rounded-xl border border-border/80 p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <Button
+                        variant="ghost"
+                        className="font-medium text-base text-foreground hover:text-primary hover:bg-accent p-0 h-auto"
+                        onClick={() => handleViewDriverDetails(driver)}
+                      >
+                        {driver.name}
+                      </Button>
+                      {getStatusBadge(driver.is_active)}
+                    </div>
+                    <PhoneLink phoneNumber={driver.phone_number} />
+                    <div className="text-sm text-muted-foreground">
+                      <p>Total Orders: {driverMetrics.total_orders}</p>
+                      <p>Completed: {driverMetrics.completed_orders}</p>
+                      <p>Total Tons: {driverMetrics.total_tons} tons</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <RoleBasedComponent action="edit">
+                        <Button variant="outline" size="sm" className="h-10 px-3" onClick={() => handleStatusToggle(driver)}>
+                          {driver.is_active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </RoleBasedComponent>
+                      <RoleBasedComponent action="edit">
+                        <Button variant="outline" size="sm" className="h-10 px-3" onClick={() => handleEditDriver(driver)}>
+                          <Edit size={14} className="mr-1" />
+                          Edit
+                        </Button>
+                      </RoleBasedComponent>
+                      <RoleBasedComponent action="delete">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-10 px-3 text-destructive hover:text-destructive">
+                              <Trash2 size={14} className="mr-1" />
+                              Delete
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-background text-foreground" aria-describedby="delete-driver-description">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription id="delete-driver-description" className="text-muted-foreground">
+                                This action cannot be undone. This will permanently delete driver {driver.name || 'Unknown Driver'}.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="bg-background text-foreground border-border hover:bg-accent">
+                                Cancel
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteDriver(driver.id, driver.name || 'Unknown Driver')}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </RoleBasedComponent>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                No drivers found. Add your first driver!
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow className="border-border">
                 <TableHead className="text-foreground">Driver Name</TableHead>
@@ -266,8 +344,9 @@ export function DriversTable() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
-        </div>
+            </Table>
+          </div>
+        )}
       </div>
       
       <EditDriverDialog 

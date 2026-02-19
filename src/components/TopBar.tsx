@@ -6,13 +6,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
 import { getRoleDisplayName } from '../lib/auth';
-import { useIsMobile } from '@/hooks/use-mobile';
 
-export function TopBar() {
-  const { sidebarCollapsed, setSidebarCollapsed } = useDashboardStore();
+interface TopBarProps {
+  isMobile?: boolean;
+  onMenuClick?: () => void;
+}
+
+export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
+  const { sidebarCollapsed } = useDashboardStore();
   const { user, signOut, refreshProfile } = useAuthStore();
-  const isMobile = useIsMobile();
-
 
   const handleSignOut = async () => {
     await signOut();
@@ -40,31 +42,30 @@ export function TopBar() {
   };
 
   return (
-    <header
-      className={`fixed top-0 right-0 h-16 bg-card border-b border-border z-40 transition-all duration-300 ease-in-out ${
-        isMobile ? 'left-0' : sidebarCollapsed ? 'left-16' : 'left-64'
-      }`}
-    >
-      <div className="flex items-center justify-between h-full px-4 sm:px-6">
-        <div className="flex-1 flex items-center gap-3">
+    <header className={`fixed top-0 right-0 h-16 bg-card border-b border-border z-40 transition-all duration-300 ease-in-out ${
+      isMobile ? 'left-0' : sidebarCollapsed ? 'left-16' : 'left-64'
+    }`}>
+      <div className={`flex items-center justify-between h-full ${isMobile ? 'px-3' : 'px-6'}`}>
+        <div className="flex-1 flex items-center">
           {isMobile && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground"
-              aria-label="Toggle navigation menu"
-              title="Toggle navigation menu"
+              onClick={onMenuClick}
+              className="mr-2 h-10 w-10 text-foreground hover:bg-accent hover:text-accent-foreground"
+              aria-label="Open navigation menu"
             >
               <Menu size={18} />
             </Button>
           )}
-          <h1 className="font-headline font-bold text-lg sm:text-xl text-gray-50">Factory Management System</h1>
+          <h1 className={`font-headline font-bold text-gray-50 ${isMobile ? 'text-base' : 'text-xl'}`}>
+            {isMobile ? 'Watania ERP' : 'Factory Management System'}
+          </h1>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-4'}`}>
           <div className="flex items-center gap-2">
-            {user?.profile?.role && (
+            {!isMobile && user?.profile?.role && (
               <Badge variant={getRoleBadgeVariant(user.profile.role) as any}>
                 <Shield size={12} className="mr-1" />
                 {getRoleDisplayName(user.profile.role)}

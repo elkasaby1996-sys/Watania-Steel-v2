@@ -16,6 +16,7 @@ import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
 import { InventoryEditModal } from '../components/InventoryEditModal';
 import { ROUTES } from '@/routes/routes';
+import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 // Table configuration for each inventory section
 interface TableConfig {
@@ -159,6 +160,7 @@ interface InventorySectionProps {
   loading: boolean;
   canEdit: boolean;
   onEdit: (tableName: InventoryTableName, data: Record<string, any>[]) => void;
+  isMobile: boolean;
 }
 
 function InventorySection({
@@ -167,6 +169,7 @@ function InventorySection({
   loading,
   canEdit,
   onEdit,
+  isMobile,
 }: InventorySectionProps) {
   const columns = getDisplayColumns(data, config.rowLabelKey, config.explicitColumns);
 
@@ -210,6 +213,30 @@ function InventorySection({
         ) : data.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No data available
+          </div>
+        ) : isMobile ? (
+          <div className="space-y-3">
+            {sortedData.map((row, idx) => (
+              <div key={row.id || idx} className="rounded-lg border border-border p-4 space-y-2">
+                <p className="font-semibold text-foreground">{row[config.rowLabelKey] || '-'}</p>
+                <div className="grid grid-cols-1 gap-1 text-sm">
+                  {columns.map((col) => {
+                    const value = row[col];
+                    const isLow = config.highlightLowValues && isLowValue(value);
+                    return (
+                      <div key={col} className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">
+                          {getColumnDisplayHeader(col, config.columnDisplayMap)}
+                        </span>
+                        <span className={isLow ? 'text-red-600 font-semibold' : 'text-foreground'}>
+                          {formatNumber(value)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -272,6 +299,7 @@ export function Inventory() {
   const navigate = useNavigate();
   const { data, loading, loadAllInventory, loadingTable } = useInventoryStore();
   const { user } = useAuthStore();
+  const { isMobile } = useDeviceInfo();
 
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -386,6 +414,7 @@ export function Inventory() {
               loading={loadingTable === config.tableName}
               canEdit={canEdit}
               onEdit={handleEdit}
+              isMobile={isMobile}
             />
           ))}
         </div>

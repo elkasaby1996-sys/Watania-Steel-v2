@@ -28,6 +28,7 @@ import { RoleBasedComponent } from '../components/RoleBasedComponent';
 import { roundTo3Decimals, formatNumber } from '../lib/utils';
 import { ROUTES } from '@/routes/routes';
 import { logger } from '@/lib/logger';
+import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const HISTORY_REFRESH_DEBOUNCE_MS = 300;
@@ -51,6 +52,7 @@ export function History() {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isMobile } = useDeviceInfo();
 
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
@@ -269,9 +271,9 @@ export function History() {
   const pageEnd = Math.min(page * pageSize, totalCount);
 
   return (
-    <div className="space-y-6">
+    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <Button
             variant="ghost"
             size="sm"
@@ -282,7 +284,7 @@ export function History() {
           Back to Dashboard
         </Button>
         <div>
-          <h1 className="text-3xl font-headline font-bold text-foreground">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
             Delivery Archive
           </h1>
           <p className="text-muted-foreground">
@@ -295,7 +297,7 @@ export function History() {
       <Card>
         <div className="p-4 space-y-4">
           <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-[240px] max-w-md">
+            <div className={`relative flex-1 ${isMobile ? 'w-full min-w-0 max-w-none' : 'min-w-[240px] max-w-md'}`}>
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
               <Input
                 id="history-search"
@@ -306,7 +308,7 @@ export function History() {
                 className="pl-10 bg-background text-foreground border-border"
               />
             </div>
-            <div className="min-w-[200px]">
+            <div className={isMobile ? 'w-full' : 'min-w-[200px]'}>
               <Input
                 id="history-company"
                 name="historyCompany"
@@ -316,7 +318,7 @@ export function History() {
                 className="bg-background text-foreground border-border"
               />
             </div>
-            <div className="min-w-[160px]">
+            <div className={isMobile ? 'w-full' : 'min-w-[160px]'}>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger id="history-status" className="bg-background text-foreground border-border">
                   <SelectValue placeholder="Status" />
@@ -328,7 +330,7 @@ export function History() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-2 ${isMobile ? 'w-full flex-col items-stretch' : ''}`}>
               <Input
                 id="history-date-from"
                 name="historyDateFrom"
@@ -347,7 +349,7 @@ export function History() {
                 className="bg-background text-foreground border-border"
               />
             </div>
-            <div className="min-w-[140px]">
+            <div className={isMobile ? 'w-full' : 'min-w-[140px]'}>
               <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
                 <SelectTrigger id="history-page-size" className="bg-background text-foreground border-border">
                   <SelectValue placeholder="Page size" />
@@ -409,7 +411,7 @@ export function History() {
                 <Collapsible open={!isCollapsed} onOpenChange={() => toggleDateCollapse(date)}>
                   <CollapsibleTrigger asChild>
                     <div className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
+                      <div className={`flex items-center justify-between ${isMobile ? 'flex-col items-start gap-3' : ''}`}>
                         <div className="flex items-center gap-3">
                           {isCollapsed ? (
                             <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -420,9 +422,9 @@ export function History() {
                             {formatDate(date)}
                           </h3>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className={`flex items-center gap-4 ${isMobile ? 'w-full flex-col items-start gap-2' : ''}`}>
                           {/* Daily Metrics - Next to the date */}
-                          <div className="flex items-center gap-4">
+                          <div className={`flex items-center gap-4 ${isMobile ? 'flex-wrap gap-2' : ''}`}>
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                               <span className="text-sm text-foreground">
@@ -446,6 +448,60 @@ export function History() {
 
                   <CollapsibleContent>
                     <div className="px-6 pb-6">
+                      {isMobile ? (
+                        <div className="space-y-3">
+                          {deliveredOrdersByDate[date].map((order) => (
+                            <div key={order.id} className="rounded-xl border border-border/80 p-4 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="font-mono text-foreground">{order.delivery_number || order.id}</p>
+                                {getStatusBadge(order.status)}
+                              </div>
+                              <p className="font-medium text-foreground">{order.customer_name}</p>
+                              <p className="text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
+                              <p className="text-sm text-muted-foreground">Site: {order.site || 'N/A'}</p>
+                              <p className="text-sm text-muted-foreground">Date: {order.date}</p>
+                              <p className="text-sm text-muted-foreground">Tons: {formatNumber(order.tons)} tons</p>
+                              <p className="text-sm text-muted-foreground">
+                                Shift: {order.shift === 'morning' ? 'Morning' : 'Night'}
+                              </p>
+                              <div>
+                                {order.signed_delivery_note ? (
+                                  <Badge className="bg-success text-success-foreground">
+                                    <CheckCircle size={12} className="mr-1" />
+                                    Signed
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-gray-400 text-white">
+                                    <XCircle size={12} className="mr-1" />
+                                    Not Signed
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-sm">
+                                <p className="text-muted-foreground">{order.driver_name || 'N/A'}</p>
+                                {order.phone_number ? (
+                                  <a
+                                    href={`tel:${order.phone_number.replace(/[\s\-\(\)]/g, '')}`}
+                                    className="text-primary hover:text-primary/80 underline"
+                                    title="Click to call"
+                                  >
+                                    {order.phone_number}
+                                  </a>
+                                ) : null}
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-10 px-3"
+                                onClick={() => handleViewOrder(order)}
+                              >
+                                {hasPermission(user?.profile?.role, 'edit') ? <Edit size={14} className="mr-1" /> : <Eye size={14} className="mr-1" />}
+                                {hasPermission(user?.profile?.role, 'edit') ? 'Edit' : 'View'}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
@@ -580,6 +636,7 @@ export function History() {
                           </TableBody>
                         </Table>
                       </div>
+                      )}
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
@@ -609,6 +666,7 @@ export function History() {
             <Button
               variant="outline"
               size="sm"
+              className="h-10 px-4"
               onClick={() => setPage(prev => Math.max(1, prev - 1))}
               disabled={page === 1 || loading}
             >
@@ -617,6 +675,7 @@ export function History() {
             <Button
               variant="outline"
               size="sm"
+              className="h-10 px-4"
               onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
               disabled={page >= totalPages || loading}
             >
@@ -635,4 +694,3 @@ export function History() {
     </div>
   );
 }
-

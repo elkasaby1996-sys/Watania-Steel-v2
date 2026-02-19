@@ -18,6 +18,7 @@ import {
 } from './ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { offcutUsageService, OffcutUsageEntry } from '@/lib/supabase';
+import { CalculatorInput } from './CalculatorInput';
 
 // Bar diameter options
 const BAR_DIAMETER_OPTIONS = [
@@ -70,6 +71,8 @@ export function EditOffcutEntryModal({
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
+  const [availableCompanies, setAvailableCompanies] = useState<string[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
 
   // Populate form when entry changes
   useEffect(() => {
@@ -83,6 +86,25 @@ export function EditOffcutEntryModal({
       setErrors({});
     }
   }, [entry]);
+
+  useEffect(() => {
+    if (!open || !entry?.date) {
+      setAvailableCompanies([]);
+      return;
+    }
+
+    const loadCompanies = async () => {
+      setLoadingCompanies(true);
+      try {
+        const companies = await offcutUsageService.getCompaniesWorkedOnDate(entry.date);
+        setAvailableCompanies(companies);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+
+    loadCompanies();
+  }, [open, entry?.date]);
 
   // Auto-calculate weight_tons when weight_kg changes
   const handleWeightKgChange = (value: string) => {
@@ -211,16 +233,39 @@ export function EditOffcutEntryModal({
             {/* Company */}
             <div className="space-y-2">
               <Label htmlFor="edit-company">Company *</Label>
-              <Input
-                id="edit-company"
+              <Select
                 value={company}
-                onChange={(e) => {
-                  setCompany(e.target.value);
+                onValueChange={(value) => {
+                  setCompany(value);
                   setErrors((prev) => ({ ...prev, company: undefined }));
                 }}
-                placeholder="Enter company name"
-                className={errors.company ? 'border-destructive' : ''}
-              />
+              >
+                <SelectTrigger
+                  id="edit-company"
+                  className={errors.company ? 'border-destructive' : ''}
+                >
+                  <SelectValue
+                    placeholder={loadingCompanies ? 'Loading clients...' : 'Select client'}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCompanies.length === 0 ? (
+                    <SelectItem value="__no_clients__" disabled>
+                      No clients found for selected day
+                    </SelectItem>
+                  ) : (
+                    availableCompanies.map((companyName) => (
+                      <SelectItem key={companyName} value={companyName}>
+                        {companyName}
+                      </SelectItem>
+                    ))
+                  )}
+                  {company &&
+                    !availableCompanies.some(
+                      (companyName) => companyName.toLowerCase() === company.toLowerCase()
+                    ) && <SelectItem value={company}>{company}</SelectItem>}
+                </SelectContent>
+              </Select>
               {errors.company && (
                 <p className="text-sm text-destructive">{errors.company}</p>
               )}
@@ -258,17 +303,15 @@ export function EditOffcutEntryModal({
             {/* Pieces Used */}
             <div className="space-y-2">
               <Label htmlFor="edit-pieces_used">Pieces Used *</Label>
-              <Input
+              <CalculatorInput
                 id="edit-pieces_used"
-                type="number"
-                min="1"
-                step="1"
+                name="edit-pieces_used"
                 value={piecesUsed}
-                onChange={(e) => {
-                  setPiecesUsed(e.target.value);
+                onChange={(value) => {
+                  setPiecesUsed(value);
                   setErrors((prev) => ({ ...prev, pieces_used: undefined }));
                 }}
-                placeholder="Enter quantity"
+                placeholder="Enter quantity or =10+5"
                 className={errors.pieces_used ? 'border-destructive' : ''}
               />
               {errors.pieces_used && (
@@ -279,14 +322,12 @@ export function EditOffcutEntryModal({
             {/* Weight (kg) */}
             <div className="space-y-2">
               <Label htmlFor="edit-weight_kg">Weight (kg) *</Label>
-              <Input
+              <CalculatorInput
                 id="edit-weight_kg"
-                type="number"
-                min="0.001"
-                step="0.001"
+                name="edit-weight_kg"
                 value={weightKg}
-                onChange={(e) => handleWeightKgChange(e.target.value)}
-                placeholder="0.000"
+                onChange={(value) => handleWeightKgChange(value)}
+                placeholder="0.000 or =500+250"
                 className={errors.weight_kg ? 'border-destructive' : ''}
               />
               {errors.weight_kg && (

@@ -387,23 +387,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   updateOrderStatus: async (orderId, status) => {
     try {
       if (status === 'delivered') {
-        const order = get().orders.find(o => o.id === orderId);
+        const order = get().orders.find(o => String(o.id) === String(orderId));
         if (order) {
           await historyService.moveOrderToHistory(order);
-          
-          set(state => {
-            const orders = state.orders.filter(o => o.id !== orderId);
-            const stats = {
-              todayOrders: orders.length,
-              inProgress: orders.length,
-              completed: 0,
-              delayed: 0,
-              delivered: state.stats.delivered + 1
-            };
-            return { orders, stats };
-          });
-          
-          get().loadHistoryOrders();
+          await get().loadOrders();
+          await get().loadHistoryOrders();
         }
       } else {
         const updateData = { status };
@@ -423,26 +411,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   markAsDelivered: async (orderId) => {
     try {
-      const order = get().orders.find(o => o.id === orderId);
+      const order = get().orders.find(o => String(o.id) === String(orderId));
       if (!order) {
         throw new Error('Order not found');
       }
       
       await historyService.moveOrderToHistory(order);
-      
-      set(state => {
-        const orders = state.orders.filter(o => o.id !== orderId);
-        const stats = {
-          todayOrders: orders.length,
-          inProgress: orders.length,
-          completed: 0,
-          delayed: 0,
-          delivered: state.stats.delivered + 1
-        };
-        return { orders, stats };
-      });
-
-      get().loadHistoryOrders();
+      await get().loadOrders();
+      await get().loadHistoryOrders();
 
       await activityService.create({
         type: 'order_completed',
@@ -807,4 +783,3 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   }
 }));
-

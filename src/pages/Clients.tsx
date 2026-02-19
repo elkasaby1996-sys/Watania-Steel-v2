@@ -11,6 +11,7 @@ import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { formatNumber } from '@/lib/utils';
 import { fetchClientsSummary, type ClientSummary } from '@/lib/clientsApi';
 import { ROUTES, routeTo } from '@/routes/routes';
+import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 export function Clients() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export function Clients() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { toast } = useToast();
   const { isAdmin } = useIsAdmin();
+  const { isMobile } = useDeviceInfo();
 
   const fetchClients = useCallback(async (searchText?: string, signal?: AbortSignal) => {
     setLoading(true);
@@ -70,9 +72,9 @@ export function Clients() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
@@ -83,7 +85,7 @@ export function Clients() {
           Back to Dashboard
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
             Clients Database
           </h1>
           <p className="text-muted-foreground">
@@ -114,9 +116,9 @@ export function Clients() {
 
       {/* Search and Filters */}
       <Card>
-        <div className="p-4">
+        <div className={isMobile ? 'p-3' : 'p-4'}>
           <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 max-w-md">
+            <div className={`relative flex-1 ${isMobile ? 'w-full max-w-none' : 'max-w-md'}`}>
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
               <Input
                 id="clients-search"
@@ -127,7 +129,7 @@ export function Clients() {
                 className="pl-10 bg-background text-foreground border-border"
               />
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
               {clients.length} clients total
             </p>
             {isAdmin && (
@@ -150,8 +152,45 @@ export function Clients() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
+          {isMobile ? (
+            <div className="space-y-3">
+              {loading ? (
+                skeletonRows.map((row) => (
+                  <div key={`skeleton-${row}`} className="rounded-xl border border-border/80 p-4 space-y-2">
+                    <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+                    <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+                  </div>
+                ))
+              ) : clients.length > 0 ? (
+                clients.map((client) => (
+                  <button
+                    key={client.id}
+                    type="button"
+                    onClick={() => handleClientClick(client.id)}
+                    className="w-full text-left rounded-xl border border-border/80 p-4 space-y-2 hover:bg-muted/40 transition-colors"
+                  >
+                    <p className="font-semibold text-base text-foreground">{client.name}</p>
+                    <p className="text-sm text-muted-foreground">Orders: {client.total_orders.toLocaleString()}</p>
+                    <p className="text-sm text-muted-foreground">Tons: {formatNumber(client.total_tons)}</p>
+                    <p className="text-sm text-muted-foreground">Sites: {client.unique_sites}</p>
+                    <p className="text-sm text-muted-foreground">Last Order: {client.last_order_date || 'N/A'}</p>
+                  </button>
+                ))
+              ) : (
+                <div className="text-center text-muted-foreground py-12">
+                  <Building2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                  <p className="font-medium">No Clients Found</p>
+                  <p className="text-sm">
+                    {searchQuery
+                      ? 'No clients match your search. Try a different term.'
+                      : 'Client data will appear here once orders are created.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow className="border-border">
                   <TableHead className="text-foreground">Client Name</TableHead>
@@ -224,8 +263,9 @@ export function Clients() {
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
-          </div>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

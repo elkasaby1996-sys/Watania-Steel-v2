@@ -16,12 +16,14 @@ import {
   type ClientSiteDetails
 } from '@/lib/clientsApi';
 import { ROUTES, routeTo } from '@/routes/routes';
+import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 export function ClientSiteDetailsPage() {
   const { clientId, siteId } = useParams<{ clientId: string; siteId: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const canEdit = hasPermission(user?.profile?.role, 'edit');
+  const { isMobile } = useDeviceInfo();
 
   const [siteSummary, setSiteSummary] = useState<ClientSiteDetails | null>(null);
   const [orders, setOrders] = useState<ClientOrderRow[]>([]);
@@ -145,7 +147,7 @@ export function ClientSiteDetailsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
       <div className="flex flex-wrap items-center gap-4">
         <Button
           variant="ghost"
@@ -157,7 +159,7 @@ export function ClientSiteDetailsPage() {
           Back to Client
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
             {siteSummary?.site_name || 'Site Details'}
           </h1>
           <p className="text-muted-foreground">Site profile and delivery metrics</p>
@@ -266,6 +268,18 @@ export function ClientSiteDetailsPage() {
                 <div className="text-sm text-muted-foreground">Loading orders...</div>
               ) : orders.length === 0 ? (
                 <div className="text-sm text-muted-foreground">No orders found for this site.</div>
+              ) : isMobile ? (
+                <div className="space-y-3">
+                  {orders.map((order) => (
+                    <div key={`${order.source}-${order.id}`} className="rounded-xl border border-border/80 p-4 space-y-1">
+                      <p className="text-sm text-muted-foreground">Date: {order.date ?? '—'}</p>
+                      <p className="text-sm text-muted-foreground">Status: {order.status ?? '—'}</p>
+                      <p className="text-sm text-muted-foreground">Type: {order.order_type ?? '—'}</p>
+                      <p className="text-sm text-muted-foreground">Shift: {order.shift ?? '—'}</p>
+                      <p className="font-medium text-foreground">Tons: {formatTons(order.tons)}</p>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>

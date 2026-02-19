@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import {
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { offcutUsageService } from '@/lib/supabase';
+import { CalculatorInput } from './CalculatorInput';
 
 // Bar diameter options
 const BAR_DIAMETER_OPTIONS = [
@@ -91,6 +92,8 @@ export function AddOffcutEntriesModal({
   const [rows, setRows] = useState<EntryRow[]>([createEmptyRow()]);
   const [errors, setErrors] = useState<Record<string, RowErrors>>({});
   const [saving, setSaving] = useState(false);
+  const [availableCompanies, setAvailableCompanies] = useState<string[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
 
   // Format date for display in title
   const formatDateForDisplay = (dateStr: string) => {
@@ -130,6 +133,25 @@ export function AddOffcutEntriesModal({
     },
     []
   );
+
+  useEffect(() => {
+    if (!open) {
+      setAvailableCompanies([]);
+      return;
+    }
+
+    const loadCompanies = async () => {
+      setLoadingCompanies(true);
+      try {
+        const companies = await offcutUsageService.getCompaniesWorkedOnDate(selectedDate);
+        setAvailableCompanies(companies);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+
+    loadCompanies();
+  }, [open, selectedDate]);
 
   // Add a new row
   const handleAddRow = useCallback(() => {
@@ -300,15 +322,41 @@ export function AddOffcutEntriesModal({
                 {/* Company */}
                 <div className="space-y-2">
                   <Label htmlFor={`${row.id}-company`}>Company *</Label>
-                  <Input
-                    id={`${row.id}-company`}
+                  <Select
                     value={row.company}
-                    onChange={(e) =>
-                      handleFieldChange(row.id, 'company', e.target.value)
+                    onValueChange={(value) =>
+                      handleFieldChange(row.id, 'company', value)
                     }
-                    placeholder="Enter company name"
-                    className={errors[row.id]?.company ? 'border-destructive' : ''}
-                  />
+                  >
+                    <SelectTrigger
+                      id={`${row.id}-company`}
+                      className={errors[row.id]?.company ? 'border-destructive' : ''}
+                    >
+                      <SelectValue
+                        placeholder={loadingCompanies ? 'Loading clients...' : 'Select client'}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableCompanies.length === 0 ? (
+                        <SelectItem value="__no_clients__" disabled>
+                          No clients found for selected day
+                        </SelectItem>
+                      ) : (
+                        availableCompanies.map((companyName) => (
+                          <SelectItem key={companyName} value={companyName}>
+                            {companyName}
+                          </SelectItem>
+                        ))
+                      )}
+                      {row.company &&
+                        !availableCompanies.some(
+                          (companyName) =>
+                            companyName.toLowerCase() === row.company.toLowerCase()
+                        ) && (
+                          <SelectItem value={row.company}>{row.company}</SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
                   {errors[row.id]?.company && (
                     <p className="text-sm text-destructive">
                       {errors[row.id].company}
@@ -351,16 +399,14 @@ export function AddOffcutEntriesModal({
                 {/* Pieces Used */}
                 <div className="space-y-2">
                   <Label htmlFor={`${row.id}-pieces_used`}>Pieces Used *</Label>
-                  <Input
+                  <CalculatorInput
                     id={`${row.id}-pieces_used`}
-                    type="number"
-                    min="1"
-                    step="1"
+                    name={`${row.id}-pieces_used`}
                     value={row.pieces_used}
-                    onChange={(e) =>
-                      handleFieldChange(row.id, 'pieces_used', e.target.value)
+                    onChange={(value) =>
+                      handleFieldChange(row.id, 'pieces_used', value)
                     }
-                    placeholder="Enter quantity"
+                    placeholder="Enter quantity or =10+5"
                     className={
                       errors[row.id]?.pieces_used ? 'border-destructive' : ''
                     }
@@ -375,16 +421,14 @@ export function AddOffcutEntriesModal({
                 {/* Weight (kg) */}
                 <div className="space-y-2">
                   <Label htmlFor={`${row.id}-weight_kg`}>Weight (kg) *</Label>
-                  <Input
+                  <CalculatorInput
                     id={`${row.id}-weight_kg`}
-                    type="number"
-                    min="0.001"
-                    step="0.001"
+                    name={`${row.id}-weight_kg`}
                     value={row.weight_kg}
-                    onChange={(e) =>
-                      handleFieldChange(row.id, 'weight_kg', e.target.value)
+                    onChange={(value) =>
+                      handleFieldChange(row.id, 'weight_kg', value)
                     }
-                    placeholder="0.000"
+                    placeholder="0.000 or =500+250"
                     className={errors[row.id]?.weight_kg ? 'border-destructive' : ''}
                   />
                   {errors[row.id]?.weight_kg && (

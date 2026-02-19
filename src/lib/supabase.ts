@@ -128,6 +128,8 @@ export interface HistoryOrderPage {
 type EnsureClientSiteResponse = {
   out_client_id?: string | null;
   out_site_id?: string | null;
+  client_id?: string | null;
+  site_id?: string | null;
 };
 
 type OrderClientSiteInput = {
@@ -151,8 +153,9 @@ export async function ensureOrderClientSite(
 ): Promise<{ clientId: string | null; siteId: string | null }> {
   const existingClientId = order.clientId ?? order.client_id ?? null;
   const existingSiteId = order.siteId ?? order.site_id ?? null;
+  const hasCompanyOrSiteInput = Boolean(order.company?.trim() || order.site?.trim());
 
-  if (existingClientId && existingSiteId) {
+  if (existingClientId && existingSiteId && !hasCompanyOrSiteInput) {
     return { clientId: existingClientId, siteId: existingSiteId };
   }
 
@@ -167,8 +170,8 @@ export async function ensureOrderClientSite(
 
   const resolved = parseEnsureClientSiteResponse(data);
   return {
-    clientId: resolved.out_client_id ?? existingClientId ?? null,
-    siteId: resolved.out_site_id ?? existingSiteId ?? null
+    clientId: resolved.out_client_id ?? resolved.client_id ?? existingClientId ?? null,
+    siteId: resolved.out_site_id ?? resolved.site_id ?? existingSiteId ?? null
   };
 }
 
@@ -744,11 +747,15 @@ export const historyService = {
     try {
       logger.debug('🔄 Moving order to history:', order.id);
       
-      const { data: existingHistory } = await supabase
+      const { data: existingHistory, error: existingHistoryError } = await supabase
         .from('history_orders')
         .select('id')
         .eq('id', order.id)
-        .single();
+        .maybeSingle();
+
+      if (existingHistoryError) {
+        throw existingHistoryError;
+      }
 
       const { clientId, siteId } = await ensureOrderClientSite({
         clientId: order.clientId,
@@ -798,22 +805,31 @@ export const historyService = {
       }
       
       if (existingHistory) {
-        await supabase
+        const { error: updateHistoryError } = await supabase
           .from('history_orders')
           .update(historyOrderData)
           .eq('id', order.id);
+        if (updateHistoryError) {
+          throw updateHistoryError;
+        }
       } else {
-        await supabase
+        const { error: insertHistoryError } = await supabase
           .from('history_orders')
           .insert([historyOrderData]);
+        if (insertHistoryError) {
+          throw insertHistoryError;
+        }
       }
 
       await verifyHistoryOrderClientLink(order.id);
       
-      await supabase
+      const { error: deleteActiveError } = await supabase
         .from('orders')
         .delete()
         .eq('id', order.id);
+      if (deleteActiveError) {
+        throw deleteActiveError;
+      }
       
       logger.debug('✅ Order moved to history successfully');
     } catch (error) {
@@ -825,6 +841,13 @@ export const historyService = {
   async moveOrderToActive(order: any): Promise<void> {
     try {
       logger.debug('🔄 Service: Moving order back to active:', order.id);
+
+      const { clientId, siteId } = await ensureOrderClientSite({
+        clientId: order.client_id,
+        siteId: order.site_id,
+        company: order.company,
+        site: order.site
+      });
       
       const activeOrderData = {
         id: order.id,
@@ -836,6 +859,8 @@ export const historyService = {
         delivery_number: order.delivery_number || order.id,
         company: order.company || '',
         site: order.site || '',
+        client_id: clientId,
+        site_id: siteId,
         driver_name: order.driver_name || '',
         phone_number: order.phone_number || '',
         delivered_at: null,
@@ -881,9 +906,20 @@ export const historyService = {
       if (!existingOrder) {
         throw new Error(`Order ${id} not found in history orders table`);
       }
+
+      const resolvedCompany = updates.company ?? existingOrder.company ?? null;
+      const resolvedSite = updates.site ?? existingOrder.site ?? null;
+      const { clientId, siteId } = await ensureOrderClientSite({
+        clientId: updates.client_id ?? existingOrder.client_id ?? null,
+        siteId: updates.site_id ?? existingOrder.site_id ?? null,
+        company: resolvedCompany,
+        site: resolvedSite
+      });
       
       const updateData: any = {
         ...updates,
+        client_id: clientId,
+        site_id: siteId,
         updated_at: new Date().toISOString()
       };
       
@@ -1208,6 +1244,52 @@ export const offcutUsageService = {
     }
   },
 
+  // Get unique company names that have orders on a specific date.
+  async getCompaniesWorkedOnDate(date: string): Promise<string[]> {
+    try {
+      const [ordersResponse, historyResponse] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('company')
+          .eq('date', date)
+          .not('company', 'is', null),
+        supabase
+          .from('history_orders')
+          .select('company')
+          .eq('date', date)
+          .not('company', 'is', null)
+      ]);
+
+      if (ordersResponse.error) {
+        throw ordersResponse.error;
+      }
+      if (historyResponse.error) {
+        throw historyResponse.error;
+      }
+
+      const rows = [...(ordersResponse.data || []), ...(historyResponse.data || [])];
+      const uniqueCompanies = new Map<string, string>();
+
+      rows.forEach((row) => {
+        const company = String(row.company ?? '').trim();
+        if (!company) {
+          return;
+        }
+        const key = company.toLowerCase();
+        if (!uniqueCompanies.has(key)) {
+          uniqueCompanies.set(key, company);
+        }
+      });
+
+      return Array.from(uniqueCompanies.values()).sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: 'base' })
+      );
+    } catch (error) {
+      console.error('Failed to fetch companies worked on date:', error);
+      return [];
+    }
+  },
+
   // Calculate diameter totals from entries
   calculateDiameterTotals(entries: OffcutUsageEntry[]): DiameterTotal[] {
     const totalsMap = new Map<string, { pieces: number; tons: number }>();
@@ -1282,4 +1364,3 @@ export const activityService = {
     }
   }
 };
-

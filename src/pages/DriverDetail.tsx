@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { driverService } from '../lib/supabase';
 import { useDriversStore } from '../stores/driversStore';
 import { ROUTES } from '@/routes/routes';
+import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 interface Driver {
   id: string;
@@ -58,6 +59,7 @@ export function DriverDetail() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showCustomRange, setShowCustomRange] = useState(false);
+  const { isMobile } = useDeviceInfo();
 
   // Get current cycle dates
   const cycleDates = getCurrentCycleDates();
@@ -200,9 +202,9 @@ export function DriverDetail() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className={isMobile ? 'space-y-4' : 'space-y-6 p-6'}>
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
@@ -213,7 +215,7 @@ export function DriverDetail() {
           Back to Drivers
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
             {driver.name}
           </h1>
           <p className="text-muted-foreground">
@@ -386,6 +388,29 @@ export function DriverDetail() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {isMobile ? (
+            <div className="space-y-3">
+              {orders.length > 0 ? (
+                orders.map((order) => (
+                  <div key={order.id} className="rounded-xl border border-border/80 p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-mono text-foreground">{order.id}</p>
+                      {getStatusBadge(order.status)}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Customer: {order.customer_name}</p>
+                    <p className="text-sm text-muted-foreground">Date: {order.date}</p>
+                    <p className="text-sm text-muted-foreground">Tons: {order.tons} tons</p>
+                    <div>{getShiftBadge(order.shift)}</div>
+                    <p className="text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  No orders found for this driver yet.
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -422,6 +447,7 @@ export function DriverDetail() {
               </TableBody>
             </Table>
           </div>
+          )}
         </CardContent>
       </Card>
     </div>

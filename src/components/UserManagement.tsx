@@ -13,6 +13,7 @@ import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
 import { useToast } from '../hooks/use-toast';
 import { logger } from '@/lib/logger';
+import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 interface UserProfile {
   id: string;
@@ -29,6 +30,7 @@ export function UserManagement() {
   const [newUser, setNewUser] = useState({ email: '', password: '', role: 'viewer' as const });
   const { user } = useAuthStore();
   const { toast } = useToast();
+  const { isMobile } = useDeviceInfo();
 
   const isAdmin = hasPermission(user?.profile?.role, 'delete');
 
@@ -232,6 +234,62 @@ export function UserManagement() {
         <CardContent>
           {loading ? (
             <div className="text-center py-8">Loading users...</div>
+          ) : isMobile ? (
+            <div className="space-y-3">
+              {users.map((userProfile) => (
+                <div key={userProfile.id} className="rounded-xl border border-border/80 p-4 space-y-2">
+                  <p className="font-semibold text-base text-foreground">{userProfile.email}</p>
+                  {userProfile.full_name && (
+                    <p className="text-sm text-muted-foreground">{userProfile.full_name}</p>
+                  )}
+                  <div>{getRoleBadge(userProfile.role)}</div>
+                  <p className="text-sm text-muted-foreground">
+                    Created: {new Date(userProfile.created_at).toLocaleDateString()}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Select
+                      value={userProfile.role}
+                      onValueChange={(newRole) => updateUserRole(userProfile.id, newRole)}
+                    >
+                      <SelectTrigger className="w-36 h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="viewer">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            Viewer
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="editor">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            Editor
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="admin">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                            Admin
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {userProfile.email !== user?.email && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-10 px-3 text-destructive hover:text-destructive"
+                        onClick={() => deleteUser(userProfile.id, userProfile.email)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -309,4 +367,3 @@ export function UserManagement() {
     </div>
   );
 }
-

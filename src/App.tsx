@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Suspense, lazy, useEffect, useRef } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { ImageAssets } from './components/ImageAssets';
@@ -10,7 +10,7 @@ import { useDashboardStore } from './stores/dashboardStore';
 import { useAuthStore } from './stores/authStore';
 import { ROUTES } from './routes/routes';
 import { RouteSkeleton } from './components/RouteSkeleton';
-import { useIsMobile } from './hooks/use-mobile';
+import { useDeviceInfo } from './hooks/useDeviceInfo';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const History = lazy(() => import('./pages/History').then((module) => ({ default: module.History })));
@@ -30,8 +30,9 @@ const OffcutExecutivePrintPage = lazy(() =>
 function AppShell() {
   const { sidebarCollapsed, setSidebarCollapsed } = useDashboardStore();
   const location = useLocation();
+  const { isMobile } = useDeviceInfo();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isReportRoute = location.pathname.startsWith(ROUTES.offcutExecutiveReport);
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (isMobile) {
@@ -39,18 +40,35 @@ function AppShell() {
     }
   }, [isMobile, setSidebarCollapsed]);
 
+  useEffect(() => {
+    if (isMobile) {
+      setMobileSidebarOpen(false);
+    }
+  }, [location.pathname, isMobile]);
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background text-foreground">
         <ImageAssets />
-        {!isReportRoute && <Sidebar />}
+        {!isReportRoute && (
+          <Sidebar
+            isMobile={isMobile}
+            mobileOpen={mobileSidebarOpen}
+            onMobileClose={() => setMobileSidebarOpen(false)}
+          />
+        )}
         <main
           className={`transition-all duration-300 ${
             isReportRoute ? 'ml-0' : isMobile ? 'ml-0' : sidebarCollapsed ? 'ml-16' : 'ml-64'
           }`}
         >
-          {!isReportRoute && <TopBar />}
-          <div className={isReportRoute ? '' : 'pt-16 px-4 pb-6 sm:p-6'}>
+          {!isReportRoute && (
+            <TopBar
+              isMobile={isMobile}
+              onMenuClick={() => setMobileSidebarOpen((prev) => !prev)}
+            />
+          )}
+          <div className={isReportRoute ? '' : isMobile ? 'pt-16 px-3 pb-5' : 'pt-16 p-6'}>
             <div className={isReportRoute ? '' : 'max-w-7xl mx-auto'}>
               <Suspense fallback={<RouteSkeleton />}>
                 <Routes>
@@ -108,7 +126,12 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <Router>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <AppShell />
       </Router>
     </ErrorBoundary>

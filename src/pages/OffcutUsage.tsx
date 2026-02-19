@@ -44,6 +44,7 @@ import {
   ProductionRow
 } from '@/reports/offcut/buildExecutiveOffcutReportData';
 import { ROUTES } from '@/routes/routes';
+import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 type ViewMode = 'daily' | 'monthly' | 'range';
 
@@ -65,6 +66,7 @@ export function OffcutUsage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuthStore();
+  const { isMobile } = useDeviceInfo();
 
   // Check if user can edit/delete (Admin or Editor)
   const canEditDelete = hasPermission(user?.profile?.role, 'edit');
@@ -351,9 +353,9 @@ export function OffcutUsage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
@@ -364,7 +366,7 @@ export function OffcutUsage() {
           Back to Dashboard
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
             Offcut Usage
           </h1>
           <p className="text-muted-foreground">
@@ -373,7 +375,7 @@ export function OffcutUsage() {
         </div>
         <Button
           onClick={() => setAddModalOpen(true)}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
+          className={`bg-primary text-primary-foreground hover:bg-primary/90 shadow-md ${isMobile ? 'h-10 px-3 text-sm' : ''}`}
         >
           <Plus size={20} className="mr-2" />
           Add Entries
@@ -440,7 +442,7 @@ export function OffcutUsage() {
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-auto"
+                  className={isMobile ? 'w-full' : 'w-auto'}
                 />
               </div>
             )}
@@ -452,7 +454,7 @@ export function OffcutUsage() {
                   Select Month
                 </Label>
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger id="month-picker" className="w-[200px]">
+                  <SelectTrigger id="month-picker" className={isMobile ? 'w-full' : 'w-[200px]'}>
                     <SelectValue placeholder="Select month" />
                   </SelectTrigger>
                   <SelectContent>
@@ -473,27 +475,27 @@ export function OffcutUsage() {
                     <Calendar className="h-4 w-4" />
                     Start Date
                   </Label>
-                  <Input
-                    id="start-date"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-auto"
-                  />
-                </div>
-                <div className="space-y-2">
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={isMobile ? 'w-full' : 'w-auto'}
+                />
+              </div>
+              <div className="space-y-2">
                   <Label htmlFor="end-date" className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     End Date
                   </Label>
-                  <Input
-                    id="end-date"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-auto"
-                  />
-                </div>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={isMobile ? 'w-full' : 'w-auto'}
+                />
+              </div>
               </>
             )}
           </div>
@@ -632,6 +634,26 @@ export function OffcutUsage() {
                 <CardTitle>Per-Diameter Totals</CardTitle>
               </CardHeader>
               <CardContent>
+                {isMobile ? (
+                  <div className="space-y-2">
+                    {diameterTotals.map((total) => (
+                      <div key={total.bar_diameter} className="rounded-xl border border-border/80 p-3">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline" className="font-medium">{total.bar_diameter}</Badge>
+                          <span className="font-bold">{total.total_tons.toFixed(3)} tons</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Total Pieces: {total.total_pieces.toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="rounded-xl border border-border/80 p-3 bg-muted/50">
+                      <p className="font-semibold">Grand Total</p>
+                      <p className="text-sm text-muted-foreground">Pieces: {summaryStats.totalPieces.toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">Tons: {summaryStats.totalWeightTons}</p>
+                    </div>
+                  </div>
+                ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -670,6 +692,7 @@ export function OffcutUsage() {
                     </TableBody>
                   </Table>
                 </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -693,6 +716,36 @@ export function OffcutUsage() {
                   <p className="text-sm mt-2">
                     Try adjusting the filter criteria or selecting a different date range.
                   </p>
+                </div>
+              ) : isMobile ? (
+                <div className="space-y-3">
+                  {filteredEntries.map((entry) => (
+                    <div key={entry.id} className="rounded-xl border border-border/80 p-4 space-y-2">
+                      <p className="text-sm text-muted-foreground">Date: {formatDate(entry.date)}</p>
+                      <p className="font-medium text-foreground">{entry.company}</p>
+                      <p className="text-sm text-muted-foreground">Bar: {entry.bar_diameter}</p>
+                      <p className="text-sm text-muted-foreground">Pieces: {entry.pieces_used.toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">Weight: {entry.weight_kg.toFixed(3)} kg ({entry.weight_tons.toFixed(3)} tons)</p>
+                      <p className="text-sm text-muted-foreground break-words">Notes: {entry.notes || '-'}</p>
+                      {canEditDelete && (
+                        <div className="flex gap-2 pt-2">
+                          <Button variant="outline" size="sm" className="h-10 px-3" onClick={() => handleEdit(entry)}>
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-10 px-3 text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteClick(entry)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
