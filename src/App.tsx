@@ -99,8 +99,9 @@ function AppShell() {
 
 function App() {
   const { loadOrders, loadDashboardMetrics } = useDashboardStore();
-  const { initialize, user, loading: authLoading, initialized } = useAuthStore();
+  const { initialize, refreshProfile, user, loading: authLoading, initialized } = useAuthStore();
   const initializedRef = useRef(false);
+  const lastResumeRefreshAtRef = useRef(0);
 
   useEffect(() => {
     // Guard against React StrictMode double-invoking effects in development.
@@ -123,6 +124,45 @@ function App() {
       dashboardStore.loadHistoryOrders();
     }
   }, [initialized, authLoading, user, loadOrders, loadDashboardMetrics]);
+
+  useEffect(() => {
+    if (!initialized || authLoading || !user) {
+      return;
+    }
+
+    const refreshOnResume = () => {
+      const now = Date.now();
+      // Avoid firing multiple times for focus + visibilitychange bursts.
+      if (now - lastResumeRefreshAtRef.current < 10_000) {
+        return;
+      }
+      lastResumeRefreshAtRef.current = now;
+
+      refreshProfile();
+      loadOrders();
+      loadDashboardMetrics();
+      const dashboardStore = useDashboardStore.getState();
+      if (dashboardStore.loadHistoryOrders) {
+        dashboardStore.loadHistoryOrders();
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshOnResume();
+      }
+    };
+
+    window.addEventListener('focus', refreshOnResume);
+    window.addEventListener('online', refreshOnResume);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', refreshOnResume);
+      window.removeEventListener('online', refreshOnResume);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [initialized, authLoading, user, refreshProfile, loadOrders, loadDashboardMetrics]);
 
   return (
     <ErrorBoundary>

@@ -189,8 +189,40 @@ export async function verifyHistoryOrderClientLink(orderId: string): Promise<voi
 
   const hasCompany = Boolean(data?.company && String(data.company).trim().length > 0);
   const hasSite = Boolean(data?.site && String(data.site).trim().length > 0);
-  const missingClientLink = hasCompany && !data?.client_id;
-  const missingSiteLink = hasSite && !data?.site_id;
+  let missingClientLink = hasCompany && !data?.client_id;
+  let missingSiteLink = hasSite && !data?.site_id;
+
+  // Attempt one automatic repair before surfacing any warning.
+  if (missingClientLink || missingSiteLink) {
+    try {
+      const { clientId, siteId } = await ensureOrderClientSite({
+        client_id: data?.client_id ?? null,
+        site_id: data?.site_id ?? null,
+        company: data?.company ?? null,
+        site: data?.site ?? null
+      });
+
+      if (clientId !== data?.client_id || siteId !== data?.site_id) {
+        const { error: updateError } = await supabase
+          .from('history_orders')
+          .update({
+            client_id: clientId,
+            site_id: siteId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId);
+
+        if (updateError) {
+          throw updateError;
+        }
+      }
+
+      missingClientLink = hasCompany && !clientId;
+      missingSiteLink = hasSite && !siteId;
+    } catch (repairError) {
+      console.error('Failed to auto-repair history order client link:', repairError);
+    }
+  }
 
   if (missingClientLink || missingSiteLink) {
     toast({
