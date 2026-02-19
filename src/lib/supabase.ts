@@ -178,7 +178,7 @@ export async function ensureOrderClientSite(
 export async function verifyHistoryOrderClientLink(orderId: string): Promise<void> {
   const { data, error } = await supabase
     .from('history_orders')
-    .select('client_id, site_id')
+    .select('client_id, site_id, company, site')
     .eq('id', orderId)
     .single();
 
@@ -187,10 +187,15 @@ export async function verifyHistoryOrderClientLink(orderId: string): Promise<voi
     return;
   }
 
-  if (!data?.client_id || !data?.site_id) {
+  const hasCompany = Boolean(data?.company && String(data.company).trim().length > 0);
+  const hasSite = Boolean(data?.site && String(data.site).trim().length > 0);
+  const missingClientLink = hasCompany && !data?.client_id;
+  const missingSiteLink = hasSite && !data?.site_id;
+
+  if (missingClientLink || missingSiteLink) {
     toast({
       title: 'Client linking failed',
-      description: `Order ${orderId} is missing client/site links.`,
+      description: `Order ${orderId} is missing ${missingClientLink && missingSiteLink ? 'client/site' : missingClientLink ? 'client' : 'site'} link.`,
       variant: 'destructive'
     });
   }
