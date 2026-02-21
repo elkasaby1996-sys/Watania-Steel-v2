@@ -685,7 +685,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       
       filteredOrders.forEach(order => {
         if (!order) return;
-        const orderDateTime = order.delivered_at || order.date;
+        const orderDateTime = order.date || order.delivered_at;
         if (!orderDateTime) return;
         const orderDate = String(orderDateTime).split('T')[0];
         
@@ -698,8 +698,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       Object.keys(groupedOrders).forEach(date => {
         try {
           groupedOrders[date].sort((a, b) => {
-            const timeA = new Date(a.delivered_at || a.date).getTime();
-            const timeB = new Date(b.delivered_at || b.date).getTime();
+            const timeA = new Date(a.date || a.delivered_at).getTime();
+            const timeB = new Date(b.date || b.delivered_at).getTime();
             return timeB - timeA;
           });
         } catch (error) {
