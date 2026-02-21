@@ -47,6 +47,9 @@ import { ROUTES } from '@/routes/routes';
 import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 type ViewMode = 'daily' | 'monthly' | 'range';
+const EXEC_REPORT_SESSION_KEY = 'offcutExecutiveReport';
+const EXEC_REPORT_LOCAL_PREFIX = 'offcutExecutiveReport:';
+const EXEC_REPORT_LATEST_KEY = 'offcutExecutiveReportLatest';
 
 // Generate month options for selector
 const getMonthOptions = () => {
@@ -281,11 +284,16 @@ export function OffcutUsage() {
         now: new Date()
       });
 
-      sessionStorage.setItem('offcutExecutiveReport', JSON.stringify(reportData));
-      const reportUrl = `${window.location.origin}${ROUTES.offcutExecutiveReport}`;
+      const reportJson = JSON.stringify(reportData);
+      const reportId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      sessionStorage.setItem(EXEC_REPORT_SESSION_KEY, reportJson);
+      localStorage.setItem(`${EXEC_REPORT_LOCAL_PREFIX}${reportId}`, reportJson);
+      localStorage.setItem(EXEC_REPORT_LATEST_KEY, reportId);
+
+      const reportUrl = `${window.location.origin}${ROUTES.offcutExecutiveReport}?rid=${encodeURIComponent(reportId)}`;
       const reportWindow = window.open(reportUrl, '_blank', 'noopener,noreferrer');
       if (!reportWindow) {
-        navigate(ROUTES.offcutExecutiveReport);
+        navigate(`${ROUTES.offcutExecutiveReport}?rid=${encodeURIComponent(reportId)}`);
       }
     } catch (error) {
       console.error('Failed to generate executive report:', error);
@@ -413,7 +421,7 @@ export function OffcutUsage() {
                   className="bg-slate-900 text-white hover:bg-slate-800"
                 >
                   <FileDown size={18} className="mr-2" />
-                  {openingExecutiveReport ? 'Opening…' : 'Open Executive Report'}
+                  {openingExecutiveReport ? 'Opening...' : 'Open Executive Report'}
                 </Button>
               </div>
             )}
