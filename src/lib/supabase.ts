@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import { toast } from '@/hooks/use-toast'
 import { getEnvVar } from './env'
 import { roundTo3Decimals } from './utils'
 import { logger } from './logger'
@@ -116,7 +115,7 @@ export interface HistoryOrderFilters {
   dateTo?: string;
   status?: string;
   company?: string;
-  deliveryNumberOrId?: string;
+  search?: string;
 }
 
 export interface HistoryOrderPage {
@@ -225,11 +224,9 @@ export async function verifyHistoryOrderClientLink(orderId: string): Promise<voi
   }
 
   if (missingClientLink || missingSiteLink) {
-    toast({
-      title: 'Client linking failed',
-      description: `Order ${orderId} is missing ${missingClientLink && missingSiteLink ? 'client/site' : missingClientLink ? 'client' : 'site'} link.`,
-      variant: 'destructive'
-    });
+    console.warn(
+      `History order ${orderId} is missing ${missingClientLink && missingSiteLink ? 'client/site' : missingClientLink ? 'client' : 'site'} link.`
+    );
   }
 }
 
@@ -740,16 +737,29 @@ export const historyService = {
       }
 
       if (filters?.dateFrom) {
-        query = query.gte('date', filters.dateFrom);
+        query = query.gte('delivered_at', `${filters.dateFrom}T00:00:00`);
       }
 
       if (filters?.dateTo) {
-        query = query.lte('date', filters.dateTo);
+        query = query.lte('delivered_at', `${filters.dateTo}T23:59:59.999`);
       }
 
-      if (filters?.deliveryNumberOrId) {
-        const term = filters.deliveryNumberOrId.replace(/,/g, '');
-        query = query.or(`delivery_number.ilike.%${term}%,id.ilike.%${term}%`);
+      if (filters?.search) {
+        const term = filters.search.replace(/,/g, '').trim();
+        if (term) {
+          query = query.or([
+            `id.ilike.%${term}%`,
+            `delivery_number.ilike.%${term}%`,
+            `customer_name.ilike.%${term}%`,
+            `company.ilike.%${term}%`,
+            `site.ilike.%${term}%`,
+            `driver_name.ilike.%${term}%`,
+            `phone_number.ilike.%${term}%`,
+            `status.ilike.%${term}%`,
+            `order_type.ilike.%${term}%`,
+            `shift.ilike.%${term}%`
+          ].join(','));
+        }
       }
 
       if (signal) {
@@ -794,6 +804,9 @@ export const historyService = {
         throw existingHistoryError;
       }
 
+      const deliveredAt = order.deliveredAt || order.delivered_at || new Date().toISOString();
+      const deliveredDate = String(deliveredAt).split('T')[0];
+
       const { clientId, siteId } = await ensureOrderClientSite({
         clientId: order.clientId,
         client_id: order.client_id,
@@ -806,7 +819,7 @@ export const historyService = {
       const historyOrderData = {
         id: order.id,
         customer_name: order.customerName,
-        date: order.date,
+        date: deliveredDate,
         status: 'delivered',
         tons: order.tons || 0,
         shift: order.shift || 'morning',
@@ -817,7 +830,7 @@ export const historyService = {
         site_id: siteId,
         driver_name: order.driverName || '',
         phone_number: order.phoneNumber || '',
-        delivered_at: new Date().toISOString(),
+        delivered_at: deliveredAt,
         signed_delivery_note: order.signedDeliveryNote || false,
         order_type: order.orderType || 'straight-bar',
         breakdown_8mm: order.breakdown?.['8mm'] || 0,

@@ -417,8 +417,24 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       }
       
       await historyService.moveOrderToHistory(order);
-      await get().loadOrders();
-      await get().loadHistoryOrders();
+
+      // Remove from dashboard immediately so delivered orders are never visible in active table.
+      set(state => {
+        const orders = state.orders.filter(o => String(o.id) !== String(orderId));
+        return {
+          orders,
+          stats: {
+            ...state.stats,
+            todayOrders: orders.length,
+            inProgress: orders.filter(o => o.status === 'in-progress').length,
+            completed: orders.filter(o => o.status === 'completed').length,
+            delayed: orders.filter(o => o.status === 'delayed').length
+          }
+        };
+      });
+
+      // Refresh in background to keep active/history data fully in sync with DB.
+      await Promise.all([get().loadOrders(), get().loadHistoryOrders()]);
 
       await activityService.create({
         type: 'order_completed',
@@ -426,7 +442,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       });
       get().loadActivities();
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to mark order as delivered' });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to mark order as delivered';
+      set({ error: errorMessage });
+      throw new Error(errorMessage);
     }
   },
 
@@ -437,6 +455,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const dbOrder = frontendToDb(order);
       
       if (order.status === 'delivered') {
+        const deliveredAt = order.deliveredAt || new Date().toISOString();
+        const deliveredDate = String(deliveredAt).split('T')[0];
         const { clientId, siteId } = await ensureOrderClientSite({
           clientId: order.clientId,
           siteId: order.siteId,
@@ -447,7 +467,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         const historyOrderData = {
           id: order.id,
           customer_name: order.customerName,
-          date: order.date,
+          date: deliveredDate,
           status: 'delivered',
           tons: order.tons || 0,
           shift: order.shift || 'morning',
@@ -458,7 +478,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           site_id: siteId,
           driver_name: order.driverName || '',
           phone_number: order.phoneNumber || '',
-          delivered_at: new Date().toISOString(),
+          delivered_at: deliveredAt,
           signed_delivery_note: order.signedDeliveryNote || false,
           order_type: order.orderType || 'straight-bar',
           breakdown_8mm: order.breakdown?.['8mm'] || 0,
@@ -664,9 +684,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const groupedOrders: { [date: string]: HistoryOrder[] } = {};
       
       filteredOrders.forEach(order => {
-        if (!order || !order.date) return;
-        
-        const orderDate = order.date;
+        if (!order) return;
+        const orderDateTime = order.delivered_at || order.date;
+        if (!orderDateTime) return;
+        const orderDate = String(orderDateTime).split('T')[0];
         
         if (!groupedOrders[orderDate]) {
           groupedOrders[orderDate] = [];

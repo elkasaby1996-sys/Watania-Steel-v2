@@ -75,7 +75,7 @@ export function History() {
       company: companyFilter.trim() || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
-      deliveryNumberOrId: debouncedSearch || undefined
+      search: debouncedSearch || undefined
     };
   }, [statusFilter, companyFilter, dateFrom, dateTo, debouncedSearch]);
 
@@ -154,9 +154,9 @@ export function History() {
     const grouped: { [date: string]: HistoryOrder[] } = {};
 
     historyOrders.forEach(order => {
-      if (!order?.date) return;
-
-      const orderDate = order.date;
+      const orderDateTime = order?.delivered_at || order?.date;
+      if (!orderDateTime) return;
+      const orderDate = String(orderDateTime).split('T')[0];
       if (!grouped[orderDate]) {
         grouped[orderDate] = [];
       }
@@ -302,7 +302,7 @@ export function History() {
               <Input
                 id="history-search"
                 name="historySearch"
-                placeholder="Search by delivery number or order ID..."
+                placeholder="Search all fields..."
                 value={historySearchQuery}
                 onChange={(e) => setHistorySearchQuery(e.target.value)}
                 className="pl-10 bg-background text-foreground border-border"
