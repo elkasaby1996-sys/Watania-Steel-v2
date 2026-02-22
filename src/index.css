@@ -73,6 +73,55 @@
   --shadow-industrial: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* Light theme */
+:root.light {
+  --color-border: hsl(220, 16%, 86%);
+  --color-input: hsl(0, 0%, 100%);
+  --color-ring: hsl(345, 65%, 40%);
+  --color-background: hsl(210, 30%, 98%);
+  --color-foreground: hsl(222, 33%, 16%);
+
+  --color-primary: hsl(345, 65%, 38%);
+  --color-primary-foreground: hsl(0, 0%, 100%);
+
+  --color-secondary: hsl(210, 22%, 93%);
+  --color-secondary-foreground: hsl(222, 33%, 16%);
+
+  --color-tertiary: hsl(215, 42%, 90%);
+  --color-tertiary-foreground: hsl(222, 33%, 16%);
+
+  --color-neutral: hsl(210, 20%, 96%);
+  --color-neutral-foreground: hsl(222, 33%, 16%);
+
+  --color-destructive: hsl(0, 70%, 45%);
+  --color-destructive-foreground: hsl(0, 0%, 100%);
+  --color-success: hsl(142, 60%, 38%);
+  --color-success-foreground: hsl(0, 0%, 100%);
+  --color-warning: hsl(38, 90%, 45%);
+  --color-warning-foreground: hsl(0, 0%, 10%);
+
+  --color-muted: hsl(215, 25%, 93%);
+  --color-muted-foreground: hsl(220, 10%, 40%);
+  --color-accent: hsl(215, 32%, 90%);
+  --color-accent-foreground: hsl(222, 33%, 16%);
+
+  --color-popover: hsl(0, 0%, 100%);
+  --color-popover-foreground: hsl(222, 33%, 16%);
+  --color-card: hsl(0, 0%, 100%);
+  --color-card-foreground: hsl(222, 33%, 16%);
+
+  --color-sidebar: hsl(213, 34%, 94%);
+  --color-sidebar-foreground: hsl(222, 33%, 22%);
+  --color-sidebar-border: hsl(220, 16%, 84%);
+  --color-sidebar-accent: hsl(345, 65%, 38%);
+  --color-sidebar-hover: hsl(215, 30%, 90%);
+  --color-sidebar-active: hsl(215, 32%, 86%);
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-card-hover: 0 4px 10px rgba(15, 23, 42, 0.12);
+  --shadow-industrial: 0 2px 6px rgba(15, 23, 42, 0.12);
+}
+
 /* Industrial Pro gradient backgrounds */
 .bg-gradient-watania {
   background: linear-gradient(135deg, hsl(345, 65%, 30%), hsl(345, 55%, 25%));
@@ -103,7 +152,7 @@ html, body {
 
   /* Typography enhancements */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-headline text-gray-50 tracking-tight;
+    @apply font-headline text-foreground tracking-tight;
   }
 
   /* Improved focus states */
@@ -145,7 +194,7 @@ html, body {
   }
 
   .page-header-title {
-    @apply font-headline text-2xl font-bold text-gray-50;
+    @apply font-headline text-2xl font-bold text-foreground;
   }
 
   .page-header-subtitle {
@@ -160,7 +209,7 @@ html, body {
 @layer utilities {
   /* Text color utilities for Industrial Pro */
   .text-heading {
-    @apply text-gray-50;
+    @apply text-foreground;
   }
 
   .text-body {

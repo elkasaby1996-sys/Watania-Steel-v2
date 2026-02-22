@@ -17,65 +17,65 @@ module.exports = {
     },
     extend: {
       colors: {
-        // Industrial Pro Design System - Dark Navy Theme
-        border: "hsl(215, 25%, 27%)", // Subtle border on dark backgrounds
-        input: "hsl(215, 28%, 17%)", // Input background
-        ring: "hsl(345, 65%, 35%)", // Focus ring - maroon accent
-        background: "hsl(218, 35%, 12%)", // Dark navy primary background
-        foreground: "hsl(210, 20%, 85%)", // Light gray body text
+        // Theme tokens (driven by CSS variables in src/index.css)
+        border: "var(--color-border)",
+        input: "var(--color-input)",
+        ring: "var(--color-ring)",
+        background: "var(--color-background)",
+        foreground: "var(--color-foreground)",
         primary: {
-          DEFAULT: "hsl(345, 65%, 30%)", // Dark maroon - company brand
-          foreground: "hsl(0, 0%, 100%)",
+          DEFAULT: "var(--color-primary)",
+          foreground: "var(--color-primary-foreground)",
         },
         secondary: {
-          DEFAULT: "hsl(215, 25%, 23%)", // Muted blue-gray for secondary actions
-          foreground: "hsl(210, 20%, 85%)",
+          DEFAULT: "var(--color-secondary)",
+          foreground: "var(--color-secondary-foreground)",
         },
         tertiary: {
-          DEFAULT: "hsl(215, 20%, 35%)", // Lighter slate for tertiary elements
-          foreground: "hsl(210, 20%, 90%)",
+          DEFAULT: "var(--color-tertiary)",
+          foreground: "var(--color-tertiary-foreground)",
         },
         neutral: {
-          DEFAULT: "hsl(215, 28%, 17%)", // Dark slate neutral
-          foreground: "hsl(210, 20%, 85%)",
+          DEFAULT: "var(--color-neutral)",
+          foreground: "var(--color-neutral-foreground)",
         },
         destructive: {
-          DEFAULT: "hsl(0, 65%, 50%)", // Red for danger/error - NOT maroon
-          foreground: "hsl(0, 0%, 100%)",
+          DEFAULT: "var(--color-destructive)",
+          foreground: "var(--color-destructive-foreground)",
         },
         success: {
-          DEFAULT: "hsl(142, 50%, 40%)", // Professional green
-          foreground: "hsl(0, 0%, 100%)",
+          DEFAULT: "var(--color-success)",
+          foreground: "var(--color-success-foreground)",
         },
         warning: {
-          DEFAULT: "hsl(38, 80%, 50%)", // Amber warning
-          foreground: "hsl(0, 0%, 10%)",
+          DEFAULT: "var(--color-warning)",
+          foreground: "var(--color-warning-foreground)",
         },
         muted: {
-          DEFAULT: "hsl(215, 25%, 20%)", // Muted dark slate
-          foreground: "hsl(215, 15%, 55%)", // Muted text
+          DEFAULT: "var(--color-muted)",
+          foreground: "var(--color-muted-foreground)",
         },
         accent: {
-          DEFAULT: "hsl(215, 25%, 25%)", // Accent background for hover states
-          foreground: "hsl(210, 20%, 90%)",
+          DEFAULT: "var(--color-accent)",
+          foreground: "var(--color-accent-foreground)",
         },
         popover: {
-          DEFAULT: "hsl(218, 32%, 15%)", // Popover/dropdown background
-          foreground: "hsl(210, 20%, 85%)",
+          DEFAULT: "var(--color-popover)",
+          foreground: "var(--color-popover-foreground)",
         },
         card: {
-          DEFAULT: "hsl(217, 30%, 16%)", // Card/surface - slightly lighter slate-blue
-          foreground: "hsl(210, 20%, 85%)",
+          DEFAULT: "var(--color-card)",
+          foreground: "var(--color-card-foreground)",
         },
         // Sidebar specific colors
         sidebar: {
-          DEFAULT: "hsl(218, 35%, 10%)", // Dark navy sidebar background
-          foreground: "hsl(210, 20%, 70%)", // Light gray sidebar text
-          border: "hsl(215, 25%, 20%)",
-          accent: "hsl(345, 65%, 30%)", // Maroon accent
-          "accent-foreground": "hsl(0, 0%, 100%)",
-          hover: "hsl(217, 30%, 18%)", // Hover state
-          active: "hsl(217, 30%, 20%)", // Active item background
+          DEFAULT: "var(--color-sidebar)",
+          foreground: "var(--color-sidebar-foreground)",
+          border: "var(--color-sidebar-border)",
+          accent: "var(--color-sidebar-accent)",
+          "accent-foreground": "var(--color-primary-foreground)",
+          hover: "var(--color-sidebar-hover)",
+          active: "var(--color-sidebar-active)",
         },
         // Gray scale for Industrial Pro
         gray: {

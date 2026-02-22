@@ -873,12 +873,34 @@ export const historyService = {
 
       await verifyHistoryOrderClientLink(order.id);
       
-      const { error: deleteActiveError } = await supabase
+      const { data: deletedActiveRows, error: deleteActiveError } = await supabase
         .from('orders')
         .delete()
-        .eq('id', order.id);
+        .eq('id', order.id)
+        .select('id');
       if (deleteActiveError) {
         throw deleteActiveError;
+      }
+
+      // Some RLS setups can return zero deleted rows without throwing an error.
+      // Fallback to marking active row as delivered so it no longer appears in active views.
+      if (!deletedActiveRows || deletedActiveRows.length === 0) {
+        logger.warn('No active order row deleted during history move; applying delivered fallback status', {
+          orderId: order.id
+        });
+
+        const { error: fallbackUpdateError } = await supabase
+          .from('orders')
+          .update({
+            status: 'delivered',
+            delivered_at: deliveredAt,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', order.id);
+
+        if (fallbackUpdateError) {
+          throw fallbackUpdateError;
+        }
       }
       
       logger.debug('✅ Order moved to history successfully');

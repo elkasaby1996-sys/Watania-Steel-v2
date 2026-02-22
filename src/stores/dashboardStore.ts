@@ -610,7 +610,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   getTodayOrders: () => {
-    return get().orders.filter(order => order.status !== 'delivered');
+    const historyIds = new Set((get().historyOrders || []).map(order => String(order.id)));
+    return get().orders.filter(
+      (order) => order.status !== 'delivered' && !historyIds.has(String(order.id))
+    );
   },
 
   getDeliveredOrders: () => {

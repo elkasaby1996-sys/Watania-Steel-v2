@@ -1,4 +1,5 @@
-import { User, LogOut, Shield, RefreshCw, Menu } from 'lucide-react';
+import { User, LogOut, Shield, RefreshCw, Menu, Moon, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,9 @@ interface TopBarProps {
 export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
   const { sidebarCollapsed } = useDashboardStore();
   const { user, signOut, refreshProfile } = useAuthStore();
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    document.documentElement.classList.contains('light') ? 'light' : 'dark'
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -26,6 +30,15 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
 
   const handleAppRefresh = () => {
     window.location.reload();
+  };
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   };
 
   const getRoleBadgeVariant = (role: string) => {
@@ -58,7 +71,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
               <Menu size={18} />
             </Button>
           )}
-          <h1 className={`font-headline font-bold text-gray-50 ${isMobile ? 'text-base' : 'text-xl'}`}>
+          <h1 className={`font-headline font-bold text-foreground ${isMobile ? 'text-base' : 'text-xl'}`}>
             {isMobile ? 'Watania ERP' : 'Factory Management System'}
           </h1>
         </div>
@@ -71,6 +84,16 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
                 {getRoleDisplayName(user.profile.role)}
               </Badge>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground"
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </Button>
             <Button
               variant="ghost"
               size="icon"
