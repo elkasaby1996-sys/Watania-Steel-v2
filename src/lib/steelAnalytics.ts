@@ -72,13 +72,13 @@ const ANALYTICS_COLUMNS = [
   'breakdown_32mm',
 ].join(', ');
 
-const getMaxDeliveredDateFromTable = async (table: 'orders' | 'history_orders', signal?: AbortSignal) => {
-  const query = supabase
-    .from(table)
-    .select('date')
-    .eq('status', 'delivered')
-    .order('date', { ascending: false })
-    .limit(1);
+const getDatePart = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  return value.split('T')[0] || null;
+};
 
 const throwIfAborted = (signal?: AbortSignal) => {
   if (signal?.aborted) {
@@ -136,10 +136,14 @@ const fetchDeliveredRows = async (
   }
 };
 
-export const fetchMaxDateAcrossTables = async (signal?: AbortSignal) => {
-  const [ordersMax, historyMax] = await Promise.all([
-    getMaxDeliveredDateFromTable('orders', signal),
-    getMaxDeliveredDateFromTable('history_orders', signal),
+const fetchDeliveredAnalyticsRows = async (signal?: AbortSignal): Promise<DeliveredAnalyticsRow[]> => {
+  if (deliveredRowsCache && deliveredRowsCache.expiresAt > Date.now()) {
+    return deliveredRowsCache.data;
+  }
+
+  const [historyRows, activeRows] = await Promise.all([
+    fetchDeliveredRows('history_orders', 0, signal),
+    fetchDeliveredRows('orders', 1, signal),
   ]);
 
   const deduped = new Map<string, DeliveredAnalyticsRow>();
