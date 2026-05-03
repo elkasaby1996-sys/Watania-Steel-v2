@@ -5,25 +5,28 @@ import { roundTo3Decimals, formatNumber } from '../lib/utils';
 
 export function SteelBreakdownChart() {
   const { orders, historyOrders } = useDashboardStore();
+  const historyIds = new Set(historyOrders.map((order) => String(order.id)));
 
-  // Combine active orders and history orders for complete steel analysis
+  // Count delivered orders only, with history taking precedence over active fallback rows.
   const allOrders = [
-    ...orders,
-    ...historyOrders.map(historyOrder => ({
-      id: historyOrder.id,
-      status: historyOrder.status,
-      breakdown: {
-        '8mm': historyOrder.breakdown_8mm || 0,
-        '10mm': historyOrder.breakdown_10mm || 0,
-        '12mm': historyOrder.breakdown_12mm || 0,
-        '14mm': historyOrder.breakdown_14mm || 0,
-        '16mm': historyOrder.breakdown_16mm || 0,
-        '18mm': historyOrder.breakdown_18mm || 0,
-        '20mm': historyOrder.breakdown_20mm || 0,
-        '25mm': historyOrder.breakdown_25mm || 0,
-        '32mm': historyOrder.breakdown_32mm || 0,
-      }
-    }))
+    ...historyOrders
+      .filter(historyOrder => historyOrder.status === 'delivered')
+      .map(historyOrder => ({
+        id: historyOrder.id,
+        status: historyOrder.status,
+        breakdown: {
+          '8mm': historyOrder.breakdown_8mm || 0,
+          '10mm': historyOrder.breakdown_10mm || 0,
+          '12mm': historyOrder.breakdown_12mm || 0,
+          '14mm': historyOrder.breakdown_14mm || 0,
+          '16mm': historyOrder.breakdown_16mm || 0,
+          '18mm': historyOrder.breakdown_18mm || 0,
+          '20mm': historyOrder.breakdown_20mm || 0,
+          '25mm': historyOrder.breakdown_25mm || 0,
+          '32mm': historyOrder.breakdown_32mm || 0,
+        }
+      })),
+    ...orders.filter(order => order.status === 'delivered' && !historyIds.has(String(order.id)))
   ];
 
   // Calculate steel breakdown from all orders with breakdown data

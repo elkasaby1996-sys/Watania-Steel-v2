@@ -224,7 +224,7 @@ export function SteelAnalytics() {
                 Analyzing: {range ? `${range.startDate} → ${range.endDate}` : 'No data'}
               </p>
               <p className="text-xs text-muted-foreground/80">
-                Window anchored to latest delivered order date
+                Window anchored to latest delivered date across orders + history_orders
               </p>
             </div>
 
