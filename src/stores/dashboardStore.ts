@@ -455,7 +455,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const dbOrder = frontendToDb(order);
       
       if (order.status === 'delivered') {
-        const deliveredAt = order.deliveredAt || new Date().toISOString();
+        const deliveredAt = order.deliveredAt || (order.date ? `${order.date}T00:00:00.000Z` : new Date().toISOString());
         const deliveredDate = String(deliveredAt).split('T')[0];
         const { clientId, siteId } = await ensureOrderClientSite({
           clientId: order.clientId,

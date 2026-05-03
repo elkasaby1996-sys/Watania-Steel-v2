@@ -28,10 +28,11 @@ type AnalyticsCacheEntry = {
 const rangeCache = new Map<string, AnalyticsCacheEntry>();
 const CACHE_TTL_MS = 60_000;
 
-const getMaxDateFromTable = async (table: 'orders' | 'history_orders', signal?: AbortSignal) => {
+const getMaxDeliveredDateFromTable = async (table: 'orders' | 'history_orders', signal?: AbortSignal) => {
   const query = supabase
     .from(table)
     .select('date')
+    .eq('status', 'delivered')
     .order('date', { ascending: false })
     .limit(1);
 
@@ -45,8 +46,8 @@ const getMaxDateFromTable = async (table: 'orders' | 'history_orders', signal?: 
 
 export const fetchMaxDateAcrossTables = async (signal?: AbortSignal) => {
   const [ordersMax, historyMax] = await Promise.all([
-    getMaxDateFromTable('orders', signal),
-    getMaxDateFromTable('history_orders', signal),
+    getMaxDeliveredDateFromTable('orders', signal),
+    getMaxDeliveredDateFromTable('history_orders', signal),
   ]);
 
   if (!ordersMax && !historyMax) {
