@@ -180,7 +180,7 @@ export function AddOrderDialog() {
       const newOrder = {
         id: orderId,
         customerName: formData.deliveryName,
-        date: new Date().toISOString().split('T')[0],
+        date: formData.orderDate,
         status: formData.status,
         tons,
         shift: formData.shift,
@@ -653,4 +653,3 @@ export function AddOrderDialog() {
     </Dialog>
   );
 }
-

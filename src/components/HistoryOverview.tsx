@@ -4,6 +4,7 @@ import { Badge } from './ui/badge';
 import { BarChart3, Weight, Wrench, Package, TrendingUp } from 'lucide-react';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { roundTo3Decimals, formatNumber } from '../lib/utils';
+import { normalizeOrderType } from '../lib/orderTypes';
 
 export function HistoryOverview() {
   const dashboardStore = useDashboardStore();
@@ -30,7 +31,7 @@ export function HistoryOverview() {
       }
       
       const tons = order.tons || 0;
-      if (order.orderType === 'cut-and-bend') {
+      if (normalizeOrderType(order.orderType) === 'cut-and-bend') {
         metrics[deliveredDate].cutAndBend += tons;
       } else {
         metrics[deliveredDate].straightBar += tons;

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { orderService, activityService, historyService, supabase, ensureOrderClientSite, verifyHistoryOrderClientLink, type Order as DBOrder, type Activity as DBActivity, type HistoryOrder } from '../lib/supabase';
 import { roundTo3Decimals } from '../lib/utils';
 import { logger } from '../lib/logger';
+import { normalizeOrderType } from '../lib/orderTypes';
 
 // Transform database types to frontend types
 interface Order {
@@ -50,7 +51,7 @@ const dbToFrontend = (dbOrder: DBOrder): Order => {
     phoneNumber: dbOrder.phone_number,
     deliveredAt: dbOrder.delivered_at,
     signedDeliveryNote: dbOrder.signed_delivery_note || false,
-    orderType: dbOrder.order_type || 'straight-bar',
+    orderType: normalizeOrderType(dbOrder.order_type),
     breakdown: {
       '8mm': Number(dbOrder.breakdown_8mm) || 0,
       '10mm': Number(dbOrder.breakdown_10mm) || 0,
@@ -81,7 +82,7 @@ const frontendToDb = (order: Order): any => {
     phone_number: order.phoneNumber,
     delivered_at: order.deliveredAt,
     signed_delivery_note: order.signedDeliveryNote || false,
-    order_type: order.orderType || 'straight-bar',
+    order_type: normalizeOrderType(order.orderType),
     breakdown_8mm: Number(order.breakdown?.['8mm']) || 0,
     breakdown_10mm: Number(order.breakdown?.['10mm']) || 0,
     breakdown_12mm: Number(order.breakdown?.['12mm']) || 0,
@@ -93,6 +94,11 @@ const frontendToDb = (order: Order): any => {
     breakdown_32mm: Number(order.breakdown?.['32mm']) || 0,
   };
 };
+
+const getTodayDate = () => new Date().toISOString().split('T')[0];
+
+const isTodayActiveOrder = (order: Order) =>
+  order.date === getTodayDate() && order.status !== 'delivered';
 
 interface DashboardStats {
   todayOrders: number;
@@ -214,8 +220,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const dbOrders = await orderService.getAll();
       const orders = dbOrders.map(dbToFrontend);
       
-      // Show ALL non-delivered orders in today's orders
+      // Keep all active orders available in state, while today-facing views filter by date.
       const activeOrders = orders.filter(o => o.status !== 'delivered');
+      const todayActiveOrders = activeOrders.filter(isTodayActiveOrder);
       
       logger.debug('📊 Loaded orders:', {
         total: orders.length,
@@ -227,10 +234,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       });
       
       const stats = {
-        todayOrders: activeOrders.length,
-        inProgress: activeOrders.filter(o => o.status === 'in-progress').length,
-        completed: activeOrders.filter(o => o.status === 'completed').length,
-        delayed: activeOrders.filter(o => o.status === 'delayed').length,
+        todayOrders: todayActiveOrders.length,
+        inProgress: todayActiveOrders.filter(o => o.status === 'in-progress').length,
+        completed: todayActiveOrders.filter(o => o.status === 'completed').length,
+        delayed: todayActiveOrders.filter(o => o.status === 'delayed').length,
         delivered: get().stats?.delivered || 0
       };
       
@@ -289,7 +296,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
 
     set({ isLoadingMetrics: true, metricsError: null });
-    const todayDate = new Date().toISOString().split('T')[0];
+    const todayDate = getTodayDate();
 
     try {
       const { data, error } = await supabase
@@ -339,9 +346,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         const tons = Number(order.tons) || 0;
         totalTons += tons;
 
-        if (order.order_type === 'cut-and-bend') {
+        const orderType = normalizeOrderType(order.order_type);
+
+        if (orderType === 'cut-and-bend') {
           cutAndBendTons += tons;
-        } else if (order.order_type === 'straight-bar') {
+        } else if (orderType === 'straight-bar') {
           straightBarTons += tons;
         }
 
@@ -421,14 +430,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Remove from dashboard immediately so delivered orders are never visible in active table.
       set(state => {
         const orders = state.orders.filter(o => String(o.id) !== String(orderId));
+        const todayOrders = orders.filter(isTodayActiveOrder);
         return {
           orders,
           stats: {
             ...state.stats,
-            todayOrders: orders.length,
-            inProgress: orders.filter(o => o.status === 'in-progress').length,
-            completed: orders.filter(o => o.status === 'completed').length,
-            delayed: orders.filter(o => o.status === 'delayed').length
+            todayOrders: todayOrders.length,
+            inProgress: todayOrders.filter(o => o.status === 'in-progress').length,
+            completed: todayOrders.filter(o => o.status === 'completed').length,
+            delayed: todayOrders.filter(o => o.status === 'delayed').length
           }
         };
       });
@@ -480,7 +490,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           phone_number: order.phoneNumber || '',
           delivered_at: deliveredAt,
           signed_delivery_note: order.signedDeliveryNote || false,
-          order_type: order.orderType || 'straight-bar',
+          order_type: normalizeOrderType(order.orderType),
           breakdown_8mm: order.breakdown?.['8mm'] || 0,
           breakdown_10mm: order.breakdown?.['10mm'] || 0,
           breakdown_12mm: order.breakdown?.['12mm'] || 0,
@@ -520,11 +530,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         
         set(state => {
           const orders = [newOrder, ...state.orders];
+          const todayOrders = orders.filter(isTodayActiveOrder);
           const stats = {
-            todayOrders: orders.length,
-            inProgress: orders.filter(o => o.status === 'in-progress').length,
-            completed: orders.filter(o => o.status === 'completed').length,
-            delayed: orders.filter(o => o.status === 'delayed').length,
+            todayOrders: todayOrders.length,
+            inProgress: todayOrders.filter(o => o.status === 'in-progress').length,
+            completed: todayOrders.filter(o => o.status === 'completed').length,
+            delayed: todayOrders.filter(o => o.status === 'delayed').length,
             delivered: state.stats.delivered
           };
           return { orders, stats, loading: false };
@@ -589,11 +600,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       
       set(state => {
         const orders = state.orders.filter(order => order.id !== orderId);
+        const todayOrders = orders.filter(isTodayActiveOrder);
         const stats = {
-          todayOrders: orders.length,
-          inProgress: orders.length,
-          completed: 0,
-          delayed: 0,
+          todayOrders: todayOrders.length,
+          inProgress: todayOrders.filter(o => o.status === 'in-progress').length,
+          completed: todayOrders.filter(o => o.status === 'completed').length,
+          delayed: todayOrders.filter(o => o.status === 'delayed').length,
           delivered: state.stats.delivered
         };
         return { orders, stats };
@@ -612,7 +624,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   getTodayOrders: () => {
     const historyIds = new Set((get().historyOrders || []).map(order => String(order.id)));
     return get().orders.filter(
-      (order) => order.status !== 'delivered' && !historyIds.has(String(order.id))
+      (order) => isTodayActiveOrder(order) && !historyIds.has(String(order.id))
     );
   },
 
@@ -727,7 +739,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       
       orders.forEach(order => {
         const tons = order.tons || 0;
-        const orderType = order.order_type || 'straight-bar';
+        const orderType = normalizeOrderType(order.order_type);
         
         if (orderType === 'cut-and-bend') {
           cutAndBend += tons;

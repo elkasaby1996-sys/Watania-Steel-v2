@@ -16,6 +16,7 @@ import { useToast } from '../hooks/use-toast';
 import { historyService, orderService, type HistoryOrder } from '../lib/supabase';
 import { CalculatorInput } from './CalculatorInput';
 import { logger } from '@/lib/logger';
+import { normalizeOrderType } from '@/lib/orderTypes';
 
 interface OrderDetailsDialogProps {
   order: any;
@@ -183,7 +184,7 @@ export function OrderDetailsDialog({
         phoneNumber: order.phone_number,
         deliveredAt: order.delivered_at,
         signedDeliveryNote: order.signed_delivery_note,
-        orderType: order.order_type,
+        orderType: normalizeOrderType(order.order_type),
         breakdown: {
           '8mm': Number(order.breakdown_8mm) || 0,
           '10mm': Number(order.breakdown_10mm) || 0,
@@ -208,7 +209,7 @@ export function OrderDetailsDialog({
         tons: orderData.tons?.toString() || '',
         shift: orderData.shift || 'morning',
         signedDeliveryNote: orderData.signedDeliveryNote || false,
-        orderType: orderData.orderType || 'straight-bar',
+        orderType: normalizeOrderType(orderData.orderType),
         orderDate: orderData.date || new Date().toISOString().split('T')[0],
         breakdown: {
           '8mm': orderData.breakdown?.['8mm']?.toString() || '0',
@@ -824,7 +825,7 @@ export function OrderDetailsDialog({
                         const orderType = isHistoryOrder 
                           ? order.order_type 
                           : order.orderType;
-                        return orderType === 'cut-and-bend' ? 'Cut and Bend' : 'Straight Bar';
+                        return normalizeOrderType(orderType) === 'cut-and-bend' ? 'Cut and Bend' : 'Straight Bar';
                       })()}
                     </p>
                   </div>
@@ -971,4 +972,3 @@ export function OrderDetailsDialog({
     </Dialog>
   );
 }
-
