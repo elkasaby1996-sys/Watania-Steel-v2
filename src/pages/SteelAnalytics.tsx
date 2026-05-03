@@ -87,7 +87,7 @@ export function SteelAnalytics() {
       setError(null);
 
       try {
-        const maxDate = await fetchMaxDateAcrossTables(controller.signal);
+        const maxDate = await fetchMaxDateAcrossTables(filterMode, controller.signal);
 
         if (!maxDate) {
           if (!isMounted) return;
@@ -99,7 +99,7 @@ export function SteelAnalytics() {
         }
 
         const endDate = maxDate;
-        const startDate = subtractDays(endDate, selectedRangeDays);
+        const startDate = subtractDays(endDate, selectedRangeDays - 1);
 
         const summary = await fetchAnalyticsSummary({
           startDate,
@@ -302,7 +302,7 @@ export function SteelAnalytics() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                 <div className="p-4 rounded-lg border border-border bg-card">
-                  <p className="text-muted-foreground">Daily Average (Actual)</p>
+                  <p className="text-muted-foreground">Daily Average (Range)</p>
                   <p className="font-semibold text-foreground">
                     {formatNumber(analytics?.dailyAverage ?? 0)} tons
                   </p>

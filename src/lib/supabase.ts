@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getEnvVar } from './env'
 import { roundTo3Decimals } from './utils'
 import { logger } from './logger'
+import { normalizeOrderType } from './orderTypes'
 
 // Get Supabase credentials from environment variables
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL')
@@ -121,6 +122,9 @@ export interface HistoryOrderFilters {
 export interface HistoryOrderPage {
   data: HistoryOrder[];
   count: number;
+  totalPages?: number;
+  pageStart?: number;
+  pageEnd?: number;
   aborted?: boolean;
 }
 
@@ -246,7 +250,7 @@ export const dbToFrontend = (dbOrder: Order): any => {
     phoneNumber: dbOrder.phone_number,
     deliveredAt: dbOrder.delivered_at,
     signedDeliveryNote: dbOrder.signed_delivery_note || false,
-    orderType: dbOrder.order_type || 'straight-bar',
+    orderType: normalizeOrderType(dbOrder.order_type),
     breakdown: {
       '8mm': Number(dbOrder.breakdown_8mm) || 0,
       '10mm': Number(dbOrder.breakdown_10mm) || 0,
@@ -276,7 +280,7 @@ export const frontendToDb = (order: any): any => {
     phone_number: order.phoneNumber,
     delivered_at: order.deliveredAt,
     signed_delivery_note: order.signedDeliveryNote || false,
-    order_type: order.orderType || 'straight-bar',
+    order_type: normalizeOrderType(order.orderType),
     breakdown_8mm: Number(order.breakdown?.['8mm']) || 0,
     breakdown_10mm: Number(order.breakdown?.['10mm']) || 0,
     breakdown_12mm: Number(order.breakdown?.['12mm']) || 0,
@@ -670,6 +674,15 @@ export const driverService = {
 const HISTORY_ORDER_LIST_COLUMNS =
   'id,customer_name,date,status,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at,signed_delivery_note,order_type,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm';
 
+const HISTORY_ORDER_DATE_COLUMNS = 'id,date,delivered_at';
+
+type HistoryOrderDateRow = Pick<HistoryOrder, 'id' | 'date' | 'delivered_at'>;
+
+const getHistoryOrderDateKey = (order: HistoryOrderDateRow) => {
+  const orderDateTime = order?.date || order?.delivered_at;
+  return orderDateTime ? String(orderDateTime).split('T')[0] : null;
+};
+
 export const historyService = {
   async getAll(): Promise<HistoryOrder[]> {
     try {
@@ -701,8 +714,7 @@ export const historyService = {
     signal?: AbortSignal;
   }): Promise<HistoryOrderPage> {
     const { page, pageSize, filters, signal } = options;
-    const start = Math.max(0, (page - 1) * pageSize);
-    const end = start + pageSize - 1;
+    const indexChunkSize = 1000;
     const isAbortError = (error: unknown) => {
       if (!error) {
         return false;
@@ -722,32 +734,29 @@ export const historyService = {
       );
     };
 
-    try {
-      let query = supabase
-        .from('history_orders')
-        .select(HISTORY_ORDER_LIST_COLUMNS, { count: 'exact' })
-        .order('delivered_at', { ascending: false });
+    const applyFilters = (query: any) => {
+      let filteredQuery = query;
 
       if (filters?.status) {
-        query = query.eq('status', filters.status);
+        filteredQuery = filteredQuery.eq('status', filters.status);
       }
 
       if (filters?.company) {
-        query = query.ilike('company', `%${filters.company}%`);
+        filteredQuery = filteredQuery.ilike('company', `%${filters.company}%`);
       }
 
       if (filters?.dateFrom) {
-        query = query.gte('delivered_at', `${filters.dateFrom}T00:00:00`);
+        filteredQuery = filteredQuery.gte('delivered_at', `${filters.dateFrom}T00:00:00`);
       }
 
       if (filters?.dateTo) {
-        query = query.lte('delivered_at', `${filters.dateTo}T23:59:59.999`);
+        filteredQuery = filteredQuery.lte('delivered_at', `${filters.dateTo}T23:59:59.999`);
       }
 
       if (filters?.search) {
         const term = filters.search.replace(/,/g, '').trim();
         if (term) {
-          query = query.or([
+          filteredQuery = filteredQuery.or([
             `id.ilike.%${term}%`,
             `delivery_number.ilike.%${term}%`,
             `customer_name.ilike.%${term}%`,
@@ -762,11 +771,121 @@ export const historyService = {
         }
       }
 
+      return filteredQuery;
+    };
+
+    try {
+      const indexRows: HistoryOrderDateRow[] = [];
+      let totalCount = 0;
+      let offset = 0;
+
+      while (true) {
+        let indexQuery = applyFilters(
+          supabase
+            .from('history_orders')
+            .select(HISTORY_ORDER_DATE_COLUMNS, { count: offset === 0 ? 'exact' : undefined })
+            .order('delivered_at', { ascending: false })
+        );
+
+        if (signal) {
+          indexQuery = indexQuery.abortSignal(signal);
+        }
+
+        const { data, error, count } = await indexQuery.range(offset, offset + indexChunkSize - 1);
+
+        if (error) {
+          if (isAbortError(error)) {
+            return { data: [], count: 0, aborted: true };
+          }
+          if (error.code === 'PGRST116' || error.message?.includes('relation "history_orders" does not exist')) {
+            console.warn('History orders table does not exist yet.');
+            return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
+          }
+          console.error('Database error fetching history order dates:', error);
+          return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
+        }
+
+        if (typeof count === 'number') {
+          totalCount = count;
+        }
+
+        const rows = (data || []) as HistoryOrderDateRow[];
+        indexRows.push(...rows);
+
+        if (rows.length < indexChunkSize || indexRows.length >= totalCount) {
+          break;
+        }
+
+        offset += indexChunkSize;
+      }
+
+      if (totalCount === 0 && indexRows.length > 0) {
+        totalCount = indexRows.length;
+      }
+
+      if (totalCount === 0 || indexRows.length === 0) {
+        return { data: [], count: totalCount, totalPages: 1, pageStart: 0, pageEnd: 0 };
+      }
+
+      const dateGroups: Array<{ date: string; count: number }> = [];
+      const dateGroupMap = new Map<string, { date: string; count: number }>();
+
+      indexRows.forEach((row) => {
+        const date = getHistoryOrderDateKey(row);
+        if (!date) return;
+
+        let group = dateGroupMap.get(date);
+        if (!group) {
+          group = { date, count: 0 };
+          dateGroupMap.set(date, group);
+          dateGroups.push(group);
+        }
+
+        group.count += 1;
+      });
+
+      const pages: Array<{ dates: string[]; count: number }> = [];
+      let currentPage = { dates: [] as string[], count: 0 };
+
+      dateGroups.forEach((group) => {
+        if (currentPage.dates.length > 0 && currentPage.count >= pageSize) {
+          pages.push(currentPage);
+          currentPage = { dates: [], count: 0 };
+        }
+
+        currentPage.dates.push(group.date);
+        currentPage.count += group.count;
+      });
+
+      if (currentPage.dates.length > 0) {
+        pages.push(currentPage);
+      }
+
+      const totalPages = Math.max(1, pages.length);
+      const safePage = Math.min(Math.max(1, page), totalPages);
+      const selectedPage = pages[safePage - 1] || { dates: [], count: 0 };
+      const previousRows = pages
+        .slice(0, safePage - 1)
+        .reduce((sum, pageGroup) => sum + pageGroup.count, 0);
+
+      if (selectedPage.dates.length === 0) {
+        return { data: [], count: totalCount, totalPages, pageStart: 0, pageEnd: 0 };
+      }
+
+      let query = applyFilters(
+        supabase
+          .from('history_orders')
+          .select(HISTORY_ORDER_LIST_COLUMNS)
+          .in('date', selectedPage.dates)
+          .order('delivered_at', { ascending: false })
+          .range(0, Math.max(selectedPage.count - 1, 0))
+      );
+
       if (signal) {
         query = query.abortSignal(signal);
       }
 
-      const { data, error, count } = await query.range(start, end);
+      const { data, error } = await query;
 
       if (error) {
         if (isAbortError(error)) {
@@ -774,19 +893,25 @@ export const historyService = {
         }
         if (error.code === 'PGRST116' || error.message?.includes('relation "history_orders" does not exist')) {
           console.warn('History orders table does not exist yet.');
-          return { data: [], count: 0 };
+          return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
         }
         console.error('Database error fetching history orders:', error);
-        return { data: [], count: 0 };
+        return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
       }
 
-      return { data: data || [], count: count || 0 };
+      return {
+        data: data || [],
+        count: totalCount,
+        totalPages,
+        pageStart: previousRows + 1,
+        pageEnd: previousRows + (data?.length || 0)
+      };
     } catch (error) {
       if (isAbortError(error)) {
         return { data: [], count: 0, aborted: true };
       }
       console.error('Failed to fetch paginated history orders:', error);
-      return { data: [], count: 0 };
+      return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
     }
   },
 
@@ -832,7 +957,7 @@ export const historyService = {
         phone_number: order.phoneNumber || '',
         delivered_at: deliveredAt,
         signed_delivery_note: order.signedDeliveryNote || false,
-        order_type: order.orderType || 'straight-bar',
+        order_type: normalizeOrderType(order.orderType),
         breakdown_8mm: order.breakdown?.['8mm'] || 0,
         breakdown_10mm: order.breakdown?.['10mm'] || 0,
         breakdown_12mm: order.breakdown?.['12mm'] || 0,
@@ -937,7 +1062,7 @@ export const historyService = {
         phone_number: order.phone_number || '',
         delivered_at: null,
         signed_delivery_note: order.signed_delivery_note || false,
-        order_type: order.order_type || 'straight-bar',
+        order_type: normalizeOrderType(order.order_type),
         breakdown_8mm: order.breakdown_8mm || 0,
         breakdown_10mm: order.breakdown_10mm || 0,
         breakdown_12mm: order.breakdown_12mm || 0,

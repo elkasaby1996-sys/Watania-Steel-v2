@@ -29,6 +29,7 @@ import { roundTo3Decimals, formatNumber } from '../lib/utils';
 import { ROUTES } from '@/routes/routes';
 import { logger } from '@/lib/logger';
 import { useDeviceInfo } from '@/hooks/useDeviceInfo';
+import { normalizeOrderType } from '@/lib/orderTypes';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const HISTORY_REFRESH_DEBOUNCE_MS = 300;
@@ -50,6 +51,9 @@ export function History() {
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [historyOrders, setHistoryOrders] = useState<HistoryOrder[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [visiblePageStart, setVisiblePageStart] = useState(0);
+  const [visiblePageEnd, setVisiblePageEnd] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isMobile } = useDeviceInfo();
@@ -106,6 +110,9 @@ export function History() {
 
       setHistoryOrders(result.data);
       setTotalCount(result.count);
+      setServerTotalPages(result.totalPages || 1);
+      setVisiblePageStart(result.pageStart || 0);
+      setVisiblePageEnd(result.pageEnd || 0);
     } catch (fetchError) {
       if (controller.signal.aborted || requestId !== requestIdRef.current) {
         return;
@@ -115,6 +122,9 @@ export function History() {
       setError(message);
       setHistoryOrders([]);
       setTotalCount(0);
+      setServerTotalPages(1);
+      setVisiblePageStart(0);
+      setVisiblePageEnd(0);
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false);
@@ -183,7 +193,7 @@ export function History() {
 
       orders.forEach(order => {
         const tons = order.tons || 0;
-        const orderType = order.order_type || 'straight-bar';
+        const orderType = normalizeOrderType(order.order_type);
 
         if (orderType === 'cut-and-bend') {
           cutAndBend += tons;
@@ -209,8 +219,8 @@ export function History() {
   }, [deliveredOrdersByDate]);
 
   const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(totalCount / pageSize));
-  }, [totalCount, pageSize]);
+    return Math.max(1, serverTotalPages);
+  }, [serverTotalPages]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -267,8 +277,8 @@ export function History() {
     });
   }, []);
 
-  const pageStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalCount);
+  const pageStart = totalCount === 0 ? 0 : visiblePageStart;
+  const pageEnd = totalCount === 0 ? 0 : visiblePageEnd;
 
   return (
     <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
@@ -357,7 +367,7 @@ export function History() {
                 <SelectContent className="bg-popover text-popover-foreground">
                   {PAGE_SIZE_OPTIONS.map(option => (
                     <SelectItem key={option} value={String(option)}>
-                      {option} per page
+                      About {option} orders / page
                     </SelectItem>
                   ))}
                 </SelectContent>
