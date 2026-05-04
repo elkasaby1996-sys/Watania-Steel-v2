@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-04T00:00:00+03:00",
+  "title": "Design System: Watania Steel ERP",
+  "extensions": {
+    "colorMeta": {
+      "industrial-night": {
+        "role": "neutral",
+        "displayName": "Industrial Night",
+        "canonical": "hsl(218, 35%, 12%)",
+        "tonalRamp": [
+          "oklch(15% 0.03 255)",
+          "oklch(24% 0.03 255)",
+          "oklch(34% 0.03 255)",
+          "oklch(45% 0.025 255)",
+          "oklch(58% 0.02 255)",
+          "oklch(72% 0.015 255)",
+          "oklch(86% 0.01 255)",
+          "oklch(95% 0.006 255)"
+        ]
+      },
+      "watania-maroon": {
+        "role": "primary",
+        "displayName": "Watania Maroon",
+        "canonical": "hsl(345, 65%, 30%)",
+        "tonalRamp": [
+          "oklch(15% 0.06 10)",
+          "oklch(24% 0.08 10)",
+          "oklch(34% 0.1 10)",
+          "oklch(45% 0.11 10)",
+          "oklch(58% 0.1 10)",
+          "oklch(72% 0.07 10)",
+          "oklch(86% 0.04 10)",
+          "oklch(95% 0.02 10)"
+        ]
+      },
+      "steel-panel": {
+        "role": "neutral",
+        "displayName": "Steel Panel",
+        "canonical": "hsl(217, 30%, 16%)",
+        "tonalRamp": [
+          "oklch(15% 0.025 255)",
+          "oklch(24% 0.025 255)",
+          "oklch(34% 0.024 255)",
+          "oklch(45% 0.02 255)",
+          "oklch(58% 0.018 255)",
+          "oklch(72% 0.014 255)",
+          "oklch(86% 0.01 255)",
+          "oklch(95% 0.006 255)"
+        ]
+      },
+      "success-green": {
+        "role": "semantic",
+        "displayName": "Success Green",
+        "canonical": "hsl(142, 50%, 40%)",
+        "tonalRamp": [
+          "oklch(15% 0.05 150)",
+          "oklch(24% 0.07 150)",
+          "oklch(34% 0.09 150)",
+          "oklch(45% 0.1 150)",
+          "oklch(58% 0.09 150)",
+          "oklch(72% 0.06 150)",
+          "oklch(86% 0.035 150)",
+          "oklch(95% 0.015 150)"
+        ]
+      },
+      "warning-amber": {
+        "role": "semantic",
+        "displayName": "Warning Amber",
+        "canonical": "hsl(38, 80%, 50%)",
+        "tonalRamp": [
+          "oklch(15% 0.05 75)",
+          "oklch(24% 0.07 75)",
+          "oklch(34% 0.09 75)",
+          "oklch(45% 0.11 75)",
+          "oklch(58% 0.11 75)",
+          "oklch(72% 0.08 75)",
+          "oklch(86% 0.045 75)",
+          "oklch(95% 0.02 75)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Primary page titles and today-first screen headers."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "App shell titles and section-level hierarchy."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles, modal headings, and dense operational groups."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Tables, forms, supporting text, and daily workflow copy."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Table headers, badges, metadata, and compact controls."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card",
+        "value": "0 1px 3px rgba(0, 0, 0, 0.25)",
+        "purpose": "Default surface separation on dark panels."
+      },
+      {
+        "name": "card-hover",
+        "value": "0 4px 12px rgba(0, 0, 0, 0.3)",
+        "purpose": "Interactive card hover response."
+      },
+      {
+        "name": "industrial",
+        "value": "0 2px 8px rgba(0, 0, 0, 0.3)",
+        "purpose": "Primary controls and sturdy low elevation."
+      },
+      {
+        "name": "industrial-lg",
+        "value": "0 8px 24px rgba(0, 0, 0, 0.4)",
+        "purpose": "Dialogs and high-priority overlays."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-fast",
+        "value": "200ms ease-out",
+        "purpose": "Buttons, inputs, cards, and table row hover states."
+      },
+      {
+        "name": "shell-slide",
+        "value": "300ms ease-in-out",
+        "purpose": "Sidebar width changes and mobile drawer entry."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "2xl-container",
+        "value": "1400px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action button for creating orders, saving forms, and confirmed workflow actions.",
+      "html": "<button class=\"ds-btn-primary\">Add Order</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 20px; border: 0; border-radius: 10px; background: #7e1b34; color: #f8fafb; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); transition: background 200ms ease-out, box-shadow 200ms ease-out; } .ds-btn-primary:hover { background: rgba(126, 27, 52, 0.9); } .ds-btn-primary:focus-visible { outline: 2px solid #931f3c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Supporting action button for retry, filters, and secondary workflows.",
+      "html": "<button class=\"ds-btn-secondary\">Retry</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 20px; border: 1px solid #344256; border-radius: 10px; background: #2c3849; color: #d1d9e0; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; transition: background 200ms ease-out, border-color 200ms ease-out; } .ds-btn-secondary:hover { background: rgba(44, 56, 73, 0.8); } .ds-btn-secondary:focus-visible { outline: 2px solid #931f3c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Default text input for forms, search, and operational filters.",
+      "html": "<input class=\"ds-input\" placeholder=\"Search orders\" />",
+      "css": ".ds-input { width: 100%; height: 40px; padding: 8px 12px; border: 1px solid #344256; border-radius: 10px; background: #1f2937; color: #d1d9e0; font-family: Inter, sans-serif; font-size: 14px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); transition: border-color 200ms ease-out, box-shadow 200ms ease-out; } .ds-input::placeholder { color: #7b899d; } .ds-input:focus-visible { outline: 2px solid #931f3c; outline-offset: 2px; border-color: #931f3c; }"
+    },
+    {
+      "name": "Operations Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Default dashboard card for daily metrics and grouped operational information.",
+      "html": "<section class=\"ds-card\"><p class=\"ds-card-label\">Active Orders</p><strong class=\"ds-card-value\">24</strong></section>",
+      "css": ".ds-card { padding: 24px; border: 1px solid #344256; border-radius: 10px; background: #1d2635; color: #d1d9e0; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: box-shadow 200ms ease-out; } .ds-card:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); } .ds-card-label { margin: 0 0 8px; color: #7b899d; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; } .ds-card-value { color: #f8fafb; font-family: Inter, sans-serif; font-size: 30px; font-weight: 700; line-height: 1; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Compact operational status label for orders, roles, and workflow state.",
+      "html": "<span class=\"ds-badge ds-badge-warning\">Delayed</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; height: 22px; padding: 2px 10px; border-radius: 8px; font-family: Inter, sans-serif; font-size: 12px; font-weight: 500; line-height: 1; } .ds-badge-warning { background: #e69b19; color: #1b2336; } .ds-badge-success { background: #339958; color: #f8fafb; } .ds-badge-neutral { background: #2c3849; color: #d1d9e0; border: 1px solid #344256; }"
+    },
+    {
+      "name": "Operations Table",
+      "kind": "custom",
+      "refersTo": "table",
+      "description": "Dense table shell for orders, drivers, clients, and inventory operations.",
+      "html": "<table class=\"ds-table\"><thead><tr><th>Order</th><th>Status</th><th class=\"ds-num\">Tons</th></tr></thead><tbody><tr><td>ORD-1042</td><td>In Progress</td><td class=\"ds-num\">18.5</td></tr></tbody></table>",
+      "css": ".ds-table { width: 100%; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid rgba(52, 66, 86, 0.6); border-radius: 12px; background: rgba(29, 38, 53, 0.6); color: #d1d9e0; font-family: Inter, sans-serif; font-size: 14px; } .ds-table th { height: 48px; padding: 0 16px; background: rgba(38, 49, 64, 0.7); color: #7b899d; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-align: left; text-transform: uppercase; } .ds-table td { padding: 12px 16px; border-top: 1px solid rgba(52, 66, 86, 0.4); } .ds-table tbody tr:hover { background: rgba(48, 61, 80, 0.45); } .ds-num { text-align: right; font-family: JetBrains Mono, monospace; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Persistent navigation item with active state for app sections.",
+      "html": "<button class=\"ds-nav-item ds-nav-active\"><span class=\"ds-nav-mark\"></span><span>Dashboard</span></button>",
+      "css": ".ds-nav-item { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 16px; border: 0; border-radius: 10px; background: transparent; color: #a3b3c2; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; text-align: left; transition: background 200ms ease-out, color 200ms ease-out; } .ds-nav-item:hover { background: #202b3c; color: #f8fafb; } .ds-nav-active { background: #242f42; color: #f8fafb; } .ds-nav-mark { position: absolute; left: 0; top: 50%; width: 4px; height: 24px; border-radius: 0 999px 999px 0; background: #7e1b34; transform: translateY(-50%); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Shift Ledger",
+    "overview": "A disciplined operations ledger for a steel factory: dark, sturdy, calm, and built for fast daily reading. The interface is product-first and should keep today's work, exceptions, and traceable operational state above decorative polish.",
+    "keyCharacteristics": [
+      "Dark industrial shell",
+      "Restrained maroon primary action",
+      "Dense tables and daily metric surfaces",
+      "Subtle tonal layering",
+      "Desktop-first with practical mobile cards"
+    ],
+    "rules": [
+      {
+        "name": "The Today-First Color Rule",
+        "body": "Maroon and semantic colors should point to action, state, or exception.",
+        "section": "colors"
+      },
+      {
+        "name": "The Numbers Need Shape Rule",
+        "body": "Use JetBrains Mono and tabular alignment for IDs, tons, dates, phone numbers, counts, and money-like values.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Until Useful Rule",
+        "body": "Use elevation to explain surface priority, hover, focus, or overlay depth.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do lead with today's operational snapshot before historical analysis.",
+      "Do use Watania Maroon for primary actions, active navigation, and meaningful emphasis.",
+      "Do preserve desktop density while keeping mobile cards readable and touch-friendly."
+    ],
+    "donts": [
+      "Don't make the product look like a generic SaaS dashboard.",
+      "Don't use overly colorful charts that compete with daily operations.",
+      "Don't rely on color alone for delayed, completed, pending, or delivered states."
+    ]
+  }
+}

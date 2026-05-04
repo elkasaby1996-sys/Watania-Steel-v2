@@ -18,6 +18,8 @@ netlify builds/
 !.env.example
 *.tsbuildinfo
 .superpowers/
+.codex-*
+.chrome-qa-temp/
 
 # Editor directories and files
 .vscode/*
