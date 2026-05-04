@@ -24,7 +24,7 @@ const PhoneLink = ({ phoneNumber }: { phoneNumber: string }) => {
   return (
     <a 
       href={`tel:${cleanNumber}`}
-      className="text-primary hover:text-primary/80 underline cursor-pointer inline-flex items-center gap-1"
+      className="inline-flex min-w-0 max-w-full items-center gap-1 break-all text-primary underline hover:text-primary/80"
       title="Click to call"
     >
       📞 {phoneNumber}
@@ -169,7 +169,7 @@ export function DriversTable() {
                       <p>Completed: {driverMetrics.completed_orders}</p>
                       <p>Total Tons: {driverMetrics.total_tons} tons</p>
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="grid grid-cols-2 gap-2 pt-1 [&_button]:w-full">
                       <RoleBasedComponent action="edit">
                         <Button variant="outline" size="sm" className="h-11 px-3" onClick={() => handleStatusToggle(driver)}>
                           {driver.is_active ? 'Deactivate' : 'Activate'}

@@ -59,7 +59,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
       isMobile ? 'left-0' : sidebarCollapsed ? 'left-16' : 'left-64'
     }`}>
       <div className={`flex h-full items-center justify-between ${isMobile ? 'px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]' : 'px-6'}`}>
-        <div className="flex-1 flex items-center">
+        <div className="flex min-w-0 flex-1 items-center">
           {isMobile && (
             <Button
               variant="ghost"
@@ -71,7 +71,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
               <Menu size={18} />
             </Button>
           )}
-          <h1 className={`font-headline font-bold text-foreground ${isMobile ? 'text-base' : 'text-xl'}`}>
+          <h1 className={`min-w-0 truncate font-headline font-bold text-foreground ${isMobile ? 'text-base' : 'text-xl'}`}>
             {isMobile ? 'Watania ERP' : 'Factory Management System'}
           </h1>
         </div>
@@ -110,7 +110,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="text-foreground hover:bg-white/[0.07] hover:text-accent-foreground p-2"
+                className={`${isMobile ? 'h-11 w-11 p-0' : 'p-2'} text-foreground hover:bg-white/[0.07] hover:text-accent-foreground`}
               >
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-secondary text-secondary-foreground text-sm font-medium">

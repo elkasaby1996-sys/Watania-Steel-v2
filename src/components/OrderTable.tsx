@@ -157,7 +157,7 @@ export function OrderTable() {
                         </a>
                       ) : null}
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="grid grid-cols-2 gap-2 pt-1 [&_button]:w-full">
                       <Button
                         variant="outline"
                         size="sm"
