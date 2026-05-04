@@ -9,55 +9,66 @@
 /* Industrial Pro Design System - Dark Navy Theme */
 :root {
   /* Core colors - Dark Navy Theme */
-  --color-border: hsl(215, 25%, 27%);
-  --color-input: hsl(215, 28%, 17%);
-  --color-ring: hsl(345, 65%, 35%);
-  --color-background: hsl(218, 35%, 12%);
-  --color-foreground: hsl(210, 20%, 85%);
+  --color-border: hsl(214, 24%, 32%);
+  --color-input: hsl(216, 28%, 16%);
+  --color-ring: hsl(345, 68%, 44%);
+  --color-background: hsl(220, 42%, 7%);
+  --color-foreground: hsl(210, 24%, 90%);
 
   /* Primary - Dark Maroon (Brand Color) */
-  --color-primary: hsl(345, 65%, 30%);
-  --color-primary-foreground: hsl(0, 0%, 100%);
+  --color-primary: hsl(345, 66%, 34%);
+  --color-primary-foreground: hsl(210, 28%, 96%);
 
   /* Secondary - Muted Blue-Gray */
-  --color-secondary: hsl(215, 25%, 23%);
-  --color-secondary-foreground: hsl(210, 20%, 85%);
+  --color-secondary: hsl(216, 25%, 24%);
+  --color-secondary-foreground: hsl(210, 24%, 90%);
 
   /* Tertiary */
-  --color-tertiary: hsl(215, 20%, 35%);
-  --color-tertiary-foreground: hsl(210, 20%, 90%);
+  --color-tertiary: hsl(216, 20%, 40%);
+  --color-tertiary-foreground: hsl(210, 28%, 94%);
 
   /* Neutral */
-  --color-neutral: hsl(215, 28%, 17%);
-  --color-neutral-foreground: hsl(210, 20%, 85%);
+  --color-neutral: hsl(216, 28%, 16%);
+  --color-neutral-foreground: hsl(210, 24%, 90%);
 
   /* Semantic colors */
-  --color-destructive: hsl(0, 65%, 50%);
-  --color-destructive-foreground: hsl(0, 0%, 100%);
-  --color-success: hsl(142, 50%, 40%);
-  --color-success-foreground: hsl(0, 0%, 100%);
-  --color-warning: hsl(38, 80%, 50%);
-  --color-warning-foreground: hsl(0, 0%, 10%);
+  --color-destructive: hsl(0, 66%, 52%);
+  --color-destructive-foreground: hsl(210, 28%, 96%);
+  --color-success: hsl(142, 48%, 42%);
+  --color-success-foreground: hsl(210, 28%, 96%);
+  --color-warning: hsl(38, 82%, 53%);
+  --color-warning-foreground: hsl(220, 42%, 7%);
 
   /* Muted & Accent */
-  --color-muted: hsl(215, 25%, 20%);
-  --color-muted-foreground: hsl(215, 15%, 55%);
-  --color-accent: hsl(215, 25%, 25%);
-  --color-accent-foreground: hsl(210, 20%, 90%);
+  --color-muted: hsl(216, 26%, 20%);
+  --color-muted-foreground: hsl(214, 18%, 64%);
+  --color-accent: hsl(216, 28%, 24%);
+  --color-accent-foreground: hsl(210, 28%, 95%);
 
   /* Surfaces */
-  --color-popover: hsl(218, 32%, 15%);
-  --color-popover-foreground: hsl(210, 20%, 85%);
+  --color-popover: hsl(218, 32%, 14%);
+  --color-popover-foreground: hsl(210, 24%, 90%);
   --color-card: hsl(217, 30%, 16%);
-  --color-card-foreground: hsl(210, 20%, 85%);
+  --color-card-foreground: hsl(210, 24%, 90%);
 
   /* Sidebar */
-  --color-sidebar: hsl(218, 35%, 10%);
-  --color-sidebar-foreground: hsl(210, 20%, 70%);
-  --color-sidebar-border: hsl(215, 25%, 20%);
-  --color-sidebar-accent: hsl(345, 65%, 30%);
-  --color-sidebar-hover: hsl(217, 30%, 18%);
-  --color-sidebar-active: hsl(217, 30%, 20%);
+  --color-sidebar: hsl(220, 42%, 7%);
+  --color-sidebar-foreground: hsl(212, 21%, 72%);
+  --color-sidebar-border: hsl(214, 24%, 28%);
+  --color-sidebar-accent: hsl(345, 66%, 34%);
+  --color-sidebar-hover: hsl(216, 30%, 18%);
+  --color-sidebar-active: hsl(216, 30%, 22%);
+
+  /* Glass material */
+  --glass-panel: hsla(217, 30%, 16%, 0.58);
+  --glass-panel-strong: hsla(217, 30%, 14%, 0.76);
+  --glass-panel-soft: hsla(217, 30%, 18%, 0.42);
+  --glass-border: hsla(210, 28%, 92%, 0.16);
+  --glass-border-strong: hsla(210, 28%, 96%, 0.24);
+  --glass-highlight: hsla(210, 28%, 98%, 0.11);
+  --glass-shadow: 0 22px 55px rgba(0, 0, 0, 0.34);
+  --glass-shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.22);
+  --glass-blur: 22px;
 
   /* Typography */
   --font-sans: "Inter", sans-serif;
@@ -65,7 +76,7 @@
   --font-mono: "JetBrains Mono", monospace;
 
   /* Radius */
-  --radius: 10px;
+  --radius: 14px;
 
   /* Shadows for dark theme */
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
@@ -136,9 +147,14 @@
 }
 
 /* Ensure proper color application */
-html, body {
+html,
+body {
+  min-height: 100%;
   color: var(--color-foreground);
-  background-color: var(--color-background);
+  background:
+    radial-gradient(circle at 10% 0%, hsla(345, 66%, 34%, 0.22), transparent 28%),
+    radial-gradient(circle at 85% 12%, hsla(216, 20%, 40%, 0.22), transparent 32%),
+    hsl(220, 42%, 7%);
   font-family: var(--font-sans);
 }
 
@@ -147,7 +163,11 @@ html, body {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply text-foreground antialiased;
+    background:
+      radial-gradient(circle at 10% 0%, hsla(345, 66%, 34%, 0.22), transparent 28%),
+      radial-gradient(circle at 85% 12%, hsla(216, 20%, 40%, 0.22), transparent 32%),
+      hsl(220, 42%, 7%);
   }
 
   /* Typography enhancements */
@@ -162,6 +182,44 @@ html, body {
 }
 
 @layer components {
+  .glass-shell {
+    background:
+      radial-gradient(circle at 8% 8%, hsla(345, 66%, 34%, 0.28), transparent 26%),
+      radial-gradient(circle at 82% 16%, hsla(216, 20%, 40%, 0.24), transparent 30%),
+      linear-gradient(135deg, hsl(220, 42%, 7%), hsl(218, 36%, 12%) 48%, hsl(220, 42%, 8%));
+  }
+
+  .glass-panel {
+    background: var(--glass-panel);
+    border: 1px solid var(--glass-border);
+    box-shadow: inset 0 1px var(--glass-highlight), var(--glass-shadow-soft);
+    backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+  }
+
+  .glass-panel-strong {
+    background: var(--glass-panel-strong);
+    border: 1px solid var(--glass-border-strong);
+    box-shadow: inset 0 1px var(--glass-highlight), var(--glass-shadow);
+    backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  }
+
+  .glass-card-hover {
+    transition: border-color 180ms ease-out, box-shadow 180ms ease-out, background-color 180ms ease-out;
+  }
+
+  .glass-card-hover:hover {
+    border-color: var(--glass-border-strong);
+    box-shadow: inset 0 1px var(--glass-highlight), 0 24px 58px rgba(0, 0, 0, 0.3);
+  }
+
+  .phone-safe-page {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+
   /* Industrial Pro Table Styles */
   .table-industrial {
     @apply w-full;
