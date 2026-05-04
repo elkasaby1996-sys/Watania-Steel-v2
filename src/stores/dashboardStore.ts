@@ -97,8 +97,12 @@ const frontendToDb = (order: Order): any => {
 
 const getTodayDate = () => new Date().toISOString().split('T')[0];
 
-const isTodayActiveOrder = (order: Order) =>
-  order.date === getTodayDate() && order.status !== 'delivered';
+const getOrderDate = (order: Pick<Order, 'date'>) => String(order.date || '').split('T')[0];
+
+const isCurrentActiveOrder = (order: Order) => {
+  const orderDate = getOrderDate(order);
+  return Boolean(orderDate) && orderDate <= getTodayDate() && order.status !== 'delivered';
+};
 
 interface DashboardStats {
   todayOrders: number;
@@ -220,9 +224,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const dbOrders = await orderService.getAll();
       const orders = dbOrders.map(dbToFrontend);
       
-      // Keep all active orders available in state, while today-facing views filter by date.
+      // Keep all active orders available in state, while dashboard-facing views include carryover work.
       const activeOrders = orders.filter(o => o.status !== 'delivered');
-      const todayActiveOrders = activeOrders.filter(isTodayActiveOrder);
+      const currentActiveOrders = activeOrders.filter(isCurrentActiveOrder);
       
       logger.debug('📊 Loaded orders:', {
         total: orders.length,
@@ -234,10 +238,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       });
       
       const stats = {
-        todayOrders: todayActiveOrders.length,
-        inProgress: todayActiveOrders.filter(o => o.status === 'in-progress').length,
-        completed: todayActiveOrders.filter(o => o.status === 'completed').length,
-        delayed: todayActiveOrders.filter(o => o.status === 'delayed').length,
+        todayOrders: currentActiveOrders.length,
+        inProgress: currentActiveOrders.filter(o => o.status === 'in-progress').length,
+        completed: currentActiveOrders.filter(o => o.status === 'completed').length,
+        delayed: currentActiveOrders.filter(o => o.status === 'delayed').length,
         delivered: get().stats?.delivered || 0
       };
       
@@ -318,7 +322,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           breakdown_25mm,
           breakdown_32mm
         `)
-        .eq('date', todayDate);
+        .neq('status', 'delivered')
+        .lte('date', todayDate);
 
       if (error) {
         throw error;
@@ -430,7 +435,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Remove from dashboard immediately so delivered orders are never visible in active table.
       set(state => {
         const orders = state.orders.filter(o => String(o.id) !== String(orderId));
-        const todayOrders = orders.filter(isTodayActiveOrder);
+        const todayOrders = orders.filter(isCurrentActiveOrder);
         return {
           orders,
           stats: {
@@ -530,7 +535,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         
         set(state => {
           const orders = [newOrder, ...state.orders];
-          const todayOrders = orders.filter(isTodayActiveOrder);
+          const todayOrders = orders.filter(isCurrentActiveOrder);
           const stats = {
             todayOrders: todayOrders.length,
             inProgress: todayOrders.filter(o => o.status === 'in-progress').length,
@@ -600,7 +605,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       
       set(state => {
         const orders = state.orders.filter(order => order.id !== orderId);
-        const todayOrders = orders.filter(isTodayActiveOrder);
+        const todayOrders = orders.filter(isCurrentActiveOrder);
         const stats = {
           todayOrders: todayOrders.length,
           inProgress: todayOrders.filter(o => o.status === 'in-progress').length,
@@ -624,7 +629,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   getTodayOrders: () => {
     const historyIds = new Set((get().historyOrders || []).map(order => String(order.id)));
     return get().orders.filter(
-      (order) => isTodayActiveOrder(order) && !historyIds.has(String(order.id))
+      (order) => isCurrentActiveOrder(order) && !historyIds.has(String(order.id))
     );
   },
 

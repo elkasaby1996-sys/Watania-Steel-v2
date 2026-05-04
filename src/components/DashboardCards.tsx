@@ -14,7 +14,7 @@ export function DashboardCards() {
 
   const cards = [
     {
-      title: "Today's Orders",
+      title: 'Active Orders',
       value: dashboardMetrics.todayOrders,
       icon: Package,
       color: 'text-primary',
