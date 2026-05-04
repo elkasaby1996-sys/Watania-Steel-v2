@@ -160,9 +160,9 @@ export function SteelAnalytics() {
   const handleRetry = () => setReloadToken((prev) => prev + 1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-4">
         <Button
             variant="ghost"
             size="sm"
@@ -301,21 +301,21 @@ export function SteelAnalytics() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                <div className="p-4 rounded-lg border border-border bg-card">
+                <div className="glass-panel rounded-xl p-4">
                   <p className="text-muted-foreground">Daily Average (Range)</p>
                   <p className="font-semibold text-foreground">
                     {formatNumber(analytics?.dailyAverage ?? 0)} tons
                   </p>
                 </div>
-                <div className="p-4 rounded-lg border border-border bg-card">
+                <div className="glass-panel rounded-xl p-4">
                   <p className="text-muted-foreground">Active Days</p>
                   <p className="font-semibold text-foreground">{analytics?.activeDays ?? 0} days</p>
                 </div>
-                <div className="p-4 rounded-lg border border-border bg-card">
+                <div className="glass-panel rounded-xl p-4">
                   <p className="text-muted-foreground">Rows Analyzed</p>
                   <p className="font-semibold text-foreground">{analytics?.rowsAnalyzed ?? 0} rows</p>
                 </div>
-                <div className="p-4 rounded-lg border border-border bg-card">
+                <div className="glass-panel rounded-xl p-4">
                   <p className="text-muted-foreground">Total Tons (Actual)</p>
                   <p className="font-semibold text-foreground">
                     {formatNumber(analytics?.totalTons ?? 0)} tons

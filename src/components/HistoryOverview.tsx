@@ -92,7 +92,7 @@ export function HistoryOverview() {
   ];
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5" />
@@ -105,8 +105,8 @@ export function HistoryOverview() {
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {overviewCards.map((card, index) => (
-            <div key={index} className="text-center p-4 border border-border rounded-lg">
-              <div className={`p-3 rounded-lg ${card.bgColor} mx-auto mb-3 w-fit`}>
+            <div key={index} className="glass-panel rounded-xl p-4 text-center">
+              <div className={`p-3 rounded-lg ${card.bgColor} mx-auto mb-3 w-fit shadow-[inset_0_1px_rgba(255,255,255,0.08)]`}>
                 <card.icon className={`h-6 w-6 ${card.color}`} />
               </div>
               <p className="text-2xl font-bold text-foreground">{card.value}</p>
@@ -122,7 +122,7 @@ export function HistoryOverview() {
               <span>Order Type Distribution</span>
               <span>{formatNumber(grandTotal)} tons total</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div className="w-full overflow-hidden rounded-full bg-white/[0.08] h-3">
               <div className="h-full flex">
                 <div
                   className="bg-green-500 transition-all duration-500"

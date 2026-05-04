@@ -201,7 +201,7 @@ function AnalyticsSection({ analytics }: AnalyticsSectionProps) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-slate-800 p-4">
+      <div className="glass-panel rounded-xl p-4">
         <div className="font-semibold mb-3">Monthly Tons</div>
         {monthlyTons.length === 0 ? (
           <div className="text-slate-400 text-sm">No monthly data available.</div>
@@ -226,7 +226,7 @@ function AnalyticsSection({ analytics }: AnalyticsSectionProps) {
         <BreakdownTable title="Shift Breakdown" rows={shiftBreakdown} />
       </div>
 
-      <div className="rounded-lg border border-slate-800 p-4">
+      <div className="glass-panel rounded-xl p-4">
         <div className="font-semibold mb-3">Diameter Breakdown</div>
         {diameterBreakdown.length === 0 ? (
           <div className="text-slate-400 text-sm">No diameter data available.</div>
@@ -262,21 +262,21 @@ type BreakdownTableProps = {
 
 function BreakdownTable({ title, rows }: BreakdownTableProps) {
   return (
-    <div className="rounded-lg border border-slate-800 p-4">
+    <div className="glass-panel rounded-xl p-4">
       {title && <div className="font-semibold mb-3">{title}</div>}
       {rows.length === 0 ? (
         <div className="text-slate-400 text-sm">No data available.</div>
       ) : (
         <table className="w-full text-sm">
           <thead className="text-slate-400">
-            <tr className="border-b border-slate-800">
+            <tr className="border-b border-white/[0.12]">
               <th className="text-left py-2">Label</th>
               <th className="text-right py-2">Tons</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.label} className="border-b border-slate-800/60">
+              <tr key={row.label} className="border-b border-white/[0.08]">
                 <td className="py-2">{row.label}</td>
                 <td className="py-2 text-right">{formatNumber(row.tons)} t</td>
               </tr>
@@ -475,9 +475,9 @@ export function ClientProfilePage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4">
         <div>
           <div className="text-sm text-slate-400">
             <Link to={ROUTES.clients} className="hover:underline">
@@ -502,19 +502,19 @@ export function ClientProfilePage() {
           )}
           <div className="flex gap-2">
             <button
-              className={`px-3 py-2 rounded ${activeTab === 'orders' ? 'bg-slate-700' : 'bg-slate-800'}`}
+              className={`rounded-lg border border-white/[0.14] px-3 py-2 backdrop-blur-xl transition-colors ${activeTab === 'orders' ? 'bg-white/[0.08]' : 'bg-white/[0.03]'}`}
               onClick={() => setActiveTab('orders')}
             >
               Orders
             </button>
             <button
-              className={`px-3 py-2 rounded ${activeTab === 'overview' ? 'bg-slate-700' : 'bg-slate-800'}`}
+              className={`rounded-lg border border-white/[0.14] px-3 py-2 backdrop-blur-xl transition-colors ${activeTab === 'overview' ? 'bg-white/[0.08]' : 'bg-white/[0.03]'}`}
               onClick={() => setActiveTab('overview')}
             >
               Overview
             </button>
             <button
-              className={`px-3 py-2 rounded ${activeTab === 'analytics' ? 'bg-slate-700' : 'bg-slate-800'}`}
+              className={`rounded-lg border border-white/[0.14] px-3 py-2 backdrop-blur-xl transition-colors ${activeTab === 'analytics' ? 'bg-white/[0.08]' : 'bg-white/[0.03]'}`}
               onClick={() => setActiveTab('analytics')}
             >
               Analytics
@@ -525,25 +525,25 @@ export function ClientProfilePage() {
 
       {/* Top cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+        <div className="glass-panel rounded-xl p-4">
           <div className="text-xs text-slate-400">Total Orders</div>
           <div className="text-2xl font-semibold">
             {loadingSummary ? '…' : summary?.total_orders ?? 0}
           </div>
         </div>
-        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+        <div className="glass-panel rounded-xl p-4">
           <div className="text-xs text-slate-400">Total Tons</div>
           <div className="text-2xl font-semibold">
             {loadingSummary ? '…' : `${formatNumber(summary?.total_tons ?? 0)} t`}
           </div>
         </div>
-        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+        <div className="glass-panel rounded-xl p-4">
           <div className="text-xs text-slate-400">Sites</div>
           <div className="text-2xl font-semibold">
             {loadingSummary ? '…' : summary?.unique_sites ?? 0}
           </div>
         </div>
-        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+        <div className="glass-panel rounded-xl p-4">
           <div className="text-xs text-slate-400">Last Order</div>
           <div className="text-2xl font-semibold">
             {loadingSummary ? '…' : safeDate(summary?.last_order_date)}
@@ -560,18 +560,18 @@ export function ClientProfilePage() {
       {/* Tabs */}
   {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+          <div className="glass-panel rounded-xl p-4">
             <div className="font-semibold mb-3">Client Overview</div>
             <div className="text-sm text-slate-300 space-y-2">
-              <div className="flex justify-between border-b border-slate-800 pb-2">
+              <div className="flex justify-between border-b border-white/[0.12] pb-2">
                 <span className="text-slate-400">Total Orders</span>
                 <span>{summary?.total_orders ?? 0}</span>
               </div>
-              <div className="flex justify-between border-b border-slate-800 pb-2">
+              <div className="flex justify-between border-b border-white/[0.12] pb-2">
                 <span className="text-slate-400">Total Tons</span>
                 <span>{formatNumber(summary?.total_tons ?? 0)} t</span>
               </div>
-              <div className="flex justify-between border-b border-slate-800 pb-2">
+              <div className="flex justify-between border-b border-white/[0.12] pb-2">
                 <span className="text-slate-400">Sites</span>
                 <span>{summary?.unique_sites ?? 0}</span>
               </div>
@@ -582,7 +582,7 @@ export function ClientProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+          <div className="glass-panel rounded-xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div className="font-semibold">Sites Performance</div>
               <MergeSitesDialog
@@ -600,7 +600,7 @@ export function ClientProfilePage() {
               <div className="overflow-auto">
                 <table className="w-full text-sm">
                   <thead className="text-slate-400">
-                    <tr className="border-b border-slate-800">
+                    <tr className="border-b border-white/[0.12]">
                       <th className="text-left py-2">Site</th>
                       <th className="text-right py-2">Orders</th>
                       <th className="text-right py-2">Tons</th>
@@ -611,7 +611,7 @@ export function ClientProfilePage() {
                     {sites.map((s) => (
                       <tr
                         key={s.site_id}
-                        className="border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/40"
+                        className="border-b border-white/[0.08] cursor-pointer hover:bg-white/[0.06]"
                         onClick={() => clientId && navigate(routeTo.clientSite(clientId, s.site_id))}
                       >
                         <td className="py-2">
@@ -643,12 +643,12 @@ export function ClientProfilePage() {
       )}
 
       {activeTab === 'orders' && (
-        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+        <div className="glass-panel rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="font-semibold">Order History</div>
             <div className="flex items-center gap-2 text-sm">
               <button
-                className="px-3 py-1 rounded bg-slate-800 disabled:opacity-50"
+                className="rounded-lg border border-white/[0.14] bg-white/[0.03] px-3 py-1 disabled:opacity-50"
                 onClick={() => setOrdersPage((current) => Math.max(1, current - 1))}
                 disabled={ordersPage <= 1 || loadingOrders}
               >
@@ -658,7 +658,7 @@ export function ClientProfilePage() {
                 Page {ordersPage} / {totalPages}
               </div>
               <button
-                className="px-3 py-1 rounded bg-slate-800 disabled:opacity-50"
+                className="rounded-lg border border-white/[0.14] bg-white/[0.03] px-3 py-1 disabled:opacity-50"
                 onClick={() => setOrdersPage((current) => Math.min(totalPages, current + 1))}
                 disabled={ordersPage >= totalPages || loadingOrders}
               >
@@ -678,7 +678,7 @@ export function ClientProfilePage() {
             <div className="overflow-auto">
               <table className="w-full text-sm">
                 <thead className="text-slate-400">
-                  <tr className="border-b border-slate-800">
+                  <tr className="border-b border-white/[0.12]">
                     <th className="text-left py-2">ID</th>
                     <th className="text-left py-2">Date</th>
                     <th className="text-left py-2">Status</th>
@@ -692,7 +692,7 @@ export function ClientProfilePage() {
                 </thead>
                 <tbody>
                   {orders.map((o) => (
-                    <tr key={`${o.source}-${o.id}-${o.date ?? ''}`} className="border-b border-slate-800/60">
+                    <tr key={`${o.source}-${o.id}-${o.date ?? ''}`} className="border-b border-white/[0.08]">
                       <td className="py-2">{o.id}</td>
                       <td className="py-2">{safeDate(o.date)}</td>
                       <td className="py-2">{o.status ?? '—'}</td>
@@ -712,7 +712,7 @@ export function ClientProfilePage() {
       )}
 
       {activeTab === 'analytics' && (
-        <div className="rounded-xl bg-slate-900/40 border border-slate-800 p-4">
+        <div className="glass-panel rounded-xl p-4">
           <div className="font-semibold mb-3">Analytics</div>
           {loadingAnalytics ? (
             <div className="text-slate-400 text-sm">Loading…</div>

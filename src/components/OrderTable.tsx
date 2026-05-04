@@ -107,7 +107,7 @@ export function OrderTable() {
   };
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-foreground">Active Orders</h3>
@@ -128,14 +128,14 @@ export function OrderTable() {
             <div className="space-y-3">
               {isLoadingOrders ? (
                 Array.from({ length: 5 }).map((_, index) => (
-                  <div key={`skeleton-${index}`} className="rounded-lg border border-border p-4 space-y-2">
+                  <div key={`skeleton-${index}`} className="glass-panel rounded-2xl p-4 space-y-3">
                     <div className="h-4 w-32 animate-pulse rounded bg-muted" />
                     <div className="h-4 w-full animate-pulse rounded bg-muted" />
                   </div>
                 ))
               ) : todayOrders.length > 0 ? (
                 todayOrders.map((order) => (
-                  <div key={order.id} className="rounded-xl border border-border/80 p-4 space-y-3">
+                  <div key={order.id} className="glass-panel rounded-2xl p-4 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-mono text-sm text-foreground">{order.id}</p>
                       {getStatusBadge(order.status)}
@@ -161,7 +161,7 @@ export function OrderTable() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-10 px-3"
+                        className="h-11 px-3"
                         onClick={() => handleViewOrder(order)}
                       >
                         {hasPermission(userRole, 'edit') ? <Edit size={14} className="mr-1" /> : <Eye size={14} className="mr-1" />}
@@ -171,7 +171,7 @@ export function OrderTable() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-10 px-3"
+                          className="h-11 px-3"
                           onClick={async () => {
                             try {
                               await toggleSignedDeliveryNote(order);
@@ -193,7 +193,7 @@ export function OrderTable() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-10 px-3"
+                            className="h-11 px-3"
                             onClick={async () => {
                               try {
                                 await handleMarkAsDelivered(order.id);
@@ -219,7 +219,7 @@ export function OrderTable() {
                       <RoleBasedComponent action="delete">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-10 px-3 text-destructive hover:text-destructive">
+                            <Button variant="outline" size="sm" className="h-11 px-3 text-destructive hover:text-destructive">
                               <Trash2 size={14} className="mr-1" />
                               Delete
                             </Button>
@@ -255,7 +255,7 @@ export function OrderTable() {
               )}
             </div>
           ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl">
             <Table>
               <TableHeader>
                 <TableRow className="border-border">

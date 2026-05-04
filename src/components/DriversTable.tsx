@@ -136,7 +136,7 @@ export function DriversTable() {
   };
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-foreground">Drivers List</h3>
@@ -152,7 +152,7 @@ export function DriversTable() {
                 if (!driver || !driver.id) return null;
                 const driverMetrics = getDriverMetrics(driver.name);
                 return (
-                  <div key={driver.id} className="rounded-xl border border-border/80 p-4 space-y-3">
+                  <div key={driver.id} className="glass-panel rounded-2xl p-4 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <Button
                         variant="ghost"
@@ -171,12 +171,12 @@ export function DriversTable() {
                     </div>
                     <div className="flex flex-wrap gap-2 pt-1">
                       <RoleBasedComponent action="edit">
-                        <Button variant="outline" size="sm" className="h-10 px-3" onClick={() => handleStatusToggle(driver)}>
+                        <Button variant="outline" size="sm" className="h-11 px-3" onClick={() => handleStatusToggle(driver)}>
                           {driver.is_active ? 'Deactivate' : 'Activate'}
                         </Button>
                       </RoleBasedComponent>
                       <RoleBasedComponent action="edit">
-                        <Button variant="outline" size="sm" className="h-10 px-3" onClick={() => handleEditDriver(driver)}>
+                        <Button variant="outline" size="sm" className="h-11 px-3" onClick={() => handleEditDriver(driver)}>
                           <Edit size={14} className="mr-1" />
                           Edit
                         </Button>
@@ -184,7 +184,7 @@ export function DriversTable() {
                       <RoleBasedComponent action="delete">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-10 px-3 text-destructive hover:text-destructive">
+                            <Button variant="outline" size="sm" className="h-11 px-3 text-destructive hover:text-destructive">
                               <Trash2 size={14} className="mr-1" />
                               Delete
                             </Button>
@@ -221,7 +221,7 @@ export function DriversTable() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl">
             <Table>
             <TableHeader>
               <TableRow className="border-border">

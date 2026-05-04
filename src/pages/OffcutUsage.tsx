@@ -361,9 +361,9 @@ export function OffcutUsage() {
   };
 
   return (
-    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
+    <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
@@ -645,7 +645,7 @@ export function OffcutUsage() {
                 {isMobile ? (
                   <div className="space-y-2">
                     {diameterTotals.map((total) => (
-                      <div key={total.bar_diameter} className="rounded-xl border border-border/80 p-3">
+                      <div key={total.bar_diameter} className="glass-panel rounded-2xl p-4">
                         <div className="flex items-center justify-between">
                           <Badge variant="outline" className="font-medium">{total.bar_diameter}</Badge>
                           <span className="font-bold">{total.total_tons.toFixed(3)} tons</span>
@@ -655,7 +655,7 @@ export function OffcutUsage() {
                         </p>
                       </div>
                     ))}
-                    <div className="rounded-xl border border-border/80 p-3 bg-muted/50">
+                    <div className="glass-panel rounded-2xl p-4">
                       <p className="font-semibold">Grand Total</p>
                       <p className="text-sm text-muted-foreground">Pieces: {summaryStats.totalPieces.toLocaleString()}</p>
                       <p className="text-sm text-muted-foreground">Tons: {summaryStats.totalWeightTons}</p>
@@ -728,7 +728,7 @@ export function OffcutUsage() {
               ) : isMobile ? (
                 <div className="space-y-3">
                   {filteredEntries.map((entry) => (
-                    <div key={entry.id} className="rounded-xl border border-border/80 p-4 space-y-2">
+                    <div key={entry.id} className="glass-panel rounded-2xl p-4 space-y-3">
                       <p className="text-sm text-muted-foreground">Date: {formatDate(entry.date)}</p>
                       <p className="font-medium text-foreground">{entry.company}</p>
                       <p className="text-sm text-muted-foreground">Bar: {entry.bar_diameter}</p>
@@ -737,14 +737,14 @@ export function OffcutUsage() {
                       <p className="text-sm text-muted-foreground break-words">Notes: {entry.notes || '-'}</p>
                       {canEditDelete && (
                         <div className="flex gap-2 pt-2">
-                          <Button variant="outline" size="sm" className="h-10 px-3" onClick={() => handleEdit(entry)}>
+                          <Button variant="outline" size="sm" className="h-11 px-3" onClick={() => handleEdit(entry)}>
                             <Edit className="h-4 w-4 mr-1" />
                             Edit
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-10 px-3 text-destructive hover:text-destructive"
+                            className="h-11 px-3 text-destructive hover:text-destructive"
                             onClick={() => handleDeleteClick(entry)}
                           >
                             <Trash2 className="h-4 w-4 mr-1" />

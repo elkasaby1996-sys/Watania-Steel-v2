@@ -281,9 +281,9 @@ export function History() {
   const pageEnd = totalCount === 0 ? 0 : visiblePageEnd;
 
   return (
-    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
+    <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex items-center gap-3">
         <Button
             variant="ghost"
             size="sm"
@@ -461,7 +461,7 @@ export function History() {
                       {isMobile ? (
                         <div className="space-y-3">
                           {deliveredOrdersByDate[date].map((order) => (
-                            <div key={order.id} className="rounded-xl border border-border/80 p-4 space-y-2">
+                            <div key={order.id} className="glass-panel rounded-2xl p-4 space-y-3">
                               <div className="flex items-center justify-between gap-2">
                                 <p className="font-mono text-foreground">{order.delivery_number || order.id}</p>
                                 {getStatusBadge(order.status)}
