@@ -11,13 +11,13 @@ Create these secrets in GitHub under repository settings:
 - `SUPABASE_DB_PASSWORD`: The production database password.
 - `SUPABASE_MIGRATIONS_BOOTSTRAPPED`: Set to `true` only after legacy migration history has been reconciled.
 
-The workflow will not apply migrations until `SUPABASE_MIGRATIONS_BOOTSTRAPPED` is exactly `true`.
+The workflow will not apply migrations until `SUPABASE_MIGRATIONS_BOOTSTRAPPED` is exactly `true`. This repository has already been bootstrapped against the production Supabase project.
 
 ## First-Time Legacy Migration Bootstrap
 
 This repository already contains historical migration files. If the production database was built manually or through the Supabase dashboard, those migrations may already be reflected in the schema but not recorded in `supabase_migrations.schema_migrations`.
 
-Before enabling automatic production deployment:
+Before enabling automatic production deployment for a new Supabase project:
 
 1. Install and authenticate the Supabase CLI locally.
 2. Link the project:
