@@ -225,7 +225,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const orders = dbOrders.map(dbToFrontend);
       
       // Keep all active orders available in state, while dashboard-facing views include carryover work.
-      const activeOrders = orders.filter(o => o.status !== 'delivered');
+      const activeOrderCandidates = orders.filter(o => o.status !== 'delivered');
+      const deliveredHistoryIds = await historyService.getDeliveredOrderIds(
+        activeOrderCandidates.map(order => order.id)
+      );
+      const activeOrders = activeOrderCandidates.filter(o => !deliveredHistoryIds.has(String(o.id)));
       const currentActiveOrders = activeOrders.filter(isCurrentActiveOrder);
       
       logger.debug('📊 Loaded orders:', {
@@ -329,7 +333,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         throw error;
       }
 
-      const orders = data || [];
+      const orderRows = data || [];
+      const deliveredHistoryIds = await historyService.getDeliveredOrderIds(
+        orderRows.map(order => order.id)
+      );
+      const orders = orderRows.filter(order => !deliveredHistoryIds.has(String(order.id)));
       const totalOrders = orders.length;
       let cutAndBendTons = 0;
       let straightBarTons = 0;
