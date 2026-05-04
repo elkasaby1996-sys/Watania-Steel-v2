@@ -40,6 +40,7 @@ Allowed changes:
 - Button, badge, input, card, table, sidebar, top bar, dialog, toast, and skeleton styling
 - Chart colors and chart container styling only
 - Responsive visual presentation, without removing data or changing available actions
+- Phone-native visual adaptation, without changing workflows or available data
 
 ## Visual System
 
@@ -225,13 +226,16 @@ Do not change data transformations or metric definitions.
 
 Desktop remains the primary experience.
 
-Mobile should:
+Mobile should feel native on iPhone and Android, not like a compressed desktop viewport. It should:
 
 - Preserve all existing actions
 - Keep table-to-card transformations where already present
 - Use glass mobile cards with stronger opacity for text
 - Keep touch targets comfortable
 - Avoid hiding business-critical fields
+- Use phone-appropriate spacing, sticky app-shell behavior, safe-area padding, and bottom-reachable actions where existing actions are already present
+- Make mobile dialogs, drawers, dropdowns, and forms feel app-like, with readable full-width surfaces and stable scrolling
+- Preserve the same data fields and actions when converting dense desktop areas into mobile cards
 
 No new mobile workflow should be invented in this pass.
 
@@ -267,6 +271,7 @@ Visual checks:
 - One dense table screen
 - One dialog/form screen
 - Navigation open/collapsed/mobile drawer
+- Phone viewport checks for Dashboard, one dense list/table screen, and one form/dialog flow
 - Light/dark toggle behavior if retained
 
 Acceptance criteria:
@@ -275,6 +280,7 @@ Acceptance criteria:
 - Existing app behavior is unchanged.
 - Existing table columns are unchanged.
 - Dense data remains readable.
+- Phone view feels native on iPhone and Android rather than like a squeezed desktop layout.
 - No generic SaaS look.
 - No overly colorful chart treatment.
 - No decorative glass that harms table or form legibility.
