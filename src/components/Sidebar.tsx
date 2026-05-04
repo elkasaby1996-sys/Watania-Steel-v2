@@ -54,22 +54,22 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
       {isMobile && mobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/50"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           onClick={onMobileClose}
           aria-label="Close menu overlay"
         />
       )}
       <div
-        className={`fixed left-0 top-0 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out z-50 ${
+        className={`fixed left-0 top-0 h-full border-r border-white/[0.12] bg-[var(--glass-panel-strong)] shadow-glass backdrop-blur-2xl transition-all duration-300 ease-in-out z-50 ${
           isMobile
-            ? `w-72 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`
+            ? `w-72 max-w-[calc(100vw-1rem)] rounded-r-2xl ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`
             : sidebarCollapsed
             ? 'w-16'
             : 'w-64'
         }`}
       >
       {/* Logo Section */}
-      <div className="flex items-center justify-between px-4 h-16 border-b border-sidebar-border">
+      <div className="flex items-center justify-between px-4 h-16 border-b border-white/[0.12]">
         <div className="flex items-center justify-center">
           <img
             src="https://c.animaapp.com/mfuv9ro3jvVXIT/img/chatgpt-image-sep-25-2025-10_05_13-am.png"
@@ -82,7 +82,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
             variant="ghost"
             size="icon"
             onClick={onMobileClose}
-            className="text-sidebar-foreground hover:bg-sidebar-hover hover:text-gray-100 h-8 w-8"
+            className="text-sidebar-foreground hover:bg-white/[0.07] hover:text-gray-100 h-8 w-8"
           >
             <X size={18} />
           </Button>
@@ -91,7 +91,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
             variant="ghost"
             size="icon"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="text-sidebar-foreground hover:bg-sidebar-hover hover:text-gray-100 h-8 w-8"
+            className="text-sidebar-foreground hover:bg-white/[0.07] hover:text-gray-100 h-8 w-8"
           >
             {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </Button>
@@ -113,8 +113,8 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
               onClick={() => handleNavigation(item.path)}
               className={`w-full justify-start gap-3 h-11 transition-all duration-200 relative ${
                 item.active
-                  ? 'bg-sidebar-active text-gray-50 font-medium'
-                  : 'text-sidebar-foreground hover:text-gray-100 hover:bg-sidebar-hover'
+                  ? 'bg-white/[0.08] text-gray-50 font-medium border border-white/[0.18] shadow-[inset_0_1px_rgba(255,255,255,0.08)]'
+                  : 'text-sidebar-foreground hover:text-gray-100 hover:bg-white/[0.06]'
               } ${!isMobile && sidebarCollapsed ? 'px-3 justify-center' : 'px-4'}`}
             >
               {/* Maroon accent indicator for active item */}

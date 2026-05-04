@@ -55,17 +55,17 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
   };
 
   return (
-    <header className={`fixed top-0 right-0 h-16 bg-card border-b border-border z-40 transition-all duration-300 ease-in-out ${
+    <header className={`fixed top-0 right-0 z-40 h-16 border-b border-white/[0.12] bg-[var(--glass-panel)] shadow-glass backdrop-blur-2xl transition-all duration-300 ease-in-out ${
       isMobile ? 'left-0' : sidebarCollapsed ? 'left-16' : 'left-64'
     }`}>
-      <div className={`flex items-center justify-between h-full ${isMobile ? 'px-3' : 'px-6'}`}>
+      <div className={`flex h-full items-center justify-between ${isMobile ? 'px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]' : 'px-6'}`}>
         <div className="flex-1 flex items-center">
           {isMobile && (
             <Button
               variant="ghost"
               size="icon"
               onClick={onMenuClick}
-              className="mr-2 h-10 w-10 text-foreground hover:bg-accent hover:text-accent-foreground"
+              className="mr-2 h-11 w-11 text-foreground hover:bg-white/[0.07] hover:text-accent-foreground"
               aria-label="Open navigation menu"
             >
               <Menu size={18} />
@@ -88,7 +88,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
               variant="ghost"
               size="icon"
               onClick={toggleTheme}
-              className="h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground"
+              className="h-8 w-8 text-foreground hover:bg-white/[0.07] hover:text-accent-foreground"
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
@@ -98,7 +98,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
               variant="ghost"
               size="icon"
               onClick={handleAppRefresh}
-              className="h-8 w-8 text-foreground hover:bg-accent hover:text-accent-foreground"
+              className="h-8 w-8 text-foreground hover:bg-white/[0.07] hover:text-accent-foreground"
               aria-label="Refresh app"
               title="Refresh app"
             >
@@ -110,7 +110,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="text-foreground hover:bg-accent hover:text-accent-foreground p-2"
+                className="text-foreground hover:bg-white/[0.07] hover:text-accent-foreground p-2"
               >
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-secondary text-secondary-foreground text-sm font-medium">
@@ -119,27 +119,27 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover text-popover-foreground w-56 border border-border">
+            <DropdownMenuContent align="end" className="w-56">
               <div className="px-3 py-2">
                 <p className="text-sm font-medium text-gray-100">{user?.email}</p>
                 <p className="text-xs text-muted-foreground">
                   {user?.profile?.role && getRoleDisplayName(user.profile.role)}
                 </p>
               </div>
-              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem
                 onClick={handleRefreshProfile}
-                className="text-popover-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                className="text-popover-foreground cursor-pointer"
               >
                 Refresh Profile
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-popover-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer">
+              <DropdownMenuItem className="text-popover-foreground cursor-pointer">
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem
                 onClick={handleSignOut}
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
+                className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
               >
                 <LogOut size={16} className="mr-2" />
                 Sign Out

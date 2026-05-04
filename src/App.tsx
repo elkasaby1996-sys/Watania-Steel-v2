@@ -48,7 +48,7 @@ function AppShell() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="min-h-screen bg-glass-shell text-foreground">
         <ImageAssets />
         {!isReportRoute && (
           <Sidebar
@@ -68,8 +68,8 @@ function AppShell() {
               onMenuClick={() => setMobileSidebarOpen((prev) => !prev)}
             />
           )}
-          <div className={isReportRoute ? '' : isMobile ? 'pt-16 px-3 pb-5' : 'pt-16 p-6'}>
-            <div className={isReportRoute ? '' : 'max-w-7xl mx-auto'}>
+          <div className={isReportRoute ? '' : isMobile ? 'pt-16 phone-safe-page' : 'pt-20 p-6'}>
+            <div className={isReportRoute ? '' : 'mx-auto w-full max-w-[1500px]'}>
               <Suspense fallback={<RouteSkeleton />}>
                 <Routes>
                   <Route path={ROUTES.dashboard} element={<Dashboard />} />
