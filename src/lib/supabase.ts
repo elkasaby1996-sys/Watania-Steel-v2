@@ -684,6 +684,36 @@ const getHistoryOrderDateKey = (order: HistoryOrderDateRow) => {
 };
 
 export const historyService = {
+  async getDeliveredOrderIds(orderIds: string[]): Promise<Set<string>> {
+    const uniqueIds = Array.from(new Set(orderIds.map(id => String(id)).filter(Boolean)));
+    const deliveredIds = new Set<string>();
+    const chunkSize = 100;
+
+    for (let index = 0; index < uniqueIds.length; index += chunkSize) {
+      const chunk = uniqueIds.slice(index, index + chunkSize);
+      const { data, error } = await supabase
+        .from('history_orders')
+        .select('id')
+        .eq('status', 'delivered')
+        .in('id', chunk);
+
+      if (error) {
+        if (error.code === 'PGRST116' || error.message?.includes('relation "history_orders" does not exist')) {
+          return deliveredIds;
+        }
+        throw error;
+      }
+
+      (data || []).forEach(order => {
+        if (order?.id) {
+          deliveredIds.add(String(order.id));
+        }
+      });
+    }
+
+    return deliveredIds;
+  },
+
   async getAll(): Promise<HistoryOrder[]> {
     try {
       const { data, error } = await supabase
