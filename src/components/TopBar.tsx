@@ -1,9 +1,7 @@
-import { User, LogOut, Shield, RefreshCw, Menu, Moon, Sun } from 'lucide-react';
+import { Shield, RefreshCw, Menu, Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
 import { getRoleDisplayName } from '../lib/auth';
@@ -15,18 +13,10 @@ interface TopBarProps {
 
 export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
   const { sidebarCollapsed } = useDashboardStore();
-  const { user, signOut, refreshProfile } = useAuthStore();
+  const { user } = useAuthStore();
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     document.documentElement.classList.contains('light') ? 'light' : 'dark'
   );
-
-  const handleSignOut = async () => {
-    await signOut();
-  };
-
-  const handleRefreshProfile = async () => {
-    await refreshProfile();
-  };
 
   const handleAppRefresh = () => {
     window.location.reload();
@@ -105,47 +95,6 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
               <RefreshCw size={16} />
             </Button>
           </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className={`${isMobile ? 'h-11 w-11 p-0' : 'p-2'} text-foreground hover:bg-white/[0.07] hover:text-accent-foreground`}
-              >
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-secondary text-secondary-foreground text-sm font-medium">
-                    {user?.email?.charAt(0).toUpperCase() || <User size={16} />}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <div className="px-3 py-2">
-                <p className="text-sm font-medium text-popover-foreground">{user?.email}</p>
-                <p className="text-xs text-muted-foreground">
-                  {user?.profile?.role && getRoleDisplayName(user.profile.role)}
-                </p>
-              </div>
-              <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuItem
-                onClick={handleRefreshProfile}
-                className="text-popover-foreground cursor-pointer"
-              >
-                Refresh Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-popover-foreground cursor-pointer">
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuItem
-                onClick={handleSignOut}
-                className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-              >
-                <LogOut size={16} className="mr-2" />
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
     </header>

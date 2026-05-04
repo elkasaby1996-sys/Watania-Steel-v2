@@ -1,33 +1,12 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useDashboardStore } from '@/stores/dashboardStore';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 
 const DIAMETERS = ['8mm', '10mm', '12mm', '14mm', '16mm', '18mm', '20mm', '25mm', '32mm'] as const;
 
 type DiameterKey = (typeof DIAMETERS)[number];
 
-const chartPalette = {
-  maroon: 'hsl(345, 66%, 44%)',
-  steel: 'hsl(216, 20%, 54%)',
-  amber: 'hsl(38, 82%, 58%)',
-  green: 'hsl(142, 48%, 46%)',
-  muted: 'hsl(214, 18%, 64%)',
-};
-
-const CHART_COLORS: Record<DiameterKey, string> = {
-  '8mm': chartPalette.muted,
-  '10mm': 'hsl(216, 20%, 48%)',
-  '12mm': chartPalette.steel,
-  '14mm': 'hsl(216, 18%, 60%)',
-  '16mm': chartPalette.maroon,
-  '18mm': 'hsl(345, 45%, 38%)',
-  '20mm': chartPalette.amber,
-  '25mm': 'hsl(38, 46%, 48%)',
-  '32mm': chartPalette.green
-};
-
-type ChartDatum = {
+type DiameterRow = {
   name: DiameterKey;
   value: number;
 };
@@ -42,27 +21,28 @@ export function DiameterDistributionChart() {
   const { dashboardMetrics, isLoadingMetrics, metricsError, loadDashboardMetrics } = useDashboardStore();
   const { steelMix } = dashboardMetrics;
 
-  const data: ChartDatum[] = DIAMETERS.map((diameter) => ({
+  const rows: DiameterRow[] = DIAMETERS.map((diameter) => ({
     name: diameter,
     value: steelMix[diameter as DiameterKey] || 0
   })).filter((item) => item.value > 0);
 
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-
-  const renderTooltip = (value: number, label: string) => {
-    const percent = total > 0 ? (value / total) * 100 : 0;
-    return `${label} — ${formatTons(value)} t (${percent.toFixed(1)}%)`;
-  };
+  const total = rows.reduce((sum, item) => sum + item.value, 0);
 
   return (
     <Card className="p-5 sm:p-6">
-      <h3 className="mb-4 text-lg font-headline font-semibold text-gray-50">
-        Diameter Distribution
-      </h3>
+      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <h3 className="text-lg font-headline font-semibold text-gray-50">
+          Diameter Distribution
+        </h3>
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          {formatTons(total)} total tons
+        </p>
+      </div>
+
       {isLoadingMetrics ? (
         <div className="space-y-4 animate-pulse">
           <div className="h-6 w-32 rounded bg-white/[0.06]" />
-          <div className="h-72 rounded-xl bg-white/[0.06]" />
+          <div className="h-56 rounded-xl bg-white/[0.06]" />
         </div>
       ) : metricsError ? (
         <div className="flex flex-col gap-3">
@@ -71,59 +51,30 @@ export function DiameterDistributionChart() {
             Retry
           </Button>
         </div>
-      ) : data.length === 0 ? (
+      ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No working orders to display.</p>
       ) : (
-        <div className="space-y-4">
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius="52%"
-                  outerRadius="88%"
-                  paddingAngle={1}
-                  stroke="hsl(220, 42%, 7%)"
-                  strokeWidth={1}
-                  isAnimationActive={false}
-                >
-                  {data.map((entry) => (
-                    <Cell key={entry.name} fill={CHART_COLORS[entry.name]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'var(--glass-panel-strong)',
-                    border: '1px solid var(--glass-border-strong)',
-                    borderRadius: '12px',
-                    color: 'var(--color-foreground)',
-                    fontSize: '14px',
-                    padding: '10px 12px',
-                    boxShadow: 'var(--glass-shadow-soft)',
-                    backdropFilter: 'blur(18px)'
-                  }}
-                  itemStyle={{ color: 'var(--color-foreground)' }}
-                  formatter={(value: number, _name, props) => {
-                    const label = (props?.payload as ChartDatum | undefined)?.name ?? 'Diameter';
-                    return [renderTooltip(value, label), ''];
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {data.map((entry) => (
-              <div key={entry.name} className="flex items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: CHART_COLORS[entry.name] }}
-                />
-                <span className="text-xs text-muted-foreground">{entry.name}</span>
-              </div>
-            ))}
-          </div>
+        <div className="overflow-hidden rounded-xl border border-white/[0.10]">
+          <table className="w-full text-sm">
+            <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.08em] text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">Diameter</th>
+                <th className="px-4 py-3 text-right font-semibold">Tons</th>
+                <th className="px-4 py-3 text-right font-semibold">Share</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.08]">
+              {rows.map((entry) => (
+                <tr key={entry.name} className="bg-card/30">
+                  <td className="px-4 py-3 font-semibold text-foreground">{entry.name}</td>
+                  <td className="px-4 py-3 text-right font-mono text-foreground">{formatTons(entry.value)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                    {total > 0 ? `${((entry.value / total) * 100).toFixed(1)}%` : '0%'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </Card>

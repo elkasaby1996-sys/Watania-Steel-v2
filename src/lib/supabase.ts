@@ -674,15 +674,6 @@ export const driverService = {
 const HISTORY_ORDER_LIST_COLUMNS =
   'id,customer_name,date,status,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at,signed_delivery_note,order_type,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm';
 
-const HISTORY_ORDER_DATE_COLUMNS = 'id,date,delivered_at';
-
-type HistoryOrderDateRow = Pick<HistoryOrder, 'id' | 'date' | 'delivered_at'>;
-
-const getHistoryOrderDateKey = (order: HistoryOrderDateRow) => {
-  const orderDateTime = order?.date || order?.delivered_at;
-  return orderDateTime ? String(orderDateTime).split('T')[0] : null;
-};
-
 export const historyService = {
   async getDeliveredOrderIds(orderIds: string[]): Promise<Set<string>> {
     const uniqueIds = Array.from(new Set(orderIds.map(id => String(id)).filter(Boolean)));
@@ -744,7 +735,6 @@ export const historyService = {
     signal?: AbortSignal;
   }): Promise<HistoryOrderPage> {
     const { page, pageSize, filters, signal } = options;
-    const indexChunkSize = 1000;
     const isAbortError = (error: unknown) => {
       if (!error) {
         return false;
@@ -805,117 +795,22 @@ export const historyService = {
     };
 
     try {
-      const indexRows: HistoryOrderDateRow[] = [];
-      let totalCount = 0;
-      let offset = 0;
-
-      while (true) {
-        let indexQuery = applyFilters(
-          supabase
-            .from('history_orders')
-            .select(HISTORY_ORDER_DATE_COLUMNS, { count: offset === 0 ? 'exact' : undefined })
-            .order('delivered_at', { ascending: false })
-        );
-
-        if (signal) {
-          indexQuery = indexQuery.abortSignal(signal);
-        }
-
-        const { data, error, count } = await indexQuery.range(offset, offset + indexChunkSize - 1);
-
-        if (error) {
-          if (isAbortError(error)) {
-            return { data: [], count: 0, aborted: true };
-          }
-          if (error.code === 'PGRST116' || error.message?.includes('relation "history_orders" does not exist')) {
-            console.warn('History orders table does not exist yet.');
-            return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
-          }
-          console.error('Database error fetching history order dates:', error);
-          return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
-        }
-
-        if (typeof count === 'number') {
-          totalCount = count;
-        }
-
-        const rows = (data || []) as HistoryOrderDateRow[];
-        indexRows.push(...rows);
-
-        if (rows.length < indexChunkSize || indexRows.length >= totalCount) {
-          break;
-        }
-
-        offset += indexChunkSize;
-      }
-
-      if (totalCount === 0 && indexRows.length > 0) {
-        totalCount = indexRows.length;
-      }
-
-      if (totalCount === 0 || indexRows.length === 0) {
-        return { data: [], count: totalCount, totalPages: 1, pageStart: 0, pageEnd: 0 };
-      }
-
-      const dateGroups: Array<{ date: string; count: number }> = [];
-      const dateGroupMap = new Map<string, { date: string; count: number }>();
-
-      indexRows.forEach((row) => {
-        const date = getHistoryOrderDateKey(row);
-        if (!date) return;
-
-        let group = dateGroupMap.get(date);
-        if (!group) {
-          group = { date, count: 0 };
-          dateGroupMap.set(date, group);
-          dateGroups.push(group);
-        }
-
-        group.count += 1;
-      });
-
-      const pages: Array<{ dates: string[]; count: number }> = [];
-      let currentPage = { dates: [] as string[], count: 0 };
-
-      dateGroups.forEach((group) => {
-        if (currentPage.dates.length > 0 && currentPage.count >= pageSize) {
-          pages.push(currentPage);
-          currentPage = { dates: [], count: 0 };
-        }
-
-        currentPage.dates.push(group.date);
-        currentPage.count += group.count;
-      });
-
-      if (currentPage.dates.length > 0) {
-        pages.push(currentPage);
-      }
-
-      const totalPages = Math.max(1, pages.length);
-      const safePage = Math.min(Math.max(1, page), totalPages);
-      const selectedPage = pages[safePage - 1] || { dates: [], count: 0 };
-      const previousRows = pages
-        .slice(0, safePage - 1)
-        .reduce((sum, pageGroup) => sum + pageGroup.count, 0);
-
-      if (selectedPage.dates.length === 0) {
-        return { data: [], count: totalCount, totalPages, pageStart: 0, pageEnd: 0 };
-      }
-
+      const safePage = Math.max(1, page);
+      const from = (safePage - 1) * pageSize;
+      const to = from + pageSize - 1;
       let query = applyFilters(
         supabase
           .from('history_orders')
-          .select(HISTORY_ORDER_LIST_COLUMNS)
-          .in('date', selectedPage.dates)
+          .select(HISTORY_ORDER_LIST_COLUMNS, { count: 'exact' })
           .order('delivered_at', { ascending: false })
-          .range(0, Math.max(selectedPage.count - 1, 0))
+          .range(from, to)
       );
 
       if (signal) {
         query = query.abortSignal(signal);
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
 
       if (error) {
         if (isAbortError(error)) {
@@ -929,12 +824,20 @@ export const historyService = {
         return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
       }
 
+      const totalCount = count || 0;
+      if (totalCount === 0) {
+        return { data: [], count: totalCount, totalPages: 1, pageStart: 0, pageEnd: 0 };
+      }
+
+      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+      const rows = data || [];
+
       return {
-        data: data || [],
+        data: rows,
         count: totalCount,
         totalPages,
-        pageStart: previousRows + 1,
-        pageEnd: previousRows + (data?.length || 0)
+        pageStart: from + 1,
+        pageEnd: from + rows.length
       };
     } catch (error) {
       if (isAbortError(error)) {

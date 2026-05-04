@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Calendar, Filter, Trophy, Plus, Edit, Trash2, FileDown } from 'lucide-react';
+import { ArrowLeft, Calendar, Filter, Trophy, Plus, Edit, Trash2, FileDown, Hash, Scale, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -529,44 +529,47 @@ export function OffcutUsage() {
           {/* Summary Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Pieces Used
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {summaryStats.totalPieces.toLocaleString()}
+              <CardContent className="flex items-start justify-between gap-4 p-5">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Pieces Used</p>
+                  <div className="mt-5 text-2xl font-bold tabular-nums">
+                    {summaryStats.totalPieces.toLocaleString()}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-muted/30 p-3">
+                  <Hash className="h-5 w-5 text-muted-foreground" />
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Tons Used
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {summaryStats.totalWeightTons}
+              <CardContent className="flex items-start justify-between gap-4 p-5">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Tons Used</p>
+                  <div className="mt-5 text-2xl font-bold tabular-nums text-primary">
+                    {summaryStats.totalWeightTons}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-primary/15 p-3">
+                  <Scale className="h-5 w-5 text-primary" />
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Average per Entry (Tons)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {summaryStats.averageTonsPerEntry}
+              <CardContent className="flex items-start justify-between gap-4 p-5">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Average per Entry (Tons)</p>
+                  <div className="mt-5 text-2xl font-bold tabular-nums">
+                    {summaryStats.averageTonsPerEntry}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Based on {summaryStats.entryCount} {summaryStats.entryCount === 1 ? 'entry' : 'entries'}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Based on {summaryStats.entryCount} {summaryStats.entryCount === 1 ? 'entry' : 'entries'}
-                </p>
+                <div className="rounded-xl border border-white/10 bg-muted/30 p-3">
+                  <Calculator className="h-5 w-5 text-muted-foreground" />
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -583,52 +586,34 @@ export function OffcutUsage() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {topDiameters.map((diameter) => (
-                    <Card
+                    <div
                       key={diameter.bar_diameter}
-                      className={`border-2 ${
+                      className={`rounded-xl border bg-muted/20 p-4 ${
                         diameter.rank === 1
-                          ? 'border-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20'
+                          ? 'border-yellow-500/60'
                           : diameter.rank === 2
-                          ? 'border-gray-400 bg-gray-50/50 dark:bg-gray-950/20'
-                          : 'border-amber-700 bg-amber-50/50 dark:bg-amber-950/20'
+                          ? 'border-slate-400/50'
+                          : 'border-amber-700/60'
                       }`}
                     >
-                      <CardContent className="pt-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge
-                            variant="outline"
-                            className={`text-lg px-3 py-1 ${
-                              diameter.rank === 1
-                                ? 'border-yellow-500 text-yellow-700 dark:text-yellow-400'
-                                : diameter.rank === 2
-                                ? 'border-gray-400 text-gray-600 dark:text-gray-300'
-                                : 'border-amber-700 text-amber-700 dark:text-amber-400'
-                            }`}
-                          >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <Badge variant="outline" className="px-3 py-1 text-sm font-semibold">
                             {diameter.bar_diameter}
                           </Badge>
-                          <span
-                            className={`text-sm font-semibold ${
-                              diameter.rank === 1
-                                ? 'text-yellow-600 dark:text-yellow-400'
-                                : diameter.rank === 2
-                                ? 'text-gray-500 dark:text-gray-400'
-                                : 'text-amber-700 dark:text-amber-400'
-                            }`}
-                          >
-                            #{diameter.rank}
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-2xl font-bold">
-                            {diameter.total_tons.toFixed(3)} <span className="text-sm font-normal text-muted-foreground">tons</span>
+                          <div className="mt-4 font-mono text-2xl font-bold tabular-nums text-foreground">
+                            {diameter.total_tons.toFixed(3)}
+                            <span className="ml-1 text-xs font-normal text-muted-foreground">tons</span>
                           </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="mt-1 text-sm text-muted-foreground">
                             {diameter.percentage}% of total
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                        <div className="rounded-lg border border-white/10 bg-background/40 px-2.5 py-1 font-mono text-xs font-semibold text-muted-foreground">
+                          #{diameter.rank}
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </CardContent>

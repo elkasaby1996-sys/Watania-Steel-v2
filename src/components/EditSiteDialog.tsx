@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { type FormEvent, useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,33 +20,39 @@ type SiteFormValues = {
   notes: string;
 };
 
+const emptyFormValues: SiteFormValues = {
+  contact_name: '',
+  contact_phone: '',
+  location_text: '',
+  google_maps_url: '',
+  notes: ''
+};
+
+const getSiteFormValues = (site: ClientSiteDetails | null): SiteFormValues => ({
+  contact_name: site?.contact_name ?? '',
+  contact_phone: site?.contact_phone ?? '',
+  location_text: site?.location_text ?? '',
+  google_maps_url: site?.google_maps_url ?? '',
+  notes: site?.notes ?? ''
+});
+
 export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [values, setValues] = useState<SiteFormValues>(emptyFormValues);
   const { toast } = useToast();
 
-  const { register, handleSubmit, reset } = useForm<SiteFormValues>({
-    defaultValues: {
-      contact_name: '',
-      contact_phone: '',
-      location_text: '',
-      google_maps_url: '',
-      notes: ''
-    }
-  });
-
   useEffect(() => {
-    reset({
-      contact_name: site?.contact_name ?? '',
-      contact_phone: site?.contact_phone ?? '',
-      location_text: site?.location_text ?? '',
-      google_maps_url: site?.google_maps_url ?? '',
-      notes: site?.notes ?? ''
-    });
-  }, [reset, site]);
+    setValues(getSiteFormValues(site));
+  }, [site]);
 
-  const onSubmit = handleSubmit(async (values) => {
+  const handleFieldChange = (field: keyof SiteFormValues, value: string) => {
+    setValues((current) => ({ ...current, [field]: value }));
+  };
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!site?.site_id) return;
     setSaving(true);
     setError(null);
@@ -86,7 +91,7 @@ export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps
     } finally {
       setSaving(false);
     }
-  });
+  };
 
   if (!canEdit) {
     return null;
@@ -105,26 +110,43 @@ export function EditSiteDialog({ site, canEdit, onUpdated }: EditSiteDialogProps
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="site-contact-name">Contact Name</Label>
-              <Input id="site-contact-name" {...register('contact_name')} />
+              <Input
+                id="site-contact-name"
+                value={values.contact_name}
+                onChange={(event) => handleFieldChange('contact_name', event.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="site-contact-phone">Contact Phone</Label>
-              <Input id="site-contact-phone" {...register('contact_phone')} />
+              <Input
+                id="site-contact-phone"
+                value={values.contact_phone}
+                onChange={(event) => handleFieldChange('contact_phone', event.target.value)}
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="site-location-text">Location Text</Label>
-              <Input id="site-location-text" {...register('location_text')} />
+              <Input
+                id="site-location-text"
+                value={values.location_text}
+                onChange={(event) => handleFieldChange('location_text', event.target.value)}
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="site-google-maps">Google Maps URL</Label>
-              <Input id="site-google-maps" {...register('google_maps_url')} />
+              <Input
+                id="site-google-maps"
+                value={values.google_maps_url}
+                onChange={(event) => handleFieldChange('google_maps_url', event.target.value)}
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="site-notes">Notes</Label>
               <textarea
                 id="site-notes"
                 className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                {...register('notes')}
+                value={values.notes}
+                onChange={(event) => handleFieldChange('notes', event.target.value)}
               />
             </div>
           </div>

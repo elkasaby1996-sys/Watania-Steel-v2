@@ -8,12 +8,10 @@ import { Checkbox } from './ui/checkbox';
 import { Separator } from './ui/separator';
 import { Plus } from 'lucide-react';
 import { useDashboardStore } from '../stores/dashboardStore';
-import { useDriversStore } from '../stores/driversStore';
 import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
 import { useToast } from '../hooks/use-toast';
 import { CalculatorInput } from './CalculatorInput';
-import { logger } from '@/lib/logger';
 
 interface OrderFormData {
   deliveryNumber: string;
@@ -41,62 +39,61 @@ interface OrderFormData {
   };
 }
 
+const getInitialFormData = (): OrderFormData => ({
+  deliveryNumber: '',
+  deliveryName: '',
+  company: '',
+  site: '',
+  driverName: 'none',
+  phoneNumber: '',
+  status: 'in-progress',
+  tons: '',
+  shift: 'morning',
+  signedDeliveryNote: false,
+  orderType: 'straight-bar',
+  orderDate: new Date().toISOString().split('T')[0],
+  breakdown: {
+    '8mm': '',
+    '10mm': '',
+    '12mm': '',
+    '14mm': '',
+    '16mm': '',
+    '18mm': '',
+    '20mm': '',
+    '25mm': '',
+    '32mm': ''
+  }
+});
+
 export function AddOrderDialog() {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState<OrderFormData>({
-    deliveryNumber: '',
-    deliveryName: '',
-    company: '',
-    site: '',
-    driverName: 'none',
-    phoneNumber: '',
-        status: 'in-progress',
-    tons: '',
-    shift: 'morning',
-    signedDeliveryNote: false,
-    orderType: 'straight-bar',
-    orderDate: new Date().toISOString().split('T')[0], // Default to today
-    breakdown: {
-      '8mm': '',
-      '10mm': '',
-      '12mm': '',
-      '14mm': '',
-      '16mm': '',
-      '18mm': '',
-      '20mm': '',
-      '25mm': '',
-      '32mm': ''
-    }
-  });
+  const [formData, setFormData] = useState<OrderFormData>(getInitialFormData);
   const [errors, setErrors] = useState<any>({});
   const [loading, setLoading] = useState(false);
-  
+  const [activeDrivers, setActiveDrivers] = useState<any[]>([]);
+
   const { addOrder } = useDashboardStore();
   const { user } = useAuthStore();
   const { toast } = useToast();
-  const [activeDrivers, setActiveDrivers] = useState<any[]>([]);
-
-  // Load drivers when dialog opens
-  useEffect(() => {
-    if (open) {
-      const loadDriversData = async () => {
-        try {
-          const { useDriversStore } = await import('../stores/driversStore');
-          const { loadDrivers, getActiveDrivers } = useDriversStore.getState();
-          await loadDrivers();
-          const drivers = getActiveDrivers();
-          setActiveDrivers(drivers);
-        } catch (error) {
-          console.error('Failed to load drivers:', error);
-          setActiveDrivers([]);
-        }
-      };
-      loadDriversData();
-    }
-  }, [open]);
-
-  // Check if user has permission to create orders
   const canCreate = hasPermission(user?.profile?.role, 'create');
+
+  useEffect(() => {
+    if (!open) return;
+
+    const loadDriversData = async () => {
+      try {
+        const { useDriversStore } = await import('../stores/driversStore');
+        const { loadDrivers, getActiveDrivers } = useDriversStore.getState();
+        await loadDrivers();
+        setActiveDrivers(getActiveDrivers());
+      } catch (error) {
+        console.error('Failed to load drivers:', error);
+        setActiveDrivers([]);
+      }
+    };
+
+    loadDriversData();
+  }, [open]);
 
   const calculateTotalTons = (): number => {
     return Object.values(formData.breakdown).reduce((total, value) => {
@@ -123,15 +120,13 @@ export function AddOrderDialog() {
     if (!formData.orderDate || formData.orderDate.trim() === '') {
       newErrors.orderDate = 'Order date is required';
     }
-    // Driver details are optional - can be updated later
     if (formData.phoneNumber && formData.phoneNumber.trim() !== '' && !/^\+?[\d\s\-\(\)]+$/.test(formData.phoneNumber)) {
       newErrors.phoneNumber = 'Please enter a valid phone number';
     }
 
-    // Validate breakdown totals
     const totalBreakdown = calculateTotalTons();
     const enteredTons = parseFloat(formData.tons) || 0;
-    
+
     if (!formData.tons || formData.tons.trim() === '') {
       newErrors.tons = 'Total tons is required';
     } else if (isNaN(Number(formData.tons)) || Number(formData.tons) <= 0) {
@@ -140,12 +135,11 @@ export function AddOrderDialog() {
       newErrors.tons = `Total tons (${enteredTons}) doesn't match breakdown total (${totalBreakdown.toFixed(3)})`;
     }
 
-    // Check for duplicate delivery numbers (exact match including special characters)
     const { orders, historyOrders } = useDashboardStore.getState();
     const deliveryNumber = formData.deliveryNumber;
     const existingActiveOrder = orders.find(o => o.id === deliveryNumber);
     const existingHistoryOrder = historyOrders.find(o => o.id === deliveryNumber);
-    
+
     if (existingActiveOrder || existingHistoryOrder) {
       newErrors.deliveryNumber = `Delivery number "${deliveryNumber}" already exists`;
     }
@@ -154,29 +148,42 @@ export function AddOrderDialog() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const resetForm = () => {
+    setFormData(getInitialFormData());
+    setErrors({});
+    setLoading(false);
+    setActiveDrivers([]);
+  };
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      resetForm();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Check permissions first
+
     if (!canCreate) {
       toast({
-        title: "Access Denied",
+        title: 'Access Denied',
         description: "You don't have permission to create orders. Contact your administrator.",
-        variant: "destructive"
+        variant: 'destructive'
       });
       return;
     }
-    
+
     if (!validateForm()) {
       return;
     }
 
+    setLoading(true);
+
     try {
-      // Use delivery number as order ID
       const orderId = formData.deliveryNumber;
-      
       const tons = Number(formData.tons);
-      
+
       const newOrder = {
         id: orderId,
         customerName: formData.deliveryName,
@@ -200,58 +207,32 @@ export function AddOrderDialog() {
           '18mm': parseFloat(formData.breakdown['18mm']) || 0,
           '20mm': parseFloat(formData.breakdown['20mm']) || 0,
           '25mm': parseFloat(formData.breakdown['25mm']) || 0,
-          '32mm': parseFloat(formData.breakdown['32mm']) || 0,
+          '32mm': parseFloat(formData.breakdown['32mm']) || 0
         }
       };
 
       await addOrder(newOrder);
-      
+
       toast({
-        title: "Order Created",
-        description: `Order ${orderId} has been successfully created.`,
+        title: 'Order Created',
+        description: `Order ${orderId} has been successfully created.`
       });
 
-      // Reset form and close dialog
-      setFormData({
-        deliveryNumber: '',
-        deliveryName: '',
-        company: '',
-        site: '',
-        driverName: 'none',
-        phoneNumber: '',
-        status: 'in-progress',
-        tons: '',
-        shift: 'morning',
-        signedDeliveryNote: false,
-        orderType: 'straight-bar',
-        orderDate: new Date().toISOString().split('T')[0],
-        breakdown: {
-          '8mm': '',
-          '10mm': '',
-          '12mm': '',
-          '14mm': '',
-          '16mm': '',
-          '18mm': '',
-          '20mm': '',
-          '25mm': '',
-          '32mm': ''
-        }
-      });
-      setErrors({});
+      resetForm();
       setOpen(false);
     } catch (error) {
       console.error('Order creation failed:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create order. Please try again.",
-        variant: "destructive"
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create order. Please try again.',
+        variant: 'destructive'
       });
+      setLoading(false);
     }
   };
 
   const handleInputChange = (field: keyof OrderFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
@@ -265,56 +246,18 @@ export function AddOrderDialog() {
         [size]: value
       }
     }));
-    
-    // Auto-calculate total tons if breakdown is being used
+
     const newBreakdown = { ...formData.breakdown, [size]: value };
     const total = Object.values(newBreakdown).reduce((sum, val) => {
       const num = parseFloat(val) || 0;
       return sum + num;
     }, 0);
-    
+
     if (total > 0) {
       setFormData(prev => ({ ...prev, tons: total.toFixed(3) }));
     }
   };
 
-  // Reset form when dialog closes
-  const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen);
-    if (!newOpen) {
-      // Reset form when dialog closes
-      setFormData({
-        deliveryNumber: '',
-        deliveryName: '',
-        company: '',
-        site: '',
-        driverName: 'none',
-        phoneNumber: '',
-        status: 'in-progress',
-        tons: '',
-        shift: 'morning',
-        signedDeliveryNote: false,
-        orderType: 'straight-bar',
-        orderDate: new Date().toISOString().split('T')[0],
-        breakdown: {
-          '8mm': '',
-          '10mm': '',
-          '12mm': '',
-          '14mm': '',
-          '16mm': '',
-          '18mm': '',
-          '20mm': '',
-          '25mm': '',
-          '32mm': ''
-        }
-      });
-      setErrors({});
-      setLoading(false);
-      setActiveDrivers([]);
-    }
-  };
-
-  // Don't render the dialog if user doesn't have permission
   if (!canCreate) {
     return null;
   }
@@ -327,31 +270,23 @@ export function AddOrderDialog() {
           <span className="font-medium">Add New Order</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] bg-background text-foreground max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[92dvh] w-[calc(100vw-1rem)] overflow-y-auto bg-background text-foreground sm:max-w-[720px]">
         <DialogHeader>
           <DialogTitle className="text-foreground">Create New Order</DialogTitle>
         </DialogHeader>
-        <form 
-          onSubmit={handleSubmit} 
-          className="space-y-6" 
-          id="add-order-form"
-          onReset={() => {
-            logger.debug('🔄 Form reset triggered');
-            setErrors({});
-            setLoading(false);
-          }}
-        >
-          <div className="grid grid-cols-2 gap-4">
+
+        <form onSubmit={handleSubmit} className="space-y-4" id="add-order-form">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-                <Label htmlFor="add-deliveryNumber" className="text-foreground">
-                  Delivery Number * (Can include letters, numbers, special characters)
-                </Label>
+              <Label htmlFor="add-deliveryNumber" className="text-foreground">
+                Delivery Number *
+              </Label>
               <Input
                 id="add-deliveryNumber"
                 name="deliveryNumber"
                 value={formData.deliveryNumber}
                 onChange={(e) => handleInputChange('deliveryNumber', e.target.value)}
-                placeholder="Enter any delivery number (e.g., DEL-001, PROJ-2024-ABC, etc.)"
+                placeholder="DEL-001 or project reference"
                 className={`bg-background text-foreground border-border ${
                   errors.deliveryNumber ? 'border-destructive' : ''
                 }`}
@@ -360,7 +295,7 @@ export function AddOrderDialog() {
                 <p className="text-sm text-destructive">{errors.deliveryNumber}</p>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="add-deliveryName" className="text-foreground">
                 Delivery Name *
@@ -370,7 +305,7 @@ export function AddOrderDialog() {
                 name="deliveryName"
                 value={formData.deliveryName}
                 onChange={(e) => handleInputChange('deliveryName', e.target.value)}
-                placeholder="John Smith"
+                placeholder="Delivery or order name"
                 className={`bg-background text-foreground border-border ${
                   errors.deliveryName ? 'border-destructive' : ''
                 }`}
@@ -419,44 +354,42 @@ export function AddOrderDialog() {
             )}
           </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="add-driverName" className="text-foreground">
-                  Driver Name
-                </Label>
-                <Select
-                  name="driverName"
-                  value={formData.driverName}
-                  onValueChange={(value) => {
-                    const driverName = value === 'none' ? '' : value;
-                    handleInputChange('driverName', driverName);
-                    // Auto-fill phone number if driver is selected
-                    if (value !== 'none') {
-                      const selectedDriver = activeDrivers.find(d => d.name === value);
-                      if (selectedDriver) {
-                        handleInputChange('phoneNumber', selectedDriver.phone_number);
-                      }
-                    } else {
-                      // Clear phone number if no driver selected
-                      handleInputChange('phoneNumber', '');
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="add-driverName" className="text-foreground">
+                Driver Name
+              </Label>
+              <Select
+                name="driverName"
+                value={formData.driverName}
+                onValueChange={(value) => {
+                  const driverName = value === 'none' ? '' : value;
+                  handleInputChange('driverName', driverName);
+                  if (value !== 'none') {
+                    const selectedDriver = activeDrivers.find(d => d.name === value);
+                    if (selectedDriver) {
+                      handleInputChange('phoneNumber', selectedDriver.phone_number);
                     }
-                  }}
-                >
-                  <SelectTrigger id="add-driverName" className="bg-background text-foreground border-border">
-                    <SelectValue placeholder="Select driver (optional)" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover text-popover-foreground">
-                    <SelectItem value="none">No driver assigned</SelectItem>
-                    {activeDrivers.map((driver) => (
-                      <SelectItem key={driver.id} value={driver.name}>
-                        {driver.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">Select from active drivers or leave empty</p>
-              </div>
-            
+                  } else {
+                    handleInputChange('phoneNumber', '');
+                  }
+                }}
+              >
+                <SelectTrigger id="add-driverName" className="bg-background text-foreground border-border">
+                  <SelectValue placeholder="Select driver (optional)" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover text-popover-foreground">
+                  <SelectItem value="none">No driver assigned</SelectItem>
+                  {activeDrivers.map((driver) => (
+                    <SelectItem key={driver.id} value={driver.name}>
+                      {driver.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Select from active drivers or leave empty</p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="add-phoneNumber" className="text-foreground">
                 Phone Number
@@ -478,25 +411,25 @@ export function AddOrderDialog() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="add-order-date" className="text-foreground">
-                  Order Date *
-                </Label>
-                <Input
-                  id="add-order-date"
-                  name="orderDate"
-                  type="date"
-                  value={formData.orderDate}
-                  onChange={(e) => handleInputChange('orderDate', e.target.value)}
-                  className={`bg-background text-foreground border-border ${
-                    errors.orderDate ? 'border-destructive' : ''
-                  }`}
-                />
-                {errors.orderDate && (
-                  <p className="text-sm text-destructive">{errors.orderDate}</p>
-                )}
-              </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="add-order-date" className="text-foreground">
+                Order Date *
+              </Label>
+              <Input
+                id="add-order-date"
+                name="orderDate"
+                type="date"
+                value={formData.orderDate}
+                onChange={(e) => handleInputChange('orderDate', e.target.value)}
+                className={`bg-background text-foreground border-border ${
+                  errors.orderDate ? 'border-destructive' : ''
+                }`}
+              />
+              {errors.orderDate && (
+                <p className="text-sm text-destructive">{errors.orderDate}</p>
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="add-tons" className="text-foreground">
@@ -526,9 +459,7 @@ export function AddOrderDialog() {
               <Select
                 name="shift"
                 value={formData.shift}
-                onValueChange={(value: 'morning' | 'night') => 
-                  handleInputChange('shift', value)
-                }
+                onValueChange={(value: 'morning' | 'night') => handleInputChange('shift', value)}
               >
                 <SelectTrigger id="add-shift" className="bg-background text-foreground border-border">
                   <SelectValue placeholder="Select shift" />
@@ -541,7 +472,7 @@ export function AddOrderDialog() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="add-orderType" className="text-foreground">
                 Order Type *
@@ -549,9 +480,7 @@ export function AddOrderDialog() {
               <Select
                 name="orderType"
                 value={formData.orderType}
-                onValueChange={(value: 'straight-bar' | 'cut-and-bend') => 
-                  handleInputChange('orderType', value)
-                }
+                onValueChange={(value: 'straight-bar' | 'cut-and-bend') => handleInputChange('orderType', value)}
               >
                 <SelectTrigger id="add-orderType" className="bg-background text-foreground border-border">
                   <SelectValue placeholder="Select order type" />
@@ -567,21 +496,19 @@ export function AddOrderDialog() {
               <Label htmlFor="add-status" className="text-foreground">
                 Order Status
               </Label>
-                <Select
-                  name="status"
-                  value={formData.status}
-                  onValueChange={(value: 'in-progress' | 'delivered') => 
-                    handleInputChange('status', value)
-                  }
-                >
-                  <SelectTrigger id="add-status" className="bg-background text-foreground border-border">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover text-popover-foreground">
-                    <SelectItem value="in-progress">In Progress</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
-                  </SelectContent>
-                </Select>
+              <Select
+                name="status"
+                value={formData.status}
+                onValueChange={(value: 'in-progress' | 'delivered') => handleInputChange('status', value)}
+              >
+                <SelectTrigger id="add-status" className="bg-background text-foreground border-border">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover text-popover-foreground">
+                  <SelectItem value="in-progress">In Progress</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -598,15 +525,14 @@ export function AddOrderDialog() {
 
           <Separator />
 
-          {/* Steel Breakdown Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-foreground">Steel Breakdown (Tons)</h4>
-              <div className="text-sm text-muted-foreground">
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h4 className="font-semibold text-foreground">Steel Breakdown</h4>
+              <div className="font-mono text-sm text-muted-foreground">
                 Total: {calculateTotalTons().toFixed(3)} tons
               </div>
             </div>
-            
+
             <div className="grid grid-cols-3 gap-3">
               {Object.entries(formData.breakdown).map(([size, value]) => (
                 <div key={size} className="space-y-1">
@@ -618,19 +544,19 @@ export function AddOrderDialog() {
                     name={`breakdown-${size}`}
                     value={value}
                     onChange={(newValue) => handleBreakdownChange(size as keyof OrderFormData['breakdown'], newValue)}
-                    placeholder="0.0 or =10+5"
-                    className="bg-background text-foreground border-border text-sm h-8"
+                    placeholder="0.0"
+                    className="bg-background text-foreground border-border"
                   />
                 </div>
               ))}
             </div>
-            
-              <p className="text-xs text-muted-foreground">
-                Enter tonnage for each steel bar size. Start with "=" for calculations (e.g., =10+5).
-              </p>
+
+            <p className="text-xs text-muted-foreground">
+              Enter tonnage for each steel bar size. Start with "=" for calculations, for example =10+5.
+            </p>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:gap-3">
             <Button
               type="button"
               variant="outline"
@@ -642,7 +568,7 @@ export function AddOrderDialog() {
             </Button>
             <Button
               type="submit"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={loading}
             >
               {loading ? 'Creating...' : 'Create Order'}

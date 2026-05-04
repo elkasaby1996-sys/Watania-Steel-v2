@@ -1,4 +1,4 @@
-import { Package, Scissors, Ruler, Weight } from 'lucide-react';
+import { ClipboardList, Scissors, Ruler, Scale } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useDashboardStore } from '../stores/dashboardStore';
@@ -16,7 +16,7 @@ export function DashboardCards() {
     {
       title: 'Active Orders',
       value: dashboardMetrics.todayOrders,
-      icon: Package,
+      icon: ClipboardList,
       color: 'text-primary',
       bgColor: 'bg-primary/20'
     },
@@ -37,7 +37,7 @@ export function DashboardCards() {
     {
       title: 'Total Tons (t)',
       value: formatTons(dashboardMetrics.totalTons),
-      icon: Weight,
+      icon: Scale,
       color: 'text-warning',
       bgColor: 'bg-warning/20'
     }

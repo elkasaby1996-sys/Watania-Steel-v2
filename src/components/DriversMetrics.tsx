@@ -79,7 +79,7 @@ export function DriversMetrics() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
-            <Badge className="border-primary/35 bg-primary/20 text-primary-foreground">
+            <Badge className="light-readable-primary-badge border-primary/35 bg-primary/20 text-primary-foreground">
               {cycleDates.start} - {cycleDates.end}
             </Badge>
             <span className="text-sm text-muted-foreground">Current reporting period</span>
