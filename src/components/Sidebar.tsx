@@ -82,7 +82,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
             variant="ghost"
             size="icon"
             onClick={onMobileClose}
-            className="text-sidebar-foreground hover:bg-white/[0.07] hover:text-gray-100 h-8 w-8"
+            className="text-sidebar-foreground hover:bg-white/[0.07] hover:text-gray-100 h-11 w-11"
           >
             <X size={18} />
           </Button>

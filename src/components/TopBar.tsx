@@ -76,8 +76,8 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
           </h1>
         </div>
 
-        <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-4'}`}>
-          <div className="flex items-center gap-2">
+        <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-4'}`}>
+          <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}>
             {!isMobile && user?.profile?.role && (
               <Badge variant={getRoleBadgeVariant(user.profile.role) as any}>
                 <Shield size={12} className="mr-1" />
@@ -88,7 +88,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
               variant="ghost"
               size="icon"
               onClick={toggleTheme}
-              className="h-8 w-8 text-foreground hover:bg-white/[0.07] hover:text-accent-foreground"
+              className={`${isMobile ? 'h-11 w-11' : 'h-8 w-8'} text-foreground hover:bg-white/[0.07] hover:text-accent-foreground`}
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
@@ -98,7 +98,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
               variant="ghost"
               size="icon"
               onClick={handleAppRefresh}
-              className="h-8 w-8 text-foreground hover:bg-white/[0.07] hover:text-accent-foreground"
+              className={`${isMobile ? 'h-11 w-11' : 'h-8 w-8'} text-foreground hover:bg-white/[0.07] hover:text-accent-foreground`}
               aria-label="Refresh app"
               title="Refresh app"
             >
