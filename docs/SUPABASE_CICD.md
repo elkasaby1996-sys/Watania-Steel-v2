@@ -38,7 +38,7 @@ Before enabling automatic production deployment:
    supabase migration repair --status applied <migration-version>
    ```
 
-   Use the migration version from the filename prefix, for example `20260218` or `20260503124413`, depending on the exact file being repaired.
+   Use the migration version from the filename prefix, for example `20260218000000` or `20260503124413`, depending on the exact file being repaired. New migrations should use unique timestamp prefixes such as `YYYYMMDDHHMMSS`.
 
 5. Repeat the dry run until it only lists migrations that should really be applied.
 6. In GitHub secrets, set `SUPABASE_MIGRATIONS_BOOTSTRAPPED` to `true`.

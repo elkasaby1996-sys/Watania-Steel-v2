@@ -46,7 +46,7 @@ jobs:
       - name: Link Supabase project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
 
-      - name: Mark legacy migrations as applied
+      - name: Remove old date-only migration records
         run: |
           supabase migration repair \
             20250923 \
@@ -57,13 +57,40 @@ jobs:
             20250928 \
             20260218 \
             20260219 \
+            20260503 \
+            --status reverted
+
+      - name: Mark normalized legacy migrations as applied
+        run: |
+          supabase migration repair \
+            20250923000000 \
+            20250924000000 \
+            20250924000100 \
+            20250925000000 \
+            20250926000000 \
+            20250927000000 \
+            20250928000000 \
+            20260218000000 \
+            20260218000100 \
+            20260218000200 \
+            20260218000300 \
+            20260218000400 \
+            20260218000500 \
+            20260218000600 \
+            20260219000000 \
+            20260219000100 \
+            20260219000200 \
+            20260219000300 \
+            20260219000400 \
+            20260219000500 \
+            20260219000600 \
+            20260219000700 \
+            20260219000800 \
+            20260503110000 \
             20260503124413 \
             20260503133000 \
             20260504120000 \
             --status applied
-
-      - name: Remove ambiguous 20260503 repair record
-        run: supabase migration repair 20260503 --status reverted
 
       - name: Confirm migration history
         run: supabase migration list
