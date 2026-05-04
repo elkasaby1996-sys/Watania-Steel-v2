@@ -136,11 +136,11 @@ export function OrderTable() {
               ) : todayOrders.length > 0 ? (
                 todayOrders.map((order) => (
                   <div key={order.id} className="glass-panel rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-mono text-sm text-foreground">{order.id}</p>
-                      {getStatusBadge(order.status)}
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 break-all font-mono text-sm text-foreground">{order.id}</p>
+                      <span className="shrink-0">{getStatusBadge(order.status)}</span>
                     </div>
-                    <p className="font-semibold text-base text-foreground">{order.customerName}</p>
+                    <p className="min-w-0 break-words text-base font-semibold text-foreground">{order.customerName}</p>
                     <p className="text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
                     <p className="text-sm text-muted-foreground">Site: {order.site || 'N/A'}</p>
                     <p className="text-sm text-muted-foreground">Date: {order.date}</p>

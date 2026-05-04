@@ -370,24 +370,24 @@ export function Inventory() {
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex items-center gap-4">
+      <div className="glass-panel flex flex-col items-stretch gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:p-5">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate(ROUTES.dashboard)}
-          className="text-foreground hover:bg-accent"
+          className="w-full justify-start text-foreground hover:bg-accent sm:w-auto"
         >
           <ArrowLeft size={16} />
           Back to Dashboard
         </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
+        <div className="min-w-0 flex-1">
+          <h1 className="break-words text-3xl font-headline font-bold text-foreground">
             Inventory Management
           </h1>
-          <p className="text-muted-foreground">
+          <p className="break-words text-muted-foreground">
             View and manage steel inventory across all categories
           </p>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="mt-1 break-words text-sm text-muted-foreground">
             Last updated: {lastUpdatedLabel}
           </p>
         </div>

@@ -477,18 +477,18 @@ export function ClientProfilePage() {
   return (
     <div className="p-6 space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4">
-        <div>
+      <div className="glass-panel flex flex-col items-stretch gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="min-w-0">
           <div className="text-sm text-slate-400">
             <Link to={ROUTES.clients} className="hover:underline">
               ← Back to Clients
             </Link>
           </div>
-          <h1 className="text-2xl font-semibold">Client profile and order history</h1>
-          <div className="text-xs text-slate-400 mt-1">Client ID: {clientId}</div>
+          <h1 className="break-words text-2xl font-semibold">Client profile and order history</h1>
+          <div className="mt-1 truncate text-xs text-slate-400">Client ID: {clientId}</div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-stretch gap-2 sm:w-auto sm:items-center">
           {isAdmin && (
             <MergeClientsDialog
               clients={mergeClientsList}
@@ -500,21 +500,21 @@ export function ClientProfilePage() {
               triggerLabel="Merge Clients"
             />
           )}
-          <div className="flex gap-2">
+          <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
             <button
-              className={`rounded-lg border border-white/[0.14] px-3 py-2 backdrop-blur-xl transition-colors ${activeTab === 'orders' ? 'bg-white/[0.08]' : 'bg-white/[0.03]'}`}
+              className={`min-w-0 truncate rounded-lg border border-white/[0.14] px-3 py-2 backdrop-blur-xl transition-colors ${activeTab === 'orders' ? 'bg-white/[0.08]' : 'bg-white/[0.03]'}`}
               onClick={() => setActiveTab('orders')}
             >
               Orders
             </button>
             <button
-              className={`rounded-lg border border-white/[0.14] px-3 py-2 backdrop-blur-xl transition-colors ${activeTab === 'overview' ? 'bg-white/[0.08]' : 'bg-white/[0.03]'}`}
+              className={`min-w-0 truncate rounded-lg border border-white/[0.14] px-3 py-2 backdrop-blur-xl transition-colors ${activeTab === 'overview' ? 'bg-white/[0.08]' : 'bg-white/[0.03]'}`}
               onClick={() => setActiveTab('overview')}
             >
               Overview
             </button>
             <button
-              className={`rounded-lg border border-white/[0.14] px-3 py-2 backdrop-blur-xl transition-colors ${activeTab === 'analytics' ? 'bg-white/[0.08]' : 'bg-white/[0.03]'}`}
+              className={`min-w-0 truncate rounded-lg border border-white/[0.14] px-3 py-2 backdrop-blur-xl transition-colors ${activeTab === 'analytics' ? 'bg-white/[0.08]' : 'bg-white/[0.03]'}`}
               onClick={() => setActiveTab('analytics')}
             >
               Analytics

@@ -283,21 +283,21 @@ export function History() {
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex items-center gap-3">
+      <div className="glass-panel flex flex-col items-stretch gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:p-5">
         <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate(ROUTES.dashboard)}
-            className="text-foreground hover:bg-accent"
+            className="w-full justify-start text-foreground hover:bg-accent sm:w-auto"
           >
           <ArrowLeft size={16} />
           Back to Dashboard
         </Button>
-        <div>
-          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
+        <div className="min-w-0">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} break-words font-headline font-bold text-foreground`}>
             Delivery Archive
           </h1>
-          <p className="text-muted-foreground">
+          <p className="break-words text-muted-foreground">
             Complete historical record of all delivered orders with daily metrics
           </p>
         </div>

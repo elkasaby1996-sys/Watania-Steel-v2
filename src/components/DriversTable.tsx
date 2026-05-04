@@ -153,15 +153,15 @@ export function DriversTable() {
                 const driverMetrics = getDriverMetrics(driver.name);
                 return (
                   <div key={driver.id} className="glass-panel rounded-2xl p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start justify-between gap-3">
                       <Button
                         variant="ghost"
-                        className="font-medium text-base text-foreground hover:text-primary hover:bg-accent p-0 h-auto"
+                        className="h-auto min-w-0 flex-1 justify-start whitespace-normal break-words p-0 text-left text-base font-medium text-foreground hover:bg-accent hover:text-primary"
                         onClick={() => handleViewDriverDetails(driver)}
                       >
                         {driver.name}
                       </Button>
-                      {getStatusBadge(driver.is_active)}
+                      <span className="shrink-0">{getStatusBadge(driver.is_active)}</span>
                     </div>
                     <PhoneLink phoneNumber={driver.phone_number} />
                     <div className="text-sm text-muted-foreground">
