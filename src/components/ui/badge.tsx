@@ -4,21 +4,21 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
+  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium backdrop-blur-xl transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
   {
     variants: {
       variant: {
         default:
-          "border-transparent bg-primary text-primary-foreground hover:bg-primary/90",
+          "border-primary/35 bg-primary/85 text-primary-foreground hover:bg-primary",
         secondary:
-          "border-border bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "border-white/12 bg-secondary/70 text-secondary-foreground hover:bg-secondary/90",
         destructive:
-          "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border-border text-foreground bg-transparent",
+          "border-destructive/35 bg-destructive/85 text-destructive-foreground hover:bg-destructive",
+        outline: "border-white/16 bg-white/[0.03] text-foreground",
         success:
-          "border-transparent bg-success text-success-foreground",
+          "border-success/35 bg-success/85 text-success-foreground",
         warning:
-          "border-transparent bg-warning text-warning-foreground",
+          "border-warning/40 bg-warning/90 text-warning-foreground",
       },
     },
     defaultVariants: {
