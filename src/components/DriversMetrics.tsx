@@ -65,40 +65,40 @@ export function DriversMetrics() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* Cycle Period Info */}
-      <Card className="border-blue-200 bg-blue-50">
+      <Card className="border-white/[0.14] bg-[var(--glass-panel)]">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-blue-800 text-lg">
-            <Calendar className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-lg text-foreground">
+            <Calendar className="h-5 w-5 text-primary" />
             Current Cycle Period
           </CardTitle>
-          <CardDescription className="text-blue-700">
+          <CardDescription className="text-muted-foreground">
             Metrics are calculated from the 25th of each month to the 25th of the following month
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
-            <Badge className="bg-blue-600 text-white">
+            <Badge className="border-primary/35 bg-primary/20 text-primary-foreground">
               {cycleDates.start} - {cycleDates.end}
             </Badge>
-            <span className="text-sm text-blue-700">Current reporting period</span>
+            <span className="text-sm text-muted-foreground">Current reporting period</span>
           </div>
         </CardContent>
       </Card>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {metricsCards.map((card, index) => (
           <Card key={index}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">{card.title}</p>
-                  <p className="text-3xl font-bold text-foreground">{card.value}</p>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{card.title}</p>
+                  <p className="text-3xl font-bold tabular-nums text-foreground">{card.value}</p>
                   <p className="text-sm text-muted-foreground mt-1">{card.subtitle}</p>
                 </div>
-                <div className={`p-3 rounded-lg ${card.bgColor}`}>
+                <div className={`rounded-xl border border-white/[0.1] p-3 shadow-[inset_0_1px_rgba(255,255,255,0.08)] ${card.bgColor}`}>
                   <card.icon className={`h-6 w-6 ${card.color}`} />
                 </div>
               </div>
@@ -125,9 +125,9 @@ export function DriversMetrics() {
               .sort((a, b) => (b?.completed_orders || 0) - (a?.completed_orders || 0))
               .slice(0, 5)
               .map((driver, index) => (
-                <div key={driver.driver_id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div key={driver.driver_id} className="flex items-center justify-between rounded-xl border border-white/[0.1] bg-white/[0.03] p-4">
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/25 bg-primary/15 font-bold text-primary">
                       {index + 1}
                     </div>
                     <div>

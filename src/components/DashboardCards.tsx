@@ -45,15 +45,15 @@ export function DashboardCards() {
 
   if (isLoadingMetrics) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <Card key={index} className="p-6 animate-pulse">
-            <div className="flex items-center justify-between">
+          <Card key={index} className="p-5 animate-pulse">
+            <div className="flex items-start justify-between gap-4">
               <div className="space-y-3">
-                <div className="h-4 w-28 rounded bg-muted" />
-                <div className="h-8 w-20 rounded bg-muted" />
+                <div className="h-4 w-28 rounded bg-white/[0.06]" />
+                <div className="h-8 w-20 rounded bg-white/[0.06]" />
               </div>
-              <div className="h-12 w-12 rounded-lg bg-muted" />
+              <div className="h-12 w-12 rounded-xl bg-white/[0.06]" />
             </div>
           </Card>
         ))}
@@ -63,8 +63,8 @@ export function DashboardCards() {
 
   if (metricsError) {
     return (
-      <div className="grid grid-cols-1 gap-6">
-        <Card className="p-6">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4">
+        <Card className="p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Dashboard metrics unavailable</p>
@@ -80,15 +80,15 @@ export function DashboardCards() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
       {cards.map((card, index) => (
-        <Card key={index} className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">{card.title}</p>
-              <p className="text-3xl font-bold text-gray-50">{card.value}</p>
+        <Card key={index} className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{card.title}</p>
+              <p className="text-3xl font-bold tabular-nums text-gray-50">{card.value}</p>
             </div>
-            <div className={`p-3 rounded-lg ${card.bgColor}`}>
+            <div className={`rounded-xl border border-white/10 p-3 shadow-[inset_0_1px_rgba(255,255,255,0.08)] ${card.bgColor}`}>
               <card.icon className={`h-6 w-6 ${card.color}`} />
             </div>
           </div>

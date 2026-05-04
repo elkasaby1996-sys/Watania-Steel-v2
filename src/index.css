@@ -263,15 +263,15 @@ body {
 
   /* Page header consistent styling */
   .page-header {
-    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6;
+    @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
   }
 
   .page-header-title {
-    @apply font-headline text-2xl font-bold text-foreground;
+    @apply font-headline text-xl sm:text-2xl font-bold text-foreground;
   }
 
   .page-header-subtitle {
-    @apply text-sm text-muted-foreground mt-1;
+    @apply mt-1 text-sm text-muted-foreground;
   }
 
   .page-header-actions {

@@ -30,14 +30,14 @@ export function DailyMetricsCard({ date, metrics, orderCount }: DailyMetricsCard
   };
 
   return (
-    <Card className="border-blue-200 bg-blue-50">
+    <Card className="border-white/[0.14] bg-[var(--glass-panel)]">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-blue-800">
+        <CardTitle className="flex items-center justify-between text-foreground">
           <span className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
+            <BarChart3 className="h-4 w-4 text-primary" />
             {formatDate(date)}
           </span>
-          <Badge variant="outline" className="text-blue-700 border-blue-300">
+          <Badge variant="outline" className="border-white/[0.14] bg-white/[0.04] text-muted-foreground">
             {orderCount} orders
           </Badge>
         </CardTitle>

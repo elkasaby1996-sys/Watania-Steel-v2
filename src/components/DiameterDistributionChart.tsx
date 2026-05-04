@@ -5,19 +5,27 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 
 const DIAMETERS = ['8mm', '10mm', '12mm', '14mm', '16mm', '18mm', '20mm', '25mm', '32mm'] as const;
 
-const CHART_COLORS: Record<DiameterKey, string> = {
-  '8mm': '#4B5563',
-  '10mm': '#0EA5E9',
-  '12mm': '#22C55E',
-  '14mm': '#14B8A6',
-  '16mm': '#F59E0B',
-  '18mm': '#A78BFA',
-  '20mm': '#F97316',
-  '25mm': '#E879F9',
-  '32mm': '#60A5FA'
+type DiameterKey = (typeof DIAMETERS)[number];
+
+const chartPalette = {
+  maroon: 'hsl(345, 66%, 44%)',
+  steel: 'hsl(216, 20%, 54%)',
+  amber: 'hsl(38, 82%, 58%)',
+  green: 'hsl(142, 48%, 46%)',
+  muted: 'hsl(214, 18%, 64%)',
 };
 
-type DiameterKey = (typeof DIAMETERS)[number];
+const CHART_COLORS: Record<DiameterKey, string> = {
+  '8mm': chartPalette.muted,
+  '10mm': 'hsl(216, 20%, 48%)',
+  '12mm': chartPalette.steel,
+  '14mm': 'hsl(216, 18%, 60%)',
+  '16mm': chartPalette.maroon,
+  '18mm': 'hsl(345, 45%, 38%)',
+  '20mm': chartPalette.amber,
+  '25mm': 'hsl(38, 46%, 48%)',
+  '32mm': chartPalette.green
+};
 
 type ChartDatum = {
   name: DiameterKey;
@@ -47,14 +55,14 @@ export function DiameterDistributionChart() {
   };
 
   return (
-    <Card className="p-6">
-      <h3 className="text-lg font-headline font-semibold text-gray-50 mb-4">
+    <Card className="p-5 sm:p-6">
+      <h3 className="mb-4 text-lg font-headline font-semibold text-gray-50">
         Diameter Distribution
       </h3>
       {isLoadingMetrics ? (
         <div className="space-y-4 animate-pulse">
-          <div className="h-6 w-32 rounded bg-muted" />
-          <div className="h-72 rounded bg-muted" />
+          <div className="h-6 w-32 rounded bg-white/[0.06]" />
+          <div className="h-72 rounded-xl bg-white/[0.06]" />
         </div>
       ) : metricsError ? (
         <div className="flex flex-col gap-3">
@@ -77,7 +85,7 @@ export function DiameterDistributionChart() {
                   innerRadius="52%"
                   outerRadius="88%"
                   paddingAngle={1}
-                  stroke="#0f172a"
+                  stroke="hsl(220, 42%, 7%)"
                   strokeWidth={1}
                   isAnimationActive={false}
                 >
@@ -87,14 +95,16 @@ export function DiameterDistributionChart() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#0f172a',
-                    border: '1px solid rgba(148, 163, 184, 0.35)',
-                    borderRadius: '8px',
-                    color: '#f8fafc',
+                    backgroundColor: 'var(--glass-panel-strong)',
+                    border: '1px solid var(--glass-border-strong)',
+                    borderRadius: '12px',
+                    color: 'var(--color-foreground)',
                     fontSize: '14px',
-                    padding: '10px 12px'
+                    padding: '10px 12px',
+                    boxShadow: 'var(--glass-shadow-soft)',
+                    backdropFilter: 'blur(18px)'
                   }}
-                  itemStyle={{ color: '#f8fafc' }}
+                  itemStyle={{ color: 'var(--color-foreground)' }}
                   formatter={(value: number, _name, props) => {
                     const label = (props?.payload as ChartDatum | undefined)?.name ?? 'Diameter';
                     return [renderTooltip(value, label), ''];
@@ -105,7 +115,7 @@ export function DiameterDistributionChart() {
           </div>
           <div className="flex flex-wrap gap-3">
             {data.map((entry) => (
-              <div key={entry.name} className="flex items-center gap-2">
+              <div key={entry.name} className="flex items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1">
                 <span
                   className="h-2.5 w-2.5 rounded-full"
                   style={{ backgroundColor: CHART_COLORS[entry.name] }}

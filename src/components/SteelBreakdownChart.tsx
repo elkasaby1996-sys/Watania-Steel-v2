@@ -3,6 +3,14 @@ import { Card } from '@/components/ui/card';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { roundTo3Decimals, formatNumber } from '../lib/utils';
 
+const chartPalette = {
+  maroon: 'hsl(345, 66%, 44%)',
+  steel: 'hsl(216, 20%, 54%)',
+  amber: 'hsl(38, 82%, 58%)',
+  green: 'hsl(142, 48%, 46%)',
+  muted: 'hsl(214, 18%, 64%)',
+};
+
 export function SteelBreakdownChart() {
   const { orders, historyOrders } = useDashboardStore();
   const historyIds = new Set(historyOrders.map((order) => String(order.id)));
@@ -52,35 +60,39 @@ export function SteelBreakdownChart() {
     .sort((a, b) => parseInt(a.size) - parseInt(b.size));
 
   return (
-    <Card className="p-6">
-      <h3 className="text-lg font-semibold text-foreground mb-4">Steel Breakdown Analysis</h3>
+    <Card className="p-5 sm:p-6">
+      <h3 className="mb-4 text-lg font-semibold text-foreground">Steel Breakdown Analysis</h3>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 4%, 80%)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(216, 20%, 34%)" opacity={0.42} />
             <XAxis 
               dataKey="size" 
-              stroke="hsl(240, 4%, 52%)"
+              stroke={chartPalette.muted}
               fontSize={12}
             />
             <YAxis 
-              stroke="hsl(240, 4%, 52%)"
+              stroke={chartPalette.muted}
               fontSize={12}
-              label={{ value: 'Tons', angle: -90, position: 'insideLeft' }}
+              label={{ value: 'Tons', angle: -90, position: 'insideLeft', fill: chartPalette.muted }}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: 'hsl(0, 0%, 100%)',
-                border: '1px solid hsl(240, 4%, 80%)',
-                borderRadius: '8px',
-                color: 'hsl(0, 0%, 12%)'
+                backgroundColor: 'var(--glass-panel-strong)',
+                border: '1px solid var(--glass-border-strong)',
+                borderRadius: '12px',
+                color: 'var(--color-foreground)',
+                boxShadow: 'var(--glass-shadow-soft)',
+                backdropFilter: 'blur(18px)'
               }}
+              itemStyle={{ color: 'var(--color-foreground)' }}
+              labelStyle={{ color: 'var(--color-muted-foreground)' }}
               formatter={(value: number) => [`${formatNumber(value)} tons`, 'Total Delivered']}
               labelFormatter={(label) => `Steel Size: ${label}`}
             />
             <Bar 
               dataKey="tons" 
-              fill="hsl(232, 90%, 62%)"
+              fill={chartPalette.steel}
               radius={[4, 4, 0, 0]}
             />
           </BarChart>
