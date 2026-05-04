@@ -121,7 +121,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <div className="px-3 py-2">
-                <p className="text-sm font-medium text-gray-100">{user?.email}</p>
+                <p className="text-sm font-medium text-popover-foreground">{user?.email}</p>
                 <p className="text-xs text-muted-foreground">
                   {user?.profile?.role && getRoleDisplayName(user.profile.role)}
                 </p>
