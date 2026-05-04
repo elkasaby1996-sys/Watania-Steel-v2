@@ -69,6 +69,14 @@
   --glass-shadow: 0 22px 55px rgba(0, 0, 0, 0.34);
   --glass-shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.22);
   --glass-blur: 22px;
+  --glass-page-background:
+    radial-gradient(circle at 10% 0%, hsla(345, 66%, 34%, 0.22), transparent 28%),
+    radial-gradient(circle at 85% 12%, hsla(216, 20%, 40%, 0.22), transparent 32%),
+    hsl(220, 42%, 7%);
+  --glass-shell-background:
+    radial-gradient(circle at 8% 8%, hsla(345, 66%, 34%, 0.28), transparent 26%),
+    radial-gradient(circle at 82% 16%, hsla(216, 20%, 40%, 0.24), transparent 30%),
+    linear-gradient(135deg, hsl(220, 42%, 7%), hsl(218, 36%, 12%) 48%, hsl(220, 42%, 8%));
 
   /* Typography */
   --font-sans: "Inter", sans-serif;
@@ -128,6 +136,23 @@
   --color-sidebar-hover: hsl(215, 30%, 90%);
   --color-sidebar-active: hsl(215, 32%, 86%);
 
+  --glass-panel: hsla(0, 0%, 100%, 0.68);
+  --glass-panel-strong: hsla(0, 0%, 100%, 0.84);
+  --glass-panel-soft: hsla(210, 30%, 98%, 0.52);
+  --glass-border: hsla(222, 33%, 16%, 0.12);
+  --glass-border-strong: hsla(222, 33%, 16%, 0.18);
+  --glass-highlight: hsla(0, 0%, 100%, 0.72);
+  --glass-shadow: 0 22px 55px rgba(15, 23, 42, 0.16);
+  --glass-shadow-soft: 0 14px 34px rgba(15, 23, 42, 0.1);
+  --glass-page-background:
+    radial-gradient(circle at 10% 0%, hsla(345, 65%, 38%, 0.12), transparent 30%),
+    radial-gradient(circle at 85% 12%, hsla(215, 42%, 72%, 0.26), transparent 34%),
+    hsl(210, 30%, 98%);
+  --glass-shell-background:
+    radial-gradient(circle at 8% 8%, hsla(345, 65%, 38%, 0.14), transparent 28%),
+    radial-gradient(circle at 82% 16%, hsla(215, 42%, 74%, 0.28), transparent 32%),
+    linear-gradient(135deg, hsl(210, 30%, 98%), hsl(215, 42%, 94%) 48%, hsl(210, 24%, 97%));
+
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.08);
   --shadow-card-hover: 0 4px 10px rgba(15, 23, 42, 0.12);
   --shadow-industrial: 0 2px 6px rgba(15, 23, 42, 0.12);
@@ -151,10 +176,7 @@ html,
 body {
   min-height: 100%;
   color: var(--color-foreground);
-  background:
-    radial-gradient(circle at 10% 0%, hsla(345, 66%, 34%, 0.22), transparent 28%),
-    radial-gradient(circle at 85% 12%, hsla(216, 20%, 40%, 0.22), transparent 32%),
-    hsl(220, 42%, 7%);
+  background: var(--glass-page-background);
   font-family: var(--font-sans);
 }
 
@@ -164,10 +186,6 @@ body {
   }
   body {
     @apply text-foreground antialiased;
-    background:
-      radial-gradient(circle at 10% 0%, hsla(345, 66%, 34%, 0.22), transparent 28%),
-      radial-gradient(circle at 85% 12%, hsla(216, 20%, 40%, 0.22), transparent 32%),
-      hsl(220, 42%, 7%);
   }
 
   /* Typography enhancements */
@@ -183,10 +201,7 @@ body {
 
 @layer components {
   .glass-shell {
-    background:
-      radial-gradient(circle at 8% 8%, hsla(345, 66%, 34%, 0.28), transparent 26%),
-      radial-gradient(circle at 82% 16%, hsla(216, 20%, 40%, 0.24), transparent 30%),
-      linear-gradient(135deg, hsl(220, 42%, 7%), hsl(218, 36%, 12%) 48%, hsl(220, 42%, 8%));
+    background: var(--glass-shell-background);
   }
 
   .glass-panel {

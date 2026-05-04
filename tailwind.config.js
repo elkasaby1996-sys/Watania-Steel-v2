@@ -95,7 +95,7 @@ module.exports = {
         'gradient-industrial': 'linear-gradient(135deg, hsl(218, 35%, 12%), hsl(217, 30%, 16%))',
         'gradient-maroon': 'linear-gradient(135deg, hsl(345, 65%, 30%), hsl(345, 55%, 25%))',
         'gradient-card': 'linear-gradient(180deg, hsl(217, 30%, 17%), hsl(217, 30%, 15%))',
-        'glass-shell': 'radial-gradient(circle at 8% 8%, hsla(345, 66%, 34%, 0.28), transparent 26%), radial-gradient(circle at 82% 16%, hsla(216, 20%, 40%, 0.24), transparent 30%), linear-gradient(135deg, hsl(220, 42%, 7%), hsl(218, 36%, 12%) 48%, hsl(220, 42%, 8%))',
+        'glass-shell': 'var(--glass-shell-background)',
         'glass-maroon': 'linear-gradient(145deg, hsl(345, 66%, 42%), hsl(345, 66%, 30%))',
         'glass-panel': 'linear-gradient(145deg, hsla(217, 30%, 18%, 0.72), hsla(217, 30%, 13%, 0.52))',
       },
