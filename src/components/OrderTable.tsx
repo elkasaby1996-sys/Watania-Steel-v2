@@ -141,16 +141,16 @@ export function OrderTable() {
                       <span className="shrink-0">{getStatusBadge(order.status)}</span>
                     </div>
                     <p className="min-w-0 break-words text-base font-semibold text-foreground">{order.customerName}</p>
-                    <p className="text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
-                    <p className="text-sm text-muted-foreground">Site: {order.site || 'N/A'}</p>
-                    <p className="text-sm text-muted-foreground">Date: {order.date}</p>
-                    <p className="text-sm text-muted-foreground">Tons: {order.tons} tons</p>
-                    <div className="text-sm text-muted-foreground">
-                      <p>Driver: {order.driverName || 'N/A'}</p>
+                    <p className="min-w-0 break-words text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
+                    <p className="min-w-0 break-words text-sm text-muted-foreground">Site: {order.site || 'N/A'}</p>
+                    <p className="min-w-0 break-words text-sm text-muted-foreground">Date: {order.date}</p>
+                    <p className="min-w-0 break-words text-sm text-muted-foreground">Tons: {order.tons} tons</p>
+                    <div className="min-w-0 text-sm text-muted-foreground">
+                      <p className="min-w-0 break-words">Driver: {order.driverName || 'N/A'}</p>
                       {order.phoneNumber ? (
                         <a
                           href={`tel:${order.phoneNumber.replace(/[\s\-\(\)]/g, '')}`}
-                          className="text-primary hover:text-primary/80 underline"
+                          className="inline-block max-w-full break-all text-primary underline hover:text-primary/80"
                           title="Click to call"
                         >
                           {order.phoneNumber}
