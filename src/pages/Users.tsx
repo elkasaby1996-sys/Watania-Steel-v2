@@ -9,23 +9,23 @@ export function Users() {
   const navigate = useNavigate();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="glass-panel flex flex-col items-stretch gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:p-5">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate(ROUTES.dashboard)}
-          className="text-foreground hover:bg-accent"
+          className="w-full justify-start text-foreground hover:bg-accent sm:w-auto"
         >
           <ArrowLeft size={16} />
           Back to Dashboard
         </Button>
-        <div>
-          <h1 className="text-3xl font-headline font-bold text-foreground">
+        <div className="min-w-0">
+          <h1 className="break-words text-3xl font-headline font-bold text-foreground">
             User Management
           </h1>
-          <p className="text-muted-foreground">
+          <p className="break-words text-muted-foreground">
             Manage user accounts and role assignments
           </p>
         </div>

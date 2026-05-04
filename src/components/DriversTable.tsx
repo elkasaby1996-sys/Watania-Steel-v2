@@ -24,7 +24,7 @@ const PhoneLink = ({ phoneNumber }: { phoneNumber: string }) => {
   return (
     <a 
       href={`tel:${cleanNumber}`}
-      className="text-primary hover:text-primary/80 underline cursor-pointer inline-flex items-center gap-1"
+      className="inline-flex min-w-0 max-w-full items-center gap-1 break-all text-primary underline hover:text-primary/80"
       title="Click to call"
     >
       📞 {phoneNumber}
@@ -136,7 +136,7 @@ export function DriversTable() {
   };
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-foreground">Drivers List</h3>
@@ -152,16 +152,16 @@ export function DriversTable() {
                 if (!driver || !driver.id) return null;
                 const driverMetrics = getDriverMetrics(driver.name);
                 return (
-                  <div key={driver.id} className="rounded-xl border border-border/80 p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
+                  <div key={driver.id} className="glass-panel rounded-2xl p-4 space-y-3">
+                    <div className="flex min-w-0 items-start justify-between gap-3">
                       <Button
                         variant="ghost"
-                        className="font-medium text-base text-foreground hover:text-primary hover:bg-accent p-0 h-auto"
+                        className="h-auto min-w-0 flex-1 justify-start whitespace-normal break-words p-0 text-left text-base font-medium text-foreground hover:bg-accent hover:text-primary"
                         onClick={() => handleViewDriverDetails(driver)}
                       >
                         {driver.name}
                       </Button>
-                      {getStatusBadge(driver.is_active)}
+                      <span className="shrink-0">{getStatusBadge(driver.is_active)}</span>
                     </div>
                     <PhoneLink phoneNumber={driver.phone_number} />
                     <div className="text-sm text-muted-foreground">
@@ -169,14 +169,14 @@ export function DriversTable() {
                       <p>Completed: {driverMetrics.completed_orders}</p>
                       <p>Total Tons: {driverMetrics.total_tons} tons</p>
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="grid grid-cols-2 gap-2 pt-1 [&_button]:w-full">
                       <RoleBasedComponent action="edit">
-                        <Button variant="outline" size="sm" className="h-10 px-3" onClick={() => handleStatusToggle(driver)}>
+                        <Button variant="outline" size="sm" className="h-11 px-3" onClick={() => handleStatusToggle(driver)}>
                           {driver.is_active ? 'Deactivate' : 'Activate'}
                         </Button>
                       </RoleBasedComponent>
                       <RoleBasedComponent action="edit">
-                        <Button variant="outline" size="sm" className="h-10 px-3" onClick={() => handleEditDriver(driver)}>
+                        <Button variant="outline" size="sm" className="h-11 px-3" onClick={() => handleEditDriver(driver)}>
                           <Edit size={14} className="mr-1" />
                           Edit
                         </Button>
@@ -184,7 +184,7 @@ export function DriversTable() {
                       <RoleBasedComponent action="delete">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-10 px-3 text-destructive hover:text-destructive">
+                            <Button variant="outline" size="sm" className="h-11 px-3 text-destructive hover:text-destructive">
                               <Trash2 size={14} className="mr-1" />
                               Delete
                             </Button>
@@ -221,7 +221,7 @@ export function DriversTable() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl">
             <Table>
             <TableHeader>
               <TableRow className="border-border">

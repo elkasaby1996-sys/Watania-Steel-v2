@@ -184,7 +184,7 @@ function InventorySection({
 
   return (
     <Card className="overflow-hidden">
-      <div className="p-4 border-b border-border flex items-center justify-between">
+      <div className="border-b border-white/[0.12] p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Package className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">
@@ -217,7 +217,7 @@ function InventorySection({
         ) : isMobile ? (
           <div className="space-y-3">
             {sortedData.map((row, idx) => (
-              <div key={row.id || idx} className="rounded-lg border border-border p-4 space-y-2">
+              <div key={row.id || idx} className="glass-panel rounded-2xl p-4 space-y-3">
                 <p className="font-semibold text-foreground">{row[config.rowLabelKey] || '-'}</p>
                 <div className="grid grid-cols-1 gap-1 text-sm">
                   {columns.map((col) => {
@@ -368,26 +368,26 @@ export function Inventory() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="glass-panel flex flex-col items-stretch gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:p-5">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate(ROUTES.dashboard)}
-          className="text-foreground hover:bg-accent"
+          className="w-full justify-start text-foreground hover:bg-accent sm:w-auto"
         >
           <ArrowLeft size={16} />
           Back to Dashboard
         </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
+        <div className="min-w-0 flex-1">
+          <h1 className="break-words text-3xl font-headline font-bold text-foreground">
             Inventory Management
           </h1>
-          <p className="text-muted-foreground">
+          <p className="break-words text-muted-foreground">
             View and manage steel inventory across all categories
           </p>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="mt-1 break-words text-sm text-muted-foreground">
             Last updated: {lastUpdatedLabel}
           </p>
         </div>
@@ -405,7 +405,7 @@ export function Inventory() {
 
       {/* Inventory Sections */}
       {!loading && (
-        <div className="space-y-6">
+        <div className="space-y-5 sm:space-y-6">
           {tableConfigs.map((config) => (
             <InventorySection
               key={config.tableName}

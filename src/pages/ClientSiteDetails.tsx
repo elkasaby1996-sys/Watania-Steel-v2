@@ -129,7 +129,7 @@ export function ClientSiteDetailsPage() {
 
   if (!clientId || !siteId) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5 sm:space-y-6">
         <Button
           variant="ghost"
           size="sm"
@@ -147,8 +147,8 @@ export function ClientSiteDetailsPage() {
   }
 
   return (
-    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
-      <div className="flex flex-wrap items-center gap-4">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-4">
         <Button
           variant="ghost"
           size="sm"
@@ -179,7 +179,7 @@ export function ClientSiteDetailsPage() {
       )}
 
       {siteSummary && !loading && (
-        <div className="space-y-6">
+        <div className="space-y-5 sm:space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-4">
@@ -271,7 +271,7 @@ export function ClientSiteDetailsPage() {
               ) : isMobile ? (
                 <div className="space-y-3">
                   {orders.map((order) => (
-                    <div key={`${order.source}-${order.id}`} className="rounded-xl border border-border/80 p-4 space-y-1">
+                    <div key={`${order.source}-${order.id}`} className="glass-panel rounded-2xl p-4 space-y-3">
                       <p className="text-sm text-muted-foreground">Date: {order.date ?? '—'}</p>
                       <p className="text-sm text-muted-foreground">Status: {order.status ?? '—'}</p>
                       <p className="text-sm text-muted-foreground">Type: {order.order_type ?? '—'}</p>

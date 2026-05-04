@@ -56,6 +56,19 @@ const formatDateLabel = (dateString: string) => {
 
 const formatDateValue = (date: Date) => date.toISOString().split('T')[0];
 
+const formatMaxThreeDecimals = (value: unknown) => {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '-';
+
+  return number.toLocaleString('en-US', {
+    maximumFractionDigits: 3,
+  });
+};
+
+const formatTonsLabel = (value: unknown) => `${formatMaxThreeDecimals(value)}t`;
+
+const formatPercentLabel = (value: unknown) => `${formatMaxThreeDecimals(value)}%`;
+
 const subtractDays = (dateString: string, days: number) => {
   const date = new Date(`${dateString}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() - days);
@@ -160,9 +173,9 @@ export function SteelAnalytics() {
   const handleRetry = () => setReloadToken((prev) => prev + 1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-4">
         <Button
             variant="ghost"
             size="sm"
@@ -188,64 +201,72 @@ export function SteelAnalytics() {
       </div>
 
       {/* Time Range Selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Time Range Configuration
-          </CardTitle>
-          <CardDescription>
-            Configure the time period for steel analytics
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            <div className="space-y-2">
-              <Label htmlFor="time-range">Time Range</Label>
-              <Select
-                value={selectedRangeDays.toString()}
-                onValueChange={(value) => setSelectedRangeDays(Number(value) as (typeof RANGE_OPTIONS)[number])}
-              >
-                <SelectTrigger id="time-range" className="bg-background text-foreground border-border">
-                  <SelectValue placeholder="Select time range" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover text-popover-foreground">
-                  {RANGE_OPTIONS.map((days) => (
-                    <SelectItem key={days} value={days.toString()}>
-                      Last {days} Days
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      <section className="rounded-xl border border-border/80 bg-card/70 p-4 sm:p-5">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                Analytics Range
+              </div>
 
-            <div className="md:col-span-2 text-sm text-muted-foreground">
-              <p>
-                Analyzing: {range ? `${range.startDate} → ${range.endDate}` : 'No data'}
-              </p>
-              <p className="text-xs text-muted-foreground/80">
-                Window anchored to latest delivered date across orders + history_orders
-              </p>
+              <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-[minmax(220px,320px)_auto] md:items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="time-range" className="text-xs uppercase tracking-[0.08em] text-muted-foreground">
+                    Time Range
+                  </Label>
+                  <Select
+                    value={selectedRangeDays.toString()}
+                    onValueChange={(value) => setSelectedRangeDays(Number(value) as (typeof RANGE_OPTIONS)[number])}
+                  >
+                    <SelectTrigger id="time-range" className="h-10 bg-background text-foreground border-border">
+                      <SelectValue placeholder="Select time range" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover text-popover-foreground">
+                      {RANGE_OPTIONS.map((days) => (
+                        <SelectItem key={days} value={days.toString()}>
+                          Last {days} Days
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="pb-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Analyzing
+                  </p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-sm text-foreground">
+                    {range ? `${range.startDate} to ${range.endDate}` : 'No data'}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <Button
               onClick={handleReset}
               variant="outline"
-              className="h-9"
+              className="h-10 w-full shrink-0 lg:w-36"
             >
               Reset
             </Button>
           </div>
 
           <Tabs value={filterMode} onValueChange={(value) => setFilterMode(value as FilterMode)}>
-            <TabsList className="flex flex-wrap gap-2 w-full md:w-auto">
-              <TabsTrigger value="all">Total (Cut & Bend + Straight Bar)</TabsTrigger>
-              <TabsTrigger value="straight-bar">Straight Bar Only</TabsTrigger>
-              <TabsTrigger value="cut-and-bend">Cut-and-Bend Only</TabsTrigger>
+            <TabsList className="grid h-auto w-full grid-cols-1 gap-1 bg-muted/35 p-1 sm:grid-cols-3">
+              <TabsTrigger value="all" className="min-h-9 whitespace-normal px-3 text-xs sm:text-sm">
+                Total
+              </TabsTrigger>
+              <TabsTrigger value="straight-bar" className="min-h-9 whitespace-normal px-3 text-xs sm:text-sm">
+                Straight Bar
+              </TabsTrigger>
+              <TabsTrigger value="cut-and-bend" className="min-h-9 whitespace-normal px-3 text-xs sm:text-sm">
+                Cut-and-Bend
+              </TabsTrigger>
             </TabsList>
           </Tabs>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {error && (
         <Card className="border-destructive">
@@ -301,21 +322,21 @@ export function SteelAnalytics() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                <div className="p-4 rounded-lg border border-border bg-card">
+                <div className="glass-panel rounded-xl p-4">
                   <p className="text-muted-foreground">Daily Average (Range)</p>
                   <p className="font-semibold text-foreground">
                     {formatNumber(analytics?.dailyAverage ?? 0)} tons
                   </p>
                 </div>
-                <div className="p-4 rounded-lg border border-border bg-card">
+                <div className="glass-panel rounded-xl p-4">
                   <p className="text-muted-foreground">Active Days</p>
                   <p className="font-semibold text-foreground">{analytics?.activeDays ?? 0} days</p>
                 </div>
-                <div className="p-4 rounded-lg border border-border bg-card">
+                <div className="glass-panel rounded-xl p-4">
                   <p className="text-muted-foreground">Rows Analyzed</p>
                   <p className="font-semibold text-foreground">{analytics?.rowsAnalyzed ?? 0} rows</p>
                 </div>
-                <div className="p-4 rounded-lg border border-border bg-card">
+                <div className="glass-panel rounded-xl p-4">
                   <p className="text-muted-foreground">Total Tons (Actual)</p>
                   <p className="font-semibold text-foreground">
                     {formatNumber(analytics?.totalTons ?? 0)} tons
@@ -345,25 +366,25 @@ export function SteelAnalytics() {
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={lineChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 4%, 30%)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                     <XAxis
                       dataKey="date"
-                      stroke="hsl(240, 4%, 70%)"
+                      stroke="var(--chart-axis)"
                       fontSize={12}
                     />
                     <YAxis
-                      stroke="hsl(240, 4%, 70%)"
+                      stroke="var(--chart-axis)"
                       fontSize={12}
                       label={{ value: 'Tons', angle: -90, position: 'insideLeft' }}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: 'hsl(240, 10%, 12%)',
-                        border: '1px solid hsl(240, 4%, 40%)',
+                        backgroundColor: 'var(--chart-tooltip-bg)',
+                        border: '1px solid var(--chart-tooltip-border)',
                         borderRadius: '8px',
-                        color: 'hsl(0, 0%, 98%)',
+                        color: 'var(--chart-tooltip-text)',
                       }}
-                      formatter={(value) => [`${value} tons`, 'Total Delivered']}
+                      formatter={(value) => [`${formatMaxThreeDecimals(value)} tons`, 'Total Delivered']}
                       labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate ?? ''}
                     />
                     <Line
@@ -410,13 +431,13 @@ export function SteelAnalytics() {
                       </Pie>
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'hsl(240, 10%, 12%)',
-                          border: '1px solid hsl(240, 4%, 40%)',
+                          backgroundColor: 'var(--chart-tooltip-bg)',
+                          border: '1px solid var(--chart-tooltip-border)',
                           borderRadius: '8px',
-                          color: 'hsl(0, 0%, 98%)',
+                          color: 'var(--chart-tooltip-text)',
                         }}
                         formatter={(value, _, props) => [
-                          `${value}t (${props?.payload?.percentage ?? 0}%)`,
+                          `${formatTonsLabel(value)} (${formatPercentLabel(props?.payload?.percentage ?? 0)})`,
                           props?.payload?.name ?? '',
                         ]}
                         labelFormatter={() => ''}
@@ -432,7 +453,7 @@ export function SteelAnalytics() {
                         style={{ backgroundColor: COLORS[index % COLORS.length] }}
                       />
                       <span className="text-foreground">
-                        {item.name}: {item.value}t ({item.percentage}%)
+                        {item.name}: {formatTonsLabel(item.value)} ({formatPercentLabel(item.percentage)})
                       </span>
                     </div>
                   ))}

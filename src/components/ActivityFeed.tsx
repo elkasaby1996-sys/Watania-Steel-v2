@@ -28,24 +28,24 @@ export function ActivityFeed() {
   };
 
   return (
-    <Card className="p-6">
-      <h3 className="text-lg font-headline font-semibold text-gray-50 mb-4">Activity Feed</h3>
+    <Card className="p-5 sm:p-6">
+      <h3 className="mb-4 text-lg font-headline font-semibold text-gray-50">Activity Feed</h3>
       <div className="space-y-4">
         {activities.map((activity, index) => (
           <div key={activity.id}>
             <div className="flex items-start gap-3">
-              <div className="mt-1 p-1.5 rounded-md bg-muted/50">
+              <div className="mt-1 rounded-lg border border-white/[0.1] bg-white/[0.04] p-1.5 shadow-[inset_0_1px_rgba(255,255,255,0.08)]">
                 {getActivityIcon(activity.type)}
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-card-foreground">{activity.message}</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {formatTime(activity.timestamp)}
                 </p>
               </div>
             </div>
             {index < activities.length - 1 && (
-              <Separator className="my-4 bg-border/50" />
+              <Separator className="my-4 bg-white/[0.08]" />
             )}
           </div>
         ))}

@@ -9,55 +9,95 @@
 /* Industrial Pro Design System - Dark Navy Theme */
 :root {
   /* Core colors - Dark Navy Theme */
-  --color-border: hsl(215, 25%, 27%);
-  --color-input: hsl(215, 28%, 17%);
-  --color-ring: hsl(345, 65%, 35%);
-  --color-background: hsl(218, 35%, 12%);
-  --color-foreground: hsl(210, 20%, 85%);
+  --color-border: hsl(214, 24%, 32%);
+  --color-input: hsl(216, 28%, 16%);
+  --color-ring: hsl(345, 68%, 44%);
+  --color-background: hsl(220, 42%, 7%);
+  --color-foreground: hsl(210, 24%, 90%);
 
   /* Primary - Dark Maroon (Brand Color) */
-  --color-primary: hsl(345, 65%, 30%);
-  --color-primary-foreground: hsl(0, 0%, 100%);
+  --color-primary: hsl(345, 66%, 34%);
+  --color-primary-foreground: hsl(210, 28%, 96%);
 
   /* Secondary - Muted Blue-Gray */
-  --color-secondary: hsl(215, 25%, 23%);
-  --color-secondary-foreground: hsl(210, 20%, 85%);
+  --color-secondary: hsl(216, 25%, 24%);
+  --color-secondary-foreground: hsl(210, 24%, 90%);
 
   /* Tertiary */
-  --color-tertiary: hsl(215, 20%, 35%);
-  --color-tertiary-foreground: hsl(210, 20%, 90%);
+  --color-tertiary: hsl(216, 20%, 40%);
+  --color-tertiary-foreground: hsl(210, 28%, 94%);
 
   /* Neutral */
-  --color-neutral: hsl(215, 28%, 17%);
-  --color-neutral-foreground: hsl(210, 20%, 85%);
+  --color-neutral: hsl(216, 28%, 16%);
+  --color-neutral-foreground: hsl(210, 24%, 90%);
 
   /* Semantic colors */
-  --color-destructive: hsl(0, 65%, 50%);
-  --color-destructive-foreground: hsl(0, 0%, 100%);
-  --color-success: hsl(142, 50%, 40%);
-  --color-success-foreground: hsl(0, 0%, 100%);
-  --color-warning: hsl(38, 80%, 50%);
-  --color-warning-foreground: hsl(0, 0%, 10%);
+  --color-destructive: hsl(0, 66%, 52%);
+  --color-destructive-foreground: hsl(210, 28%, 96%);
+  --color-success: hsl(142, 48%, 42%);
+  --color-success-foreground: hsl(210, 28%, 96%);
+  --color-warning: hsl(38, 82%, 53%);
+  --color-warning-foreground: hsl(220, 42%, 7%);
 
   /* Muted & Accent */
-  --color-muted: hsl(215, 25%, 20%);
-  --color-muted-foreground: hsl(215, 15%, 55%);
-  --color-accent: hsl(215, 25%, 25%);
-  --color-accent-foreground: hsl(210, 20%, 90%);
+  --color-muted: hsl(216, 26%, 20%);
+  --color-muted-foreground: hsl(214, 18%, 64%);
+  --color-accent: hsl(216, 28%, 24%);
+  --color-accent-foreground: hsl(210, 28%, 95%);
 
   /* Surfaces */
-  --color-popover: hsl(218, 32%, 15%);
-  --color-popover-foreground: hsl(210, 20%, 85%);
+  --color-popover: hsl(218, 32%, 14%);
+  --color-popover-foreground: hsl(210, 24%, 90%);
   --color-card: hsl(217, 30%, 16%);
-  --color-card-foreground: hsl(210, 20%, 85%);
+  --color-card-foreground: hsl(210, 24%, 90%);
 
   /* Sidebar */
-  --color-sidebar: hsl(218, 35%, 10%);
-  --color-sidebar-foreground: hsl(210, 20%, 70%);
-  --color-sidebar-border: hsl(215, 25%, 20%);
-  --color-sidebar-accent: hsl(345, 65%, 30%);
-  --color-sidebar-hover: hsl(217, 30%, 18%);
-  --color-sidebar-active: hsl(217, 30%, 20%);
+  --color-sidebar: hsl(220, 42%, 7%);
+  --color-sidebar-foreground: hsl(212, 21%, 72%);
+  --color-sidebar-border: hsl(214, 24%, 28%);
+  --color-sidebar-accent: hsl(345, 66%, 34%);
+  --color-sidebar-hover: hsl(216, 30%, 18%);
+  --color-sidebar-active: hsl(216, 30%, 22%);
+  --sidebar-surface: radial-gradient(circle at 50% 0%, hsl(219 34% 18%), hsl(220 33% 10%) 42%, hsl(222 36% 7%));
+  --sidebar-text: hsl(210, 24%, 90%);
+  --sidebar-muted: hsl(214, 18%, 64%);
+  --sidebar-border: hsla(210, 28%, 96%, 0.10);
+  --sidebar-border-soft: hsla(210, 28%, 96%, 0.08);
+  --sidebar-hover-border: hsla(210, 28%, 96%, 0.09);
+  --sidebar-hover-bg: hsla(210, 28%, 96%, 0.045);
+  --sidebar-active-bg: linear-gradient(90deg, hsl(345 62% 34% / 0.22), hsl(219 27% 18% / 0.92));
+  --sidebar-active-text: hsl(210, 20%, 95%);
+  --sidebar-item-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  --sidebar-rail-shadow: 10px 0 30px rgba(0, 0, 0, 0.32);
+  --sidebar-logo-bg: linear-gradient(145deg, hsl(220 30% 7%), hsl(218 28% 13%));
+  --sidebar-logo-border: hsla(210, 28%, 96%, 0.14);
+  --sidebar-logo-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  --sidebar-footer-bg: hsla(210, 28%, 96%, 0.035);
+  --sidebar-footer-hover-bg: hsla(210, 28%, 96%, 0.06);
+
+  /* Glass material */
+  --glass-panel: hsla(217, 30%, 16%, 0.58);
+  --glass-panel-strong: hsla(217, 30%, 14%, 0.76);
+  --glass-panel-soft: hsla(217, 30%, 18%, 0.42);
+  --glass-border: hsla(210, 28%, 92%, 0.16);
+  --glass-border-strong: hsla(210, 28%, 96%, 0.24);
+  --glass-highlight: hsla(210, 28%, 98%, 0.11);
+  --glass-shadow: 0 22px 55px rgba(0, 0, 0, 0.34);
+  --glass-shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.22);
+  --glass-blur: 22px;
+  --glass-page-background:
+    radial-gradient(circle at 10% 0%, hsla(345, 66%, 34%, 0.22), transparent 28%),
+    radial-gradient(circle at 85% 12%, hsla(216, 20%, 40%, 0.22), transparent 32%),
+    hsl(220, 42%, 7%);
+  --glass-shell-background:
+    radial-gradient(circle at 8% 8%, hsla(345, 66%, 34%, 0.28), transparent 26%),
+    radial-gradient(circle at 82% 16%, hsla(216, 20%, 40%, 0.24), transparent 30%),
+    linear-gradient(135deg, hsl(220, 42%, 7%), hsl(218, 36%, 12%) 48%, hsl(220, 42%, 8%));
+  --chart-grid: hsl(240, 4%, 30%);
+  --chart-axis: hsl(240, 4%, 70%);
+  --chart-tooltip-bg: hsl(240, 10%, 12%);
+  --chart-tooltip-border: hsl(240, 4%, 40%);
+  --chart-tooltip-text: hsl(0, 0%, 98%);
 
   /* Typography */
   --font-sans: "Inter", sans-serif;
@@ -65,7 +105,7 @@
   --font-mono: "JetBrains Mono", monospace;
 
   /* Radius */
-  --radius: 10px;
+  --radius: 14px;
 
   /* Shadows for dark theme */
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
@@ -116,10 +156,76 @@
   --color-sidebar-accent: hsl(345, 65%, 38%);
   --color-sidebar-hover: hsl(215, 30%, 90%);
   --color-sidebar-active: hsl(215, 32%, 86%);
+  --sidebar-surface: linear-gradient(180deg, hsl(210 34% 98%), hsl(214 36% 94%));
+  --sidebar-text: hsl(222, 33%, 18%);
+  --sidebar-muted: hsl(220, 11%, 43%);
+  --sidebar-border: hsla(220, 18%, 70%, 0.54);
+  --sidebar-border-soft: hsla(220, 18%, 70%, 0.38);
+  --sidebar-hover-border: hsla(345, 65%, 38%, 0.20);
+  --sidebar-hover-bg: hsla(215, 34%, 86%, 0.58);
+  --sidebar-active-bg: linear-gradient(90deg, hsl(345 65% 38% / 0.12), hsl(214 40% 88% / 0.84));
+  --sidebar-active-text: hsl(222, 33%, 14%);
+  --sidebar-item-shadow: inset 0 1px rgba(255, 255, 255, 0.74);
+  --sidebar-rail-shadow: 10px 0 26px rgba(15, 23, 42, 0.10);
+  --sidebar-logo-bg: linear-gradient(145deg, hsl(210 30% 99%), hsl(214 28% 91%));
+  --sidebar-logo-border: hsla(220, 18%, 70%, 0.58);
+  --sidebar-logo-shadow: inset 0 1px rgba(255, 255, 255, 0.82);
+  --sidebar-footer-bg: hsla(0, 0%, 100%, 0.58);
+  --sidebar-footer-hover-bg: hsla(215, 34%, 86%, 0.70);
+
+  --glass-panel: hsla(0, 0%, 100%, 0.68);
+  --glass-panel-strong: hsla(0, 0%, 100%, 0.84);
+  --glass-panel-soft: hsla(210, 30%, 98%, 0.52);
+  --glass-border: hsla(222, 33%, 16%, 0.12);
+  --glass-border-strong: hsla(222, 33%, 16%, 0.18);
+  --glass-highlight: hsla(0, 0%, 100%, 0.72);
+  --glass-shadow: 0 22px 55px rgba(15, 23, 42, 0.16);
+  --glass-shadow-soft: 0 14px 34px rgba(15, 23, 42, 0.1);
+  --glass-page-background:
+    radial-gradient(circle at 10% 0%, hsla(345, 65%, 38%, 0.12), transparent 30%),
+    radial-gradient(circle at 85% 12%, hsla(215, 42%, 72%, 0.26), transparent 34%),
+    hsl(210, 30%, 98%);
+  --glass-shell-background:
+    radial-gradient(circle at 8% 8%, hsla(345, 65%, 38%, 0.14), transparent 28%),
+    radial-gradient(circle at 82% 16%, hsla(215, 42%, 74%, 0.28), transparent 32%),
+    linear-gradient(135deg, hsl(210, 30%, 98%), hsl(215, 42%, 94%) 48%, hsl(210, 24%, 97%));
+  --chart-grid: hsl(220, 16%, 72%);
+  --chart-axis: hsl(220, 12%, 42%);
+  --chart-tooltip-bg: hsl(0, 0%, 100%);
+  --chart-tooltip-border: hsl(220, 16%, 78%);
+  --chart-tooltip-text: hsl(222, 33%, 16%);
 
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.08);
   --shadow-card-hover: 0 4px 10px rgba(15, 23, 42, 0.12);
   --shadow-industrial: 0 2px 6px rgba(15, 23, 42, 0.12);
+}
+
+:root.light .text-gray-50 {
+  color: var(--color-foreground);
+}
+
+:root.light .text-gray-100,
+:root.light .text-gray-200 {
+  color: hsl(222, 33%, 22%);
+}
+
+:root.light .text-gray-300 {
+  color: hsl(220, 14%, 42%);
+}
+
+:root.light .app-sidebar .text-gray-50,
+:root.light .app-sidebar .text-gray-100,
+:root.light .app-sidebar .text-gray-200 {
+  color: var(--sidebar-text);
+}
+
+:root.light .app-sidebar .text-gray-300 {
+  color: var(--sidebar-muted);
+}
+
+:root.light .light-readable-primary-badge {
+  color: var(--color-primary);
+  background-color: hsl(345 65% 38% / 0.10);
 }
 
 /* Industrial Pro gradient backgrounds */
@@ -136,9 +242,11 @@
 }
 
 /* Ensure proper color application */
-html, body {
+html,
+body {
+  min-height: 100%;
   color: var(--color-foreground);
-  background-color: var(--color-background);
+  background: var(--glass-page-background);
   font-family: var(--font-sans);
 }
 
@@ -147,7 +255,7 @@ html, body {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply text-foreground antialiased;
   }
 
   /* Typography enhancements */
@@ -162,6 +270,71 @@ html, body {
 }
 
 @layer components {
+  .app-sidebar {
+    color: var(--sidebar-text);
+    background: var(--sidebar-surface);
+    border-color: var(--sidebar-border);
+    box-shadow: var(--sidebar-rail-shadow);
+  }
+
+  .sidebar-brand-section {
+    border-color: var(--sidebar-border-soft);
+  }
+
+  .sidebar-brand-line {
+    background: linear-gradient(90deg, transparent, hsl(345 66% 42% / 0.40), transparent);
+  }
+
+  .sidebar-logo-frame {
+    background: var(--sidebar-logo-bg);
+    border-color: var(--sidebar-logo-border);
+    box-shadow: var(--sidebar-logo-shadow);
+  }
+
+  .sidebar-bottom-panel {
+    background: var(--sidebar-footer-bg);
+    border-color: var(--sidebar-border-soft);
+  }
+
+  .sidebar-bottom-panel:hover {
+    background: var(--sidebar-footer-hover-bg);
+  }
+
+  .glass-shell {
+    background: var(--glass-shell-background);
+  }
+
+  .glass-panel {
+    background: var(--glass-panel);
+    border: 1px solid var(--glass-border);
+    box-shadow: inset 0 1px var(--glass-highlight), var(--glass-shadow-soft);
+    backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+  }
+
+  .glass-panel-strong {
+    background: var(--glass-panel-strong);
+    border: 1px solid var(--glass-border-strong);
+    box-shadow: inset 0 1px var(--glass-highlight), var(--glass-shadow);
+    backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  }
+
+  .glass-card-hover {
+    transition: border-color 180ms ease-out, box-shadow 180ms ease-out, background-color 180ms ease-out;
+  }
+
+  .glass-card-hover:hover {
+    border-color: var(--glass-border-strong);
+    box-shadow: inset 0 1px var(--glass-highlight), 0 24px 58px rgba(0, 0, 0, 0.3);
+  }
+
+  .phone-safe-page {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+
   /* Industrial Pro Table Styles */
   .table-industrial {
     @apply w-full;
@@ -190,19 +363,124 @@ html, body {
 
   /* Page header consistent styling */
   .page-header {
-    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6;
+    @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
   }
 
   .page-header-title {
-    @apply font-headline text-2xl font-bold text-foreground;
+    @apply font-headline text-xl sm:text-2xl font-bold text-foreground;
   }
 
   .page-header-subtitle {
-    @apply text-sm text-muted-foreground mt-1;
+    @apply mt-1 text-sm text-muted-foreground;
   }
 
   .page-header-actions {
     @apply flex items-center gap-3;
+  }
+
+  .nav-route-button {
+    transform: translateZ(0);
+    transition:
+      background-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .nav-route-button:hover {
+    transform: translateX(1px) translateZ(0);
+  }
+
+  .nav-route-button-active {
+    color: var(--sidebar-active-text);
+    animation: nav-route-settle 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .nav-route-wash {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      radial-gradient(circle at 12% 50%, hsl(345 66% 42% / 0.20), transparent 34%),
+      linear-gradient(90deg, hsl(345 66% 34% / 0.16), transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+    animation: nav-route-wash-in 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .nav-route-icon {
+    transition:
+      color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .nav-route-button-active .nav-route-icon {
+    animation: nav-route-icon-settle 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .nav-route-dot {
+    height: 0.375rem;
+    width: 0.375rem;
+    flex: none;
+    border-radius: 999px;
+    background: var(--color-primary);
+    box-shadow: 0 0 0 3px hsl(345 66% 34% / 0.12);
+    animation: nav-route-dot-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes nav-route-settle {
+  from {
+    transform: translateX(-3px) translateZ(0);
+  }
+  to {
+    transform: translateX(0) translateZ(0);
+  }
+}
+
+@keyframes nav-route-wash-in {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes nav-route-icon-settle {
+  0% {
+    transform: translateX(-2px) scale(0.96);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes nav-route-dot-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-5px) scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-route-button,
+  .nav-route-icon {
+    transition: none;
+  }
+
+  .nav-route-button-active,
+  .nav-route-button-active .nav-route-icon,
+  .nav-route-wash,
+  .nav-route-dot {
+    animation: none;
   }
 }
 

@@ -107,7 +107,7 @@ export function OrderTable() {
   };
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-foreground">Active Orders</h3>
@@ -128,40 +128,40 @@ export function OrderTable() {
             <div className="space-y-3">
               {isLoadingOrders ? (
                 Array.from({ length: 5 }).map((_, index) => (
-                  <div key={`skeleton-${index}`} className="rounded-lg border border-border p-4 space-y-2">
+                  <div key={`skeleton-${index}`} className="glass-panel rounded-2xl p-4 space-y-3">
                     <div className="h-4 w-32 animate-pulse rounded bg-muted" />
                     <div className="h-4 w-full animate-pulse rounded bg-muted" />
                   </div>
                 ))
               ) : todayOrders.length > 0 ? (
                 todayOrders.map((order) => (
-                  <div key={order.id} className="rounded-xl border border-border/80 p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-mono text-sm text-foreground">{order.id}</p>
-                      {getStatusBadge(order.status)}
+                  <div key={order.id} className="glass-panel rounded-2xl p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 break-all font-mono text-sm text-foreground">{order.id}</p>
+                      <span className="shrink-0">{getStatusBadge(order.status)}</span>
                     </div>
-                    <p className="font-semibold text-base text-foreground">{order.customerName}</p>
-                    <p className="text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
-                    <p className="text-sm text-muted-foreground">Site: {order.site || 'N/A'}</p>
-                    <p className="text-sm text-muted-foreground">Date: {order.date}</p>
-                    <p className="text-sm text-muted-foreground">Tons: {order.tons} tons</p>
-                    <div className="text-sm text-muted-foreground">
-                      <p>Driver: {order.driverName || 'N/A'}</p>
+                    <p className="min-w-0 break-words text-base font-semibold text-foreground">{order.customerName}</p>
+                    <p className="min-w-0 break-words text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
+                    <p className="min-w-0 break-words text-sm text-muted-foreground">Site: {order.site || 'N/A'}</p>
+                    <p className="min-w-0 break-words text-sm text-muted-foreground">Date: {order.date}</p>
+                    <p className="min-w-0 break-words text-sm text-muted-foreground">Tons: {order.tons} tons</p>
+                    <div className="min-w-0 text-sm text-muted-foreground">
+                      <p className="min-w-0 break-words">Driver: {order.driverName || 'N/A'}</p>
                       {order.phoneNumber ? (
                         <a
                           href={`tel:${order.phoneNumber.replace(/[\s\-\(\)]/g, '')}`}
-                          className="text-primary hover:text-primary/80 underline"
+                          className="inline-block max-w-full break-all text-primary underline hover:text-primary/80"
                           title="Click to call"
                         >
                           {order.phoneNumber}
                         </a>
                       ) : null}
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="grid grid-cols-2 gap-2 pt-1 [&_button]:w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-10 px-3"
+                        className="h-11 px-3"
                         onClick={() => handleViewOrder(order)}
                       >
                         {hasPermission(userRole, 'edit') ? <Edit size={14} className="mr-1" /> : <Eye size={14} className="mr-1" />}
@@ -171,7 +171,7 @@ export function OrderTable() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-10 px-3"
+                          className="h-11 px-3"
                           onClick={async () => {
                             try {
                               await toggleSignedDeliveryNote(order);
@@ -193,7 +193,7 @@ export function OrderTable() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-10 px-3"
+                            className="h-11 px-3"
                             onClick={async () => {
                               try {
                                 await handleMarkAsDelivered(order.id);
@@ -219,7 +219,7 @@ export function OrderTable() {
                       <RoleBasedComponent action="delete">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-10 px-3 text-destructive hover:text-destructive">
+                            <Button variant="outline" size="sm" className="h-11 px-3 text-destructive hover:text-destructive">
                               <Trash2 size={14} className="mr-1" />
                               Delete
                             </Button>
@@ -255,7 +255,7 @@ export function OrderTable() {
               )}
             </div>
           ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl">
             <Table>
               <TableHeader>
                 <TableRow className="border-border">

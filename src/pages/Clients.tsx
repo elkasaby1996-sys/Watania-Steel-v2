@@ -72,9 +72,9 @@ export function Clients() {
   };
 
   return (
-    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
+    <div className="space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
@@ -156,7 +156,7 @@ export function Clients() {
             <div className="space-y-3">
               {loading ? (
                 skeletonRows.map((row) => (
-                  <div key={`skeleton-${row}`} className="rounded-xl border border-border/80 p-4 space-y-2">
+                  <div key={`skeleton-${row}`} className="glass-panel rounded-2xl p-4 space-y-3">
                     <div className="h-4 w-40 rounded bg-muted animate-pulse" />
                     <div className="h-4 w-24 rounded bg-muted animate-pulse" />
                   </div>
@@ -167,7 +167,7 @@ export function Clients() {
                     key={client.id}
                     type="button"
                     onClick={() => handleClientClick(client.id)}
-                    className="w-full text-left rounded-xl border border-border/80 p-4 space-y-2 hover:bg-muted/40 transition-colors"
+                    className="glass-panel w-full rounded-2xl p-4 text-left space-y-3 transition-colors hover:bg-white/[0.07]"
                   >
                     <p className="font-semibold text-base text-foreground">{client.name}</p>
                     <p className="text-sm text-muted-foreground">Orders: {client.total_orders.toLocaleString()}</p>

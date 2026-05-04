@@ -202,27 +202,27 @@ export function DriverDetail() {
   }
 
   return (
-    <div className={isMobile ? 'space-y-4' : 'space-y-6 p-6'}>
+    <div className={`${isMobile ? '' : 'p-6'} space-y-5 sm:space-y-6`}>
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="glass-panel flex flex-col items-stretch gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:p-5">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate(ROUTES.drivers)}
-          className="text-foreground hover:bg-accent"
+          className="w-full justify-start text-foreground hover:bg-accent sm:w-auto"
         >
           <ArrowLeft size={16} />
           Back to Drivers
         </Button>
-        <div className="flex-1">
-          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
+        <div className="min-w-0 flex-1">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} break-words font-headline font-bold text-foreground`}>
             {driver.name}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="break-words text-muted-foreground">
             Driver performance and order history
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Badge className={driver.is_active ? 'bg-success text-success-foreground' : 'bg-gray-400 text-white'}>
             {driver.is_active ? 'Active' : 'Inactive'}
           </Badge>
@@ -284,22 +284,22 @@ export function DriverDetail() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 border border-border rounded-lg">
+            <div className="glass-panel rounded-xl p-4 text-center">
               <Package className="h-8 w-8 text-primary mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{cycleMetrics.total_orders}</p>
               <p className="text-sm text-muted-foreground">Total Orders</p>
             </div>
-            <div className="text-center p-4 border border-border rounded-lg">
+            <div className="glass-panel rounded-xl p-4 text-center">
               <CheckCircle className="h-8 w-8 text-success mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{cycleMetrics.completed_orders}</p>
               <p className="text-sm text-muted-foreground">Completed</p>
             </div>
-            <div className="text-center p-4 border border-border rounded-lg">
+            <div className="glass-panel rounded-xl p-4 text-center">
               <Clock className="h-8 w-8 text-warning mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{cycleMetrics.pending_orders}</p>
               <p className="text-sm text-muted-foreground">Pending</p>
             </div>
-            <div className="text-center p-4 border border-border rounded-lg">
+            <div className="glass-panel rounded-xl p-4 text-center">
               <Weight className="h-8 w-8 text-tertiary mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{cycleMetrics.total_tons}</p>
               <p className="text-sm text-muted-foreground">Total Tons</p>
@@ -392,7 +392,7 @@ export function DriverDetail() {
             <div className="space-y-3">
               {orders.length > 0 ? (
                 orders.map((order) => (
-                  <div key={order.id} className="rounded-xl border border-border/80 p-4 space-y-2">
+                  <div key={order.id} className="glass-panel rounded-2xl p-4 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-mono text-foreground">{order.id}</p>
                       {getStatusBadge(order.status)}

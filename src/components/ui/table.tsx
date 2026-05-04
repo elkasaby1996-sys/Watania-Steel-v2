@@ -6,7 +6,7 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto rounded-xl border border-border/60 bg-card/60 shadow-sm">
+  <div className="relative w-full overflow-auto rounded-2xl border border-white/[0.14] bg-[var(--glass-panel)] shadow-glass backdrop-blur-xl">
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
@@ -22,7 +22,7 @@ const TableHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <thead
     ref={ref}
-    className={cn("sticky top-0 z-10 bg-muted/70 backdrop-blur supports-[backdrop-filter]:bg-muted/55 [&_tr]:border-b", className)}
+    className={cn("sticky top-0 z-10 bg-[var(--glass-panel-strong)] backdrop-blur-xl [&_tr]:border-b", className)}
     {...props}
   />
 ))
@@ -35,7 +35,7 @@ const TableBody = React.forwardRef<
   <tbody
     ref={ref}
     className={cn(
-      "[&_tr:last-child]:border-0 [&_tr:nth-child(even)]:bg-muted/15",
+      "[&_tr:last-child]:border-0 [&_tr:nth-child(even)]:bg-white/[0.025]",
       className
     )}
     {...props}
@@ -50,7 +50,7 @@ const TableFooter = React.forwardRef<
   <tfoot
     ref={ref}
     className={cn(
-      "border-t bg-muted/30 font-medium [&>tr]:last:border-b-0",
+      "border-t bg-[var(--glass-panel-soft)] font-medium [&>tr]:last:border-b-0",
       className
     )}
     {...props}
@@ -65,7 +65,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b border-border/40 transition-colors duration-150 hover:bg-accent/45 data-[state=selected]:bg-accent",
+      "border-b border-white/[0.10] transition-colors duration-150 hover:bg-accent data-[state=selected]:bg-accent",
       className
     )}
     {...props}

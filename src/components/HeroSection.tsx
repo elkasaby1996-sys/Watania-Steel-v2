@@ -12,8 +12,8 @@ export function HeroSection() {
   });
 
   return (
-    <div className="mb-8">
-      <div className="page-header">
+    <div className="mb-6">
+      <div className="page-header glass-panel rounded-2xl p-4 sm:p-5">
         <div>
           <h1 className="page-header-title">
             Al Watania Steel - Daily Orders

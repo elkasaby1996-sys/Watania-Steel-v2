@@ -1,22 +1,23 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Card } from '@/components/ui/card';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Edit,
+  AlertTriangle,
   ArrowLeft,
-  Search,
   Calendar,
-  Eye,
   CheckCircle,
-  XCircle,
-  RefreshCw,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Edit,
+  Eye,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  XCircle
 } from 'lucide-react';
 import { OrderDetailsDialog } from '../components/OrderDetailsDialog';
 import { useAuthStore } from '../stores/authStore';
@@ -25,30 +26,38 @@ import { useNavigate } from 'react-router-dom';
 import { type HistoryOrder, historyService, type HistoryOrderFilters } from '../lib/supabase';
 import { useToast } from '../hooks/use-toast';
 import { RoleBasedComponent } from '../components/RoleBasedComponent';
-import { roundTo3Decimals, formatNumber } from '../lib/utils';
+import { formatNumber, roundTo3Decimals } from '../lib/utils';
 import { ROUTES } from '@/routes/routes';
 import { logger } from '@/lib/logger';
 import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 import { normalizeOrderType } from '@/lib/orderTypes';
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100];
+const HISTORY_PAGE_SIZE = 100;
 const HISTORY_REFRESH_DEBOUNCE_MS = 300;
+
+type DailyMetric = {
+  straightBar: number;
+  cutAndBend: number;
+  total: number;
+};
 
 export function History() {
   const { user } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isMobile } = useDeviceInfo();
+
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<HistoryOrder | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [companyFilter, setCompanyFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [historyOrders, setHistoryOrders] = useState<HistoryOrder[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
@@ -56,7 +65,6 @@ export function History() {
   const [visiblePageEnd, setVisiblePageEnd] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isMobile } = useDeviceInfo();
 
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
@@ -71,7 +79,7 @@ export function History() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, companyFilter, dateFrom, dateTo, pageSize]);
+  }, [debouncedSearch, statusFilter, companyFilter, dateFrom, dateTo]);
 
   const filters: HistoryOrderFilters = useMemo(() => {
     return {
@@ -89,17 +97,14 @@ export function History() {
     abortRef.current = controller;
     const requestId = ++requestIdRef.current;
 
-    if (previousController) {
-      previousController.abort();
-    }
-
+    previousController?.abort();
     setLoading(true);
     setError(null);
 
     try {
       const result = await historyService.getPaginated({
         page,
-        pageSize,
+        pageSize: HISTORY_PAGE_SIZE,
         filters,
         signal: controller.signal
       });
@@ -130,7 +135,7 @@ export function History() {
         setLoading(false);
       }
     }
-  }, [page, pageSize, filters]);
+  }, [page, filters]);
 
   useEffect(() => {
     fetchHistoryOrders();
@@ -156,27 +161,21 @@ export function History() {
     };
   }, []);
 
-  const refreshHistory = useCallback(() => {
-    fetchHistoryOrders();
-  }, [fetchHistoryOrders]);
-
   const deliveredOrdersByDate = useMemo(() => {
-    const grouped: { [date: string]: HistoryOrder[] } = {};
+    const grouped: Record<string, HistoryOrder[]> = {};
 
-    historyOrders.forEach(order => {
+    historyOrders.forEach((order) => {
       const orderDateTime = order?.date || order?.delivered_at;
       if (!orderDateTime) return;
       const orderDate = String(orderDateTime).split('T')[0];
-      if (!grouped[orderDate]) {
-        grouped[orderDate] = [];
-      }
+      grouped[orderDate] = grouped[orderDate] || [];
       grouped[orderDate].push(order);
     });
 
-    Object.keys(grouped).forEach(date => {
+    Object.keys(grouped).forEach((date) => {
       grouped[date].sort((a, b) => {
-        const timeA = new Date(a.date || a.delivered_at).getTime();
-        const timeB = new Date(b.date || b.delivered_at).getTime();
+        const timeA = new Date(a.date || a.delivered_at || '').getTime();
+        const timeB = new Date(b.date || b.delivered_at || '').getTime();
         return timeB - timeA;
       });
     });
@@ -185,13 +184,13 @@ export function History() {
   }, [historyOrders]);
 
   const dailyMetrics = useMemo(() => {
-    const metrics: { [date: string]: { straightBar: number; cutAndBend: number; total: number } } = {};
+    const metrics: Record<string, DailyMetric> = {};
 
     Object.entries(deliveredOrdersByDate).forEach(([date, orders]) => {
       let straightBar = 0;
       let cutAndBend = 0;
 
-      orders.forEach(order => {
+      orders.forEach((order) => {
         const tons = order.tons || 0;
         const orderType = normalizeOrderType(order.order_type);
 
@@ -218,9 +217,7 @@ export function History() {
     );
   }, [deliveredOrdersByDate]);
 
-  const totalPages = useMemo(() => {
-    return Math.max(1, serverTotalPages);
-  }, [serverTotalPages]);
+  const totalPages = useMemo(() => Math.max(1, serverTotalPages), [serverTotalPages]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -229,16 +226,11 @@ export function History() {
   }, [page, totalPages]);
 
   const formatDate = useCallback((dateString: string) => {
-    if (!dateString) {
-      return 'Invalid Date';
-    }
+    if (!dateString) return 'Invalid Date';
 
     try {
       const date = new Date(dateString);
-
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date';
-      }
+      if (Number.isNaN(date.getTime())) return 'Invalid Date';
 
       return date.toLocaleDateString('en-US', {
         weekday: 'long',
@@ -246,27 +238,45 @@ export function History() {
         month: 'long',
         day: 'numeric'
       });
-    } catch (error) {
+    } catch {
       return 'Invalid Date';
     }
   }, []);
 
   const getStatusBadge = useCallback((status: string) => {
     if (status === 'in-progress') {
-      return <Badge className="bg-yellow-100 text-yellow-800">In Progress</Badge>;
+      return <Badge variant="warning">In progress</Badge>;
     }
 
-    return <Badge className="bg-success text-success-foreground">Delivered</Badge>;
+    return <Badge variant="success">Delivered</Badge>;
   }, []);
 
-  const handleViewOrder = useCallback((order: any) => {
-    logger.debug('🔍 History - Selected order:', order);
+  const getSignedBadge = useCallback((signed?: boolean | null) => {
+    if (signed) {
+      return (
+        <Badge variant="success">
+          <CheckCircle size={12} className="mr-1" />
+          Signed
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="outline" className="border-warning/60 text-foreground">
+        <XCircle size={12} className="mr-1 text-warning" />
+        Not signed
+      </Badge>
+    );
+  }, []);
+
+  const handleViewOrder = useCallback((order: HistoryOrder) => {
+    logger.debug('History selected order:', order);
     setSelectedOrder(order);
     setDetailsDialogOpen(true);
   }, []);
 
   const toggleDateCollapse = useCallback((date: string) => {
-    setCollapsedDates(prev => {
+    setCollapsedDates((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(date)) {
         newSet.delete(date);
@@ -277,398 +287,448 @@ export function History() {
     });
   }, []);
 
+  const refreshHistory = useCallback(() => {
+    fetchHistoryOrders();
+  }, [fetchHistoryOrders]);
+
+  const resetFilters = useCallback(() => {
+    setHistorySearchQuery('');
+    setDebouncedSearch('');
+    setCompanyFilter('');
+    setStatusFilter('all');
+    setDateFrom('');
+    setDateTo('');
+    setPage(1);
+  }, []);
+
+  const updateSignedDeliveryNote = useCallback(async (order: HistoryOrder) => {
+    try {
+      const newStatus = !order.signed_delivery_note;
+
+      await historyService.update(order.id, {
+        signed_delivery_note: newStatus
+      } as HistoryOrder);
+
+      await fetchHistoryOrders();
+
+      toast({
+        title: 'Delivery Note Updated',
+        description: `Delivery note marked as ${newStatus ? 'signed' : 'not signed'}.`,
+      });
+    } catch (updateError) {
+      console.error('Failed to update delivery note:', updateError);
+      toast({
+        title: 'Error',
+        description: 'Failed to update delivery note. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  }, [fetchHistoryOrders, toast]);
+
+  const hasActiveFilters = Boolean(
+    historySearchQuery.trim() ||
+    debouncedSearch ||
+    companyFilter.trim() ||
+    statusFilter !== 'all' ||
+    dateFrom ||
+    dateTo
+  );
+
+  const activeFilterCount = [
+    historySearchQuery.trim() || debouncedSearch,
+    companyFilter.trim(),
+    statusFilter !== 'all',
+    dateFrom || dateTo
+  ].filter(Boolean).length;
+
   const pageStart = totalCount === 0 ? 0 : visiblePageStart;
   const pageEnd = totalCount === 0 ? 0 : visiblePageEnd;
+  const resultSummary = totalCount === 0 ? 'No results' : `Showing ${pageStart}-${pageEnd} of ${totalCount}`;
+  const canEdit = hasPermission(user?.profile?.role, 'edit');
 
   return (
-    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(ROUTES.dashboard)}
-            className="text-foreground hover:bg-accent"
-          >
-          <ArrowLeft size={16} />
-          Back to Dashboard
-        </Button>
-        <div>
-          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
-            Delivery Archive
-          </h1>
-          <p className="text-muted-foreground">
-            Complete historical record of all delivered orders with daily metrics
-          </p>
+    <div className="space-y-4 sm:space-y-5">
+      <section className="rounded-lg border border-border bg-card px-4 py-4 shadow-card sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(ROUTES.dashboard)}
+              className="h-8 w-fit px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+            >
+              <ArrowLeft size={15} />
+              Dashboard
+            </Button>
+            <div>
+              <h1 className="break-words font-headline text-2xl font-semibold text-foreground sm:text-3xl">
+                Delivery Archive
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Delivered orders by date, tonnage, driver, and signed delivery note.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:justify-end">
+            <span>{totalCount.toLocaleString()} delivered orders</span>
+            <span className="hidden text-border sm:inline">|</span>
+            <span>{resultSummary}</span>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Search + Filters */}
-      <Card>
-        <div className="p-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className={`relative flex-1 ${isMobile ? 'w-full min-w-0 max-w-none' : 'min-w-[240px] max-w-md'}`}>
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
+      <section className="rounded-lg border border-border bg-card px-4 py-4 shadow-card sm:px-5">
+        <div className="grid gap-3 xl:grid-cols-[minmax(260px,1.55fr)_minmax(180px,0.9fr)_minmax(160px,0.7fr)_minmax(320px,1.25fr)_minmax(210px,auto)] xl:items-end">
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Search</span>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
               <Input
                 id="history-search"
                 name="historySearch"
-                placeholder="Search all fields..."
+                placeholder="Delivery, company, site, driver"
                 value={historySearchQuery}
-                onChange={(e) => setHistorySearchQuery(e.target.value)}
-                className="pl-10 bg-background text-foreground border-border"
+                onChange={(event) => setHistorySearchQuery(event.target.value)}
+                className="h-10 bg-background pl-10 text-foreground"
               />
             </div>
-            <div className={isMobile ? 'w-full' : 'min-w-[200px]'}>
+          </label>
+
+          <label className={`space-y-1.5 ${filtersExpanded || hasActiveFilters ? '' : 'hidden lg:block'}`}>
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Company</span>
+            <Input
+              id="history-company"
+              name="historyCompany"
+              placeholder="Any company"
+              value={companyFilter}
+              onChange={(event) => setCompanyFilter(event.target.value)}
+              className="h-10 bg-background text-foreground"
+            />
+          </label>
+
+          <label className={`space-y-1.5 ${filtersExpanded || hasActiveFilters ? '' : 'hidden lg:block'}`}>
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Status</span>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger id="history-status" className="h-10 bg-background text-foreground">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover text-popover-foreground">
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="in-progress">In progress</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+
+          <div className="space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Date range</span>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
               <Input
-                id="history-company"
-                name="historyCompany"
-                placeholder="Filter by company"
-                value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
-                className="bg-background text-foreground border-border"
-              />
-            </div>
-            <div className={isMobile ? 'w-full' : 'min-w-[160px]'}>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger id="history-status" className="bg-background text-foreground border-border">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover text-popover-foreground">
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className={`flex items-center gap-2 ${isMobile ? 'w-full flex-col items-stretch' : ''}`}>
-              <Input
+                aria-label="History start date"
                 id="history-date-from"
                 name="historyDateFrom"
                 type="date"
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="bg-background text-foreground border-border"
+                onChange={(event) => setDateFrom(event.target.value)}
+                className="h-10 bg-background text-foreground"
               />
-              <span className="text-muted-foreground text-sm">to</span>
+              <span className="text-xs text-muted-foreground">to</span>
               <Input
+                aria-label="History end date"
                 id="history-date-to"
                 name="historyDateTo"
                 type="date"
                 value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="bg-background text-foreground border-border"
+                onChange={(event) => setDateTo(event.target.value)}
+                className="h-10 bg-background text-foreground"
               />
             </div>
-            <div className={isMobile ? 'w-full' : 'min-w-[140px]'}>
-              <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
-                <SelectTrigger id="history-page-size" className="bg-background text-foreground border-border">
-                  <SelectValue placeholder="Page size" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover text-popover-foreground">
-                  {PAGE_SIZE_OPTIONS.map(option => (
-                    <SelectItem key={option} value={String(option)}>
-                      About {option} orders / page
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          </div>
+
+          <div className="flex items-center gap-3 xl:justify-end xl:pl-5">
             <Button
-              onClick={refreshHistory}
+              type="button"
+              onClick={() => setFiltersExpanded((value) => !value)}
               variant="outline"
               size="sm"
-              className="text-foreground border-border hover:bg-accent"
-              disabled={loading}
+              className="h-10 border-border text-foreground hover:bg-accent lg:hidden"
             >
-              <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              <SlidersHorizontal className="h-4 w-4" />
+              {filtersExpanded || hasActiveFilters ? 'Less' : 'Filters'}
+            </Button>
+            <Button
+              onClick={resetFilters}
+              variant="ghost"
+              size="sm"
+              className="h-10 text-muted-foreground hover:text-foreground"
+              disabled={!hasActiveFilters || loading}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reset
             </Button>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-            <span>
-              {totalCount} delivered orders found
-            </span>
-            <span>
-              {totalCount === 0 ? 'No results' : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
-            </span>
-          </div>
         </div>
-      </Card>
+
+        {hasActiveFilters ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+            <span>{activeFilterCount} active {activeFilterCount === 1 ? 'filter' : 'filters'}</span>
+            {debouncedSearch ? <Badge variant="outline">Search: {debouncedSearch}</Badge> : null}
+            {companyFilter.trim() ? <Badge variant="outline">Company: {companyFilter.trim()}</Badge> : null}
+            {statusFilter !== 'all' ? <Badge variant="outline">Status: {statusFilter}</Badge> : null}
+            {dateFrom || dateTo ? <Badge variant="outline">Dates: {dateFrom || 'start'} to {dateTo || 'today'}</Badge> : null}
+          </div>
+        ) : null}
+      </section>
 
       {error ? (
-        <Card>
-          <div className="p-4 text-sm text-destructive">
-            {error}
+        <section className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+              <div>
+                <h2 className="font-semibold text-foreground">Archive did not load</h2>
+                <p className="mt-1 text-muted-foreground">
+                  Keep your filters in place and retry. If this repeats, check the connection or Supabase access.
+                </p>
+                <p className="mt-2 break-words text-xs text-destructive">{error}</p>
+              </div>
+            </div>
+            <Button onClick={refreshHistory} variant="outline" size="sm" disabled={loading}>
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Retry
+            </Button>
           </div>
-        </Card>
+        </section>
       ) : null}
 
-      {/* Orders by Date - Collapsible */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {loading ? (
-          <Card>
-            <div className="p-6 space-y-4">
+          <section className="rounded-lg border border-border bg-card p-4 shadow-card">
+            <div className="space-y-3" aria-label="Loading archive orders">
               {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="h-6 bg-muted rounded animate-pulse" />
+                <div key={index} className="grid gap-2 rounded-md border border-border bg-background/50 p-3 sm:grid-cols-[120px_1fr_160px_100px]">
+                  <div className="h-4 rounded bg-muted animate-pulse" />
+                  <div className="h-4 rounded bg-muted animate-pulse" />
+                  <div className="h-4 rounded bg-muted animate-pulse" />
+                  <div className="h-4 rounded bg-muted animate-pulse" />
+                </div>
               ))}
             </div>
-          </Card>
+          </section>
         ) : sortedDates.length > 0 ? (
           sortedDates.map((date) => {
             const isCollapsed = collapsedDates.has(date);
+            const metrics = dailyMetrics[date];
+
             return (
-              <Card key={date}>
+              <section key={date} className="overflow-hidden rounded-lg border border-border bg-card shadow-card">
                 <Collapsible open={!isCollapsed} onOpenChange={() => toggleDateCollapse(date)}>
                   <CollapsibleTrigger asChild>
-                    <div className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-                      <div className={`flex items-center justify-between ${isMobile ? 'flex-col items-start gap-3' : ''}`}>
-                        <div className="flex items-center gap-3">
+                    <button className="w-full cursor-pointer px-4 py-3 text-left transition-colors hover:bg-muted/35">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center gap-3">
                           {isCollapsed ? (
-                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                           ) : (
-                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                           )}
-                          <h3 className="text-lg font-semibold text-foreground">
+                          <h3 className="truncate text-base font-semibold text-foreground sm:text-lg">
                             {formatDate(date)}
                           </h3>
                         </div>
-                        <div className={`flex items-center gap-4 ${isMobile ? 'w-full flex-col items-start gap-2' : ''}`}>
-                          {/* Daily Metrics - Next to the date */}
-                          <div className={`flex items-center gap-4 ${isMobile ? 'flex-wrap gap-2' : ''}`}>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                              <span className="text-sm text-foreground">
-                                Straight Bar: <strong>{formatNumber(dailyMetrics[date]?.straightBar || 0)} tons</strong>
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                              <span className="text-sm text-foreground">
-                                Cut & Bend: <strong>{formatNumber(dailyMetrics[date]?.cutAndBend || 0)} tons</strong>
-                              </span>
-                            </div>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:flex sm:items-center sm:gap-4">
+                          <span className="text-muted-foreground">
+                            Total <strong className="font-mono font-semibold text-foreground">{formatNumber(metrics?.total || 0)}t</strong>
+                          </span>
+                          <span className="text-muted-foreground">
+                            Straight <strong className="font-mono font-semibold text-foreground">{formatNumber(metrics?.straightBar || 0)}t</strong>
+                          </span>
+                          <span className="text-muted-foreground">
+                            Cut & Bend <strong className="font-mono font-semibold text-foreground">{formatNumber(metrics?.cutAndBend || 0)}t</strong>
+                          </span>
+                          <span className="text-muted-foreground">
                             {deliveredOrdersByDate[date].length} orders
-                          </p>
+                          </span>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   </CollapsibleTrigger>
 
                   <CollapsibleContent>
-                    <div className="px-6 pb-6">
+                    <div className="border-t border-border">
                       {isMobile ? (
-                        <div className="space-y-3">
+                        <div className="divide-y divide-border">
                           {deliveredOrdersByDate[date].map((order) => (
-                            <div key={order.id} className="rounded-xl border border-border/80 p-4 space-y-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="font-mono text-foreground">{order.delivery_number || order.id}</p>
+                            <article key={order.id} className="space-y-3 bg-card px-4 py-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-mono text-sm font-semibold text-foreground">{order.delivery_number || order.id}</p>
+                                  <p className="mt-1 line-clamp-2 break-words text-sm font-medium text-foreground">{order.customer_name}</p>
+                                </div>
                                 {getStatusBadge(order.status)}
                               </div>
-                              <p className="font-medium text-foreground">{order.customer_name}</p>
-                              <p className="text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
-                              <p className="text-sm text-muted-foreground">Site: {order.site || 'N/A'}</p>
-                              <p className="text-sm text-muted-foreground">Date: {order.date}</p>
-                              <p className="text-sm text-muted-foreground">Tons: {formatNumber(order.tons)} tons</p>
-                              <p className="text-sm text-muted-foreground">
-                                Shift: {order.shift === 'morning' ? 'Morning' : 'Night'}
-                              </p>
-                              <div>
-                                {order.signed_delivery_note ? (
-                                  <Badge className="bg-success text-success-foreground">
-                                    <CheckCircle size={12} className="mr-1" />
-                                    Signed
-                                  </Badge>
-                                ) : (
-                                  <Badge className="bg-gray-400 text-white">
-                                    <XCircle size={12} className="mr-1" />
-                                    Not Signed
-                                  </Badge>
-                                )}
+
+                              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                <div className="min-w-0">
+                                  <dt className="text-xs uppercase tracking-[0.08em] text-muted-foreground">Company</dt>
+                                  <dd className="truncate text-foreground">{order.company || 'N/A'}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs uppercase tracking-[0.08em] text-muted-foreground">Tons</dt>
+                                  <dd className="font-mono text-foreground">{formatNumber(order.tons)}</dd>
+                                </div>
+                                <div className="min-w-0">
+                                  <dt className="text-xs uppercase tracking-[0.08em] text-muted-foreground">Site</dt>
+                                  <dd className="truncate text-foreground">{order.site || 'N/A'}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs uppercase tracking-[0.08em] text-muted-foreground">Shift</dt>
+                                  <dd className="text-foreground">{order.shift === 'morning' ? 'Morning' : 'Night'}</dd>
+                                </div>
+                              </dl>
+
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                  {getSignedBadge(order.signed_delivery_note)}
+                                  <span>{order.driver_name || 'No driver'}</span>
+                                  {order.phone_number ? (
+                                    <a
+                                      href={`tel:${order.phone_number.replace(/[\s\-\(\)]/g, '')}`}
+                                      className="font-mono text-primary underline-offset-4 hover:underline"
+                                      title="Click to call"
+                                    >
+                                      {order.phone_number}
+                                    </a>
+                                  ) : null}
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-9 px-3"
+                                  onClick={() => handleViewOrder(order)}
+                                >
+                                  {canEdit ? <Edit size={14} className="mr-1" /> : <Eye size={14} className="mr-1" />}
+                                  {canEdit ? 'Edit' : 'View'}
+                                </Button>
                               </div>
-                              <div className="text-sm">
-                                <p className="text-muted-foreground">{order.driver_name || 'N/A'}</p>
-                                {order.phone_number ? (
-                                  <a
-                                    href={`tel:${order.phone_number.replace(/[\s\-\(\)]/g, '')}`}
-                                    className="text-primary hover:text-primary/80 underline"
-                                    title="Click to call"
-                                  >
-                                    {order.phone_number}
-                                  </a>
-                                ) : null}
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-10 px-3"
-                                onClick={() => handleViewOrder(order)}
-                              >
-                                {hasPermission(user?.profile?.role, 'edit') ? <Edit size={14} className="mr-1" /> : <Eye size={14} className="mr-1" />}
-                                {hasPermission(user?.profile?.role, 'edit') ? 'Edit' : 'View'}
-                              </Button>
-                            </div>
+                            </article>
                           ))}
                         </div>
                       ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="border-border">
-                              <TableHead className="text-foreground">Delivery Number</TableHead>
-                              <TableHead className="text-foreground">Delivery Name</TableHead>
-                              <TableHead className="text-foreground">Company</TableHead>
-                              <TableHead className="text-foreground">Site</TableHead>
-                              <TableHead className="text-foreground">Date</TableHead>
-                              <TableHead className="text-foreground">Status</TableHead>
-                              <TableHead className="text-foreground">Tons</TableHead>
-                              <TableHead className="text-foreground">Shift</TableHead>
-                              <TableHead className="text-foreground">Delivery Note</TableHead>
-                              <TableHead className="text-foreground">Contact</TableHead>
-                              <TableHead className="text-foreground">Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {deliveredOrdersByDate[date].map((order) => (
-                              <TableRow key={order.id} className="border-border hover:bg-muted/50">
-                                <TableCell className="font-mono text-foreground">
-                                  {order.delivery_number || order.id}
-                                </TableCell>
-                                <TableCell className="text-foreground">
-                                  {order.customer_name}
-                                </TableCell>
-                                <TableCell className="text-foreground">{order.company || 'N/A'}</TableCell>
-                                <TableCell className="text-foreground">{order.site || 'N/A'}</TableCell>
-                                <TableCell className="text-foreground">{order.date}</TableCell>
-                                <TableCell>{getStatusBadge(order.status)}</TableCell>
-                                <TableCell className="text-foreground">{formatNumber(order.tons)} tons</TableCell>
-                                <TableCell>
-                                  <Badge className={order.shift === 'morning' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
-                                    {order.shift === 'morning' ? 'Morning' : 'Night'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <RoleBasedComponent action="edit" fallback={
-                                    order.signed_delivery_note ? (
-                                      <Badge className="bg-success text-success-foreground">
-                                        <CheckCircle size={12} className="mr-1" />
-                                        Signed
-                                      </Badge>
-                                    ) : (
-                                      <Badge className="bg-gray-400 text-white">
-                                        <XCircle size={12} className="mr-1" />
-                                        Not Signed
-                                      </Badge>
-                                    )
-                                  }>
-                                    <div
-                                      onClick={async (e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-
-                                        try {
-                                          logger.debug('🔄 Toggling delivery note for history order:', order.id);
-                                          logger.debug('📋 Current status:', order.signed_delivery_note);
-
-                                          // Toggle signed delivery note status for history order
-                                          const newStatus = !order.signed_delivery_note;
-
-                                          const updatedHistoryOrder: Partial<HistoryOrder> = {
-                                            signed_delivery_note: newStatus
-                                          };
-
-                                          await historyService.update(order.id, updatedHistoryOrder as HistoryOrder);
-
-                                          await fetchHistoryOrders();
-
-                                          toast({
-                                            title: "Delivery Note Updated",
-                                            description: `Delivery note marked as ${newStatus ? 'signed' : 'not signed'}.`,
-                                          });
-                                        } catch (updateError) {
-                                          console.error('❌ Failed to update delivery note:', updateError);
-                                          toast({
-                                            title: "Error",
-                                            description: "Failed to update delivery note. Please try again.",
-                                            variant: "destructive"
-                                          });
-                                        }
-                                      }}
-                                      className="cursor-pointer"
-                                      title={`Click to mark as ${order.signed_delivery_note ? 'not signed' : 'signed'}`}
-                                    >
-                                      {order.signed_delivery_note ? (
-                                        <Badge className="bg-success text-success-foreground cursor-pointer hover:bg-success/80 transition-colors">
-                                          <CheckCircle size={12} className="mr-1" />
-                                          Signed
-                                        </Badge>
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[1120px] caption-bottom text-sm">
+                            <thead className="bg-muted/45">
+                              <tr className="border-b border-border">
+                                <th className="h-10 px-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Delivery</th>
+                                <th className="h-10 px-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Order</th>
+                                <th className="h-10 px-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Company</th>
+                                <th className="h-10 px-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Site</th>
+                                <th className="h-10 px-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Date</th>
+                                <th className="h-10 px-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Status</th>
+                                <th className="h-10 px-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Tons</th>
+                                <th className="h-10 px-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Shift</th>
+                                <th className="h-10 px-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Note</th>
+                                <th className="h-10 px-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Contact</th>
+                                <th className="h-10 px-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {deliveredOrdersByDate[date].map((order) => (
+                                <tr key={order.id} className="transition-colors hover:bg-muted/35">
+                                  <td className="px-3 py-2.5 align-top font-mono text-foreground">{order.delivery_number || order.id}</td>
+                                  <td className="max-w-[260px] px-3 py-2.5 align-top text-foreground">
+                                    <span className="line-clamp-2 break-words">{order.customer_name}</span>
+                                  </td>
+                                  <td className="max-w-[180px] truncate px-3 py-2.5 align-top text-foreground">{order.company || 'N/A'}</td>
+                                  <td className="max-w-[200px] truncate px-3 py-2.5 align-top text-foreground">{order.site || 'N/A'}</td>
+                                  <td className="px-3 py-2.5 align-top font-mono text-xs text-muted-foreground">{order.date}</td>
+                                  <td className="px-3 py-2.5 align-top">{getStatusBadge(order.status)}</td>
+                                  <td className="px-3 py-2.5 text-right align-top font-mono text-foreground">{formatNumber(order.tons)}</td>
+                                  <td className="px-3 py-2.5 align-top">
+                                    <Badge variant="secondary" className="border-border bg-muted/50">
+                                      {order.shift === 'morning' ? 'Morning' : 'Night'}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-3 py-2.5 align-top">
+                                    <RoleBasedComponent action="edit" fallback={getSignedBadge(order.signed_delivery_note)}>
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          updateSignedDeliveryNote(order);
+                                        }}
+                                        className="rounded-md"
+                                        title={`Click to mark as ${order.signed_delivery_note ? 'not signed' : 'signed'}`}
+                                      >
+                                        {getSignedBadge(order.signed_delivery_note)}
+                                      </button>
+                                    </RoleBasedComponent>
+                                  </td>
+                                  <td className="px-3 py-2.5 align-top">
+                                    <div>
+                                      <p className="text-sm text-foreground">{order.driver_name || 'N/A'}</p>
+                                      {order.phone_number ? (
+                                        <a
+                                          href={`tel:${order.phone_number.replace(/[\s\-\(\)]/g, '')}`}
+                                          className="font-mono text-xs text-primary underline-offset-4 hover:underline"
+                                          title="Click to call"
+                                        >
+                                          {order.phone_number}
+                                        </a>
                                       ) : (
-                                        <Badge className="bg-gray-400 text-white cursor-pointer hover:bg-gray-500 transition-colors">
-                                          <XCircle size={12} className="mr-1" />
-                                          Not Signed
-                                        </Badge>
+                                        <span className="text-sm text-muted-foreground">-</span>
                                       )}
                                     </div>
-                                  </RoleBasedComponent>
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <p className="text-sm text-foreground">
-                                      {order.driver_name || 'N/A'}
-                                    </p>
-                                    {order.phone_number ? (
-                                      <a
-                                        href={`tel:${order.phone_number.replace(/[\s\-\(\)]/g, '')}`}
-                                        className="text-sm text-primary hover:text-primary/80 underline cursor-pointer"
-                                        title="Click to call"
-                                      >
-                                        📞 {order.phone_number}
-                                      </a>
-                                    ) : (
-                                      <span className="text-sm text-muted-foreground">-</span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleViewOrder(order)}
-                                    className="bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"
-                                    title={hasPermission(user?.profile?.role, 'edit') ? "Edit Order Details" : "View Order Details"}
-                                  >
-                                    {hasPermission(user?.profile?.role, 'edit') ? <Edit size={16} /> : <Eye size={16} />}
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right align-top">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleViewOrder(order)}
+                                      className="h-8 bg-transparent px-2 text-foreground hover:bg-accent hover:text-accent-foreground"
+                                      title={canEdit ? 'Edit Order Details' : 'View Order Details'}
+                                    >
+                                      {canEdit ? <Edit size={16} /> : <Eye size={16} />}
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       )}
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
-              </Card>
+              </section>
             );
           })
         ) : (
-          <Card>
-            <div className="p-12 text-center">
-              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">No delivered orders found</h3>
-              <p className="text-muted-foreground">
-                {debouncedSearch ? 'Try adjusting your search terms.' : 'Delivered orders will appear here.'}
+          <section className="rounded-lg border border-border bg-card p-8 text-center shadow-card">
+            <div className="mx-auto max-w-md">
+              <Calendar className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
+              <h3 className="text-lg font-semibold text-foreground">
+                {hasActiveFilters ? 'No archive records match these filters' : 'No delivered orders yet'}
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {hasActiveFilters
+                  ? 'Reset the filters or widen the date range to continue searching the archive.'
+                  : 'Delivered orders will appear here after they move into history.'}
               </p>
+              {hasActiveFilters ? (
+                <Button onClick={resetFilters} variant="outline" size="sm" className="mt-4">
+                  <RotateCcw className="h-4 w-4" />
+                  Reset filters
+                </Button>
+              ) : null}
             </div>
-          </Card>
+          </section>
         )}
       </div>
 
-      {/* Pagination Controls */}
-      <Card>
-        <div className="p-4 flex flex-wrap items-center justify-between gap-4">
+      <section className="rounded-lg border border-border bg-card p-4 shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="text-sm text-muted-foreground">
             Page {page} of {totalPages}
           </div>
@@ -677,7 +737,7 @@ export function History() {
               variant="outline"
               size="sm"
               className="h-10 px-4"
-              onClick={() => setPage(prev => Math.max(1, prev - 1))}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               disabled={page === 1 || loading}
             >
               Previous
@@ -686,14 +746,14 @@ export function History() {
               variant="outline"
               size="sm"
               className="h-10 px-4"
-              onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
               disabled={page >= totalPages || loading}
             >
               Next
             </Button>
           </div>
         </div>
-      </Card>
+      </section>
 
       <OrderDetailsDialog
         order={selectedOrder}

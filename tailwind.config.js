@@ -95,11 +95,16 @@ module.exports = {
         'gradient-industrial': 'linear-gradient(135deg, hsl(218, 35%, 12%), hsl(217, 30%, 16%))',
         'gradient-maroon': 'linear-gradient(135deg, hsl(345, 65%, 30%), hsl(345, 55%, 25%))',
         'gradient-card': 'linear-gradient(180deg, hsl(217, 30%, 17%), hsl(217, 30%, 15%))',
+        'glass-shell': 'var(--glass-shell-background)',
+        'glass-maroon': 'linear-gradient(145deg, hsl(345, 66%, 42%), hsl(345, 66%, 30%))',
+        'glass-panel': 'linear-gradient(145deg, hsla(217, 30%, 18%, 0.72), hsla(217, 30%, 13%, 0.52))',
       },
       borderRadius: {
-        lg: "10px",
-        md: "8px",
-        sm: "4px",
+        lg: "14px",
+        md: "10px",
+        sm: "6px",
+        xl: "18px",
+        "2xl": "22px",
       },
       fontFamily: {
         sans: ['"Inter"', 'sans-serif'],
@@ -117,11 +122,12 @@ module.exports = {
         '64': '16rem',
       },
       boxShadow: {
-        'industrial': '0 2px 8px rgba(0, 0, 0, 0.3)',
-        'industrial-md': '0 4px 12px rgba(0, 0, 0, 0.35)',
-        'industrial-lg': '0 8px 24px rgba(0, 0, 0, 0.4)',
-        'card': '0 1px 3px rgba(0, 0, 0, 0.25)',
-        'card-hover': '0 4px 12px rgba(0, 0, 0, 0.3)',
+        'industrial': '0 12px 30px rgba(126, 27, 52, 0.28)',
+        'industrial-md': '0 18px 46px rgba(0, 0, 0, 0.32)',
+        'industrial-lg': '0 28px 80px rgba(0, 0, 0, 0.46)',
+        'card': 'inset 0 1px rgba(255, 255, 255, 0.1), 0 14px 34px rgba(0, 0, 0, 0.22)',
+        'card-hover': 'inset 0 1px rgba(255, 255, 255, 0.14), 0 24px 58px rgba(0, 0, 0, 0.3)',
+        'glass': 'inset 0 1px rgba(255, 255, 255, 0.11), 0 22px 55px rgba(0, 0, 0, 0.34)',
       },
       keyframes: {
         "accordion-down": {
