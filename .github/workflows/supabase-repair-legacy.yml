@@ -59,9 +59,11 @@ jobs:
             20260219 \
             20260503124413 \
             20260503133000 \
-            20260503 \
             20260504120000 \
             --status applied
+
+      - name: Remove ambiguous 20260503 repair record
+        run: supabase migration repair 20260503 --status reverted
 
       - name: Confirm migration history
         run: supabase migration list
