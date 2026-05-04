@@ -125,22 +125,22 @@ export function DriversMetrics() {
               .sort((a, b) => (b?.completed_orders || 0) - (a?.completed_orders || 0))
               .slice(0, 5)
               .map((driver, index) => (
-                <div key={driver.driver_id} className="flex items-center justify-between rounded-xl border border-white/[0.1] bg-white/[0.03] p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/25 bg-primary/15 font-bold text-primary">
+                <div key={driver.driver_id} className="flex flex-col gap-3 rounded-xl border border-white/[0.1] bg-white/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/15 font-bold text-primary">
                       {index + 1}
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{driver.driver_name}</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-foreground">{driver.driver_name}</p>
+                      <p className="truncate text-sm text-muted-foreground">
                         {driver.phone_number}
                       </p>
                     </div>
                     {!driver.is_active && (
-                      <Badge variant="outline" className="text-xs">Inactive</Badge>
+                      <Badge variant="outline" className="shrink-0 text-xs">Inactive</Badge>
                     )}
                   </div>
-                  <div className="text-right">
+                  <div className="shrink-0 text-left sm:text-right">
                     <p className="font-bold text-foreground">{driver.completed_orders} orders</p>
                     <p className="text-sm text-muted-foreground">{formatNumber(driver.total_tons)} tons</p>
                   </div>

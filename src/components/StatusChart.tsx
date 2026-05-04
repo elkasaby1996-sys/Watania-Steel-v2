@@ -11,11 +11,14 @@ const chartData = [
 ];
 
 const chartPalette = {
-  maroon: 'hsl(345, 66%, 44%)',
   steel: 'hsl(216, 20%, 54%)',
   amber: 'hsl(38, 82%, 58%)',
-  green: 'hsl(142, 48%, 46%)',
-  muted: 'hsl(214, 18%, 64%)',
+};
+
+const chartTheme = {
+  axis: 'var(--color-muted-foreground)',
+  grid: 'var(--color-border)',
+  dotStroke: 'var(--color-background)',
 };
 
 export function StatusChart() {
@@ -25,14 +28,14 @@ export function StatusChart() {
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(216, 20%, 34%)" opacity={0.42} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.42} />
             <XAxis 
               dataKey="name" 
-              stroke={chartPalette.muted}
+              stroke={chartTheme.axis}
               fontSize={12}
             />
             <YAxis 
-              stroke={chartPalette.muted}
+              stroke={chartTheme.axis}
               fontSize={12}
             />
             <Tooltip 
@@ -52,7 +55,7 @@ export function StatusChart() {
               dataKey="orders" 
               stroke={chartPalette.steel}
               strokeWidth={3}
-              dot={{ fill: chartPalette.steel, stroke: 'hsl(220, 42%, 7%)', strokeWidth: 2, r: 4 }}
+              dot={{ fill: chartPalette.steel, stroke: chartTheme.dotStroke, strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6, fill: chartPalette.steel, stroke: chartPalette.amber, strokeWidth: 2 }}
             />
           </LineChart>

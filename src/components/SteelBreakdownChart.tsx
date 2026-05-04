@@ -4,11 +4,12 @@ import { useDashboardStore } from '../stores/dashboardStore';
 import { roundTo3Decimals, formatNumber } from '../lib/utils';
 
 const chartPalette = {
-  maroon: 'hsl(345, 66%, 44%)',
   steel: 'hsl(216, 20%, 54%)',
-  amber: 'hsl(38, 82%, 58%)',
-  green: 'hsl(142, 48%, 46%)',
-  muted: 'hsl(214, 18%, 64%)',
+};
+
+const chartTheme = {
+  axis: 'var(--color-muted-foreground)',
+  grid: 'var(--color-border)',
 };
 
 export function SteelBreakdownChart() {
@@ -65,16 +66,16 @@ export function SteelBreakdownChart() {
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(216, 20%, 34%)" opacity={0.42} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.42} />
             <XAxis 
               dataKey="size" 
-              stroke={chartPalette.muted}
+              stroke={chartTheme.axis}
               fontSize={12}
             />
             <YAxis 
-              stroke={chartPalette.muted}
+              stroke={chartTheme.axis}
               fontSize={12}
-              label={{ value: 'Tons', angle: -90, position: 'insideLeft', fill: chartPalette.muted }}
+              label={{ value: 'Tons', angle: -90, position: 'insideLeft', fill: chartTheme.axis }}
             />
             <Tooltip
               contentStyle={{
