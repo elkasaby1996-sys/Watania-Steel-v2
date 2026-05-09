@@ -83,24 +83,12 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
             : 'w-64'
         }`}
       >
-      {/* Logo Section */}
-      <div className={`sidebar-brand-section relative flex h-[82px] shrink-0 items-center justify-between overflow-hidden border-b ${!isMobile && sidebarCollapsed ? 'px-2' : 'px-3'}`}>
-        <div className="sidebar-brand-line pointer-events-none absolute inset-x-3 top-3 h-px" />
-        <div className={`flex min-w-0 items-center gap-3 ${!isMobile && sidebarCollapsed ? 'w-full justify-center' : 'flex-1'}`}>
-          <div className={`sidebar-logo-frame relative flex shrink-0 overflow-hidden rounded-lg border ${!isMobile && sidebarCollapsed ? 'h-11 w-11' : 'h-14 w-14'}`}>
-            <img
-              src="https://c.animaapp.com/mfuv9ro3jvVXIT/img/chatgpt-image-sep-25-2025-10_05_13-am.png"
-              alt="Al Watania Steel Qatar"
-              className={`${!isMobile && sidebarCollapsed ? 'h-24 w-24 scale-[2.15]' : 'h-28 w-28 scale-[2.05]'} absolute left-1/2 top-1/2 max-w-none -translate-x-1/2 -translate-y-1/2 object-contain`}
-            />
-          </div>
-          {(isMobile || !sidebarCollapsed) && (
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-semibold leading-5 text-gray-50">Watania Steel</p>
-              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Factory Command</p>
-            </div>
-          )}
-        </div>
+      <div className={`sidebar-control-section flex h-14 shrink-0 items-center border-b ${!isMobile && sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-3'}`}>
+        {(isMobile || !sidebarCollapsed) && (
+          <p className="truncate text-[15px] font-semibold leading-5 text-gray-50">
+            Al Watania Steel
+          </p>
+        )}
         {isMobile ? (
           <Button
             variant="ghost"
@@ -205,9 +193,12 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className={`sidebar-bottom-panel w-full border hover:text-[var(--sidebar-text)] ${
-                !isMobile && sidebarCollapsed ? 'h-11 justify-center px-0' : 'h-auto justify-start px-3 py-2'
-              }`}
+              className={cn(
+                'w-full hover:text-[var(--sidebar-text)]',
+                !isMobile && sidebarCollapsed
+                  ? 'h-10 justify-center rounded-md border-0 bg-transparent px-0 hover:bg-[var(--sidebar-hover-bg)]'
+                  : 'sidebar-bottom-panel h-auto justify-start border px-3 py-2'
+              )}
             >
               <Avatar className="h-8 w-8 shrink-0">
                 <AvatarFallback className="bg-secondary text-secondary-foreground text-sm font-medium">
