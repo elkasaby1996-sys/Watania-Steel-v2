@@ -16,7 +16,7 @@ export function HeroSection() {
       <div className="page-header glass-panel rounded-2xl p-4 sm:p-5">
         <div>
           <h1 className="page-header-title">
-            Al Watania Steel - Daily Orders
+            Daily Overview
           </h1>
           <p className="page-header-subtitle">
             {today} - Track and manage steel deliveries

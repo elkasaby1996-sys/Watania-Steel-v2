@@ -277,18 +277,8 @@ body {
     box-shadow: var(--sidebar-rail-shadow);
   }
 
-  .sidebar-brand-section {
+  .sidebar-control-section {
     border-color: var(--sidebar-border-soft);
-  }
-
-  .sidebar-brand-line {
-    background: linear-gradient(90deg, transparent, hsl(345 66% 42% / 0.40), transparent);
-  }
-
-  .sidebar-logo-frame {
-    background: var(--sidebar-logo-bg);
-    border-color: var(--sidebar-logo-border);
-    box-shadow: var(--sidebar-logo-shadow);
   }
 
   .sidebar-bottom-panel {
