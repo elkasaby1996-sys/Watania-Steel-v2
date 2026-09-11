@@ -50,6 +50,7 @@ function AppShell() {
     <ProtectedRoute>
       <div className="min-h-screen bg-glass-shell text-foreground">
         <ImageAssets />
+        <a className="skip-link" href="#workspace-content">Skip to workspace</a>
         {!isReportRoute && (
           <Sidebar
             isMobile={isMobile}
@@ -57,7 +58,7 @@ function AppShell() {
             onMobileClose={() => setMobileSidebarOpen(false)}
           />
         )}
-        <main
+        <main id="workspace-content"
           className={`transition-all duration-300 ${
             isReportRoute ? 'ml-0' : isMobile ? 'ml-0' : sidebarCollapsed ? 'ml-16' : 'ml-64'
           }`}
@@ -68,7 +69,7 @@ function AppShell() {
               onMenuClick={() => setMobileSidebarOpen((prev) => !prev)}
             />
           )}
-          <div className={isReportRoute ? '' : isMobile ? 'pt-16 phone-safe-page' : 'pt-20 p-6'}>
+          <div className={isReportRoute ? '' : isMobile ? 'workspace-main phone-safe-page' : 'workspace-main p-6'}>
             <div className={isReportRoute ? '' : 'mx-auto w-full max-w-[1500px]'}>
               <Suspense fallback={<RouteSkeleton />}>
                 <Routes>
@@ -179,3 +180,5 @@ function App() {
 }
 
 export default App;
+
+

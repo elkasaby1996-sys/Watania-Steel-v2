@@ -107,8 +107,8 @@ module.exports = {
         "2xl": "22px",
       },
       fontFamily: {
-        sans: ['"Inter"', 'sans-serif'],
-        headline: ['"Poppins"', 'sans-serif'],
+        sans: ['"Manrope"', 'sans-serif'],
+        headline: ['"Manrope"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
       spacing: {
@@ -147,3 +147,4 @@ module.exports = {
   },
   plugins: [require("tailwindcss-animate")],
 }
+

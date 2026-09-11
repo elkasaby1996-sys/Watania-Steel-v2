@@ -110,7 +110,7 @@ export function OrderTable() {
     <Card className="overflow-hidden">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-foreground">Active Orders</h3>
+          <h3 className="text-lg font-semibold text-foreground">Active deliveries</h3>
           <p className="text-sm text-muted-foreground">
             {isLoadingOrders ? 'Loading...' : `${todayOrders.length} active orders`}
           </p>
@@ -250,7 +250,7 @@ export function OrderTable() {
                 ))
               ) : (
                 <div className="text-center text-muted-foreground py-8">
-                  No active orders yet. Create your first order!
+                  No active deliveries. New orders will appear here.
                 </div>
               )}
             </div>
@@ -448,7 +448,7 @@ export function OrderTable() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
-                    No active orders yet. Create your first order!
+                    No active deliveries. New orders will appear here.
                   </TableCell>
                 </TableRow>
               )}
@@ -466,3 +466,4 @@ export function OrderTable() {
     </Card>
   );
 }
+

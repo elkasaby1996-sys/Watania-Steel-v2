@@ -25,7 +25,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-glass-shell flex items-center justify-center px-4 py-8 phone-safe-page">
+    <div className="login-workspace min-h-screen overflow-x-hidden bg-glass-shell flex items-center justify-center px-4 py-8 phone-safe-page">
       <div className="w-full min-w-0 max-w-[calc(100vw-2rem)] sm:max-w-md">
         {/* Header */}
         <div className="text-center space-y-4 mb-6 sm:mb-8">
@@ -37,19 +37,19 @@ export function Login() {
             />
             <div className="min-w-0">
               <h1 className="text-xl sm:text-3xl font-headline font-bold text-foreground mb-1 break-words leading-tight">
-                Order Management System
+                Watania Steel
               </h1>
             </div>
           </div>
           <p className="text-sm sm:text-base text-muted-foreground break-words">
-            Sign in to manage your steel delivery orders
+            Factory operations, in one place.
           </p>
         </div>
 
         {/* Login Form */}
         <Card className="w-full min-w-0 max-w-full">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center">Welcome</CardTitle>
+            <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
             <CardDescription className="text-center">
               Enter your credentials to access the dashboard
             </CardDescription>
@@ -108,3 +108,4 @@ export function Login() {
     </div>
   );
 }
+

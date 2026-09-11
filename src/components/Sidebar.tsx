@@ -47,13 +47,13 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
   }), [now]);
 
   const menuItems = [
-    { icon: Home, label: 'Dashboard', path: ROUTES.dashboard, active: location.pathname === ROUTES.dashboard, group: 'Daily Work' },
-    { icon: History, label: 'History', path: ROUTES.history, active: location.pathname === ROUTES.history, group: 'Daily Work' },
-    { icon: Truck, label: 'Drivers', path: ROUTES.drivers, active: location.pathname === ROUTES.drivers || location.pathname.startsWith(`${ROUTES.drivers}/`), group: 'Daily Work' },
-    { icon: Building2, label: 'Clients', path: ROUTES.clients, active: location.pathname === ROUTES.clients || location.pathname.startsWith(`${ROUTES.clients}/`), group: 'Daily Work' },
-    { icon: Warehouse, label: 'Inventory', path: ROUTES.inventory, active: location.pathname === ROUTES.inventory, group: 'Daily Work' },
-    { icon: Scissors, label: 'Offcut Usage', path: ROUTES.offcutUsage, active: location.pathname === ROUTES.offcutUsage, group: 'Insights' },
-    { icon: BarChart3, label: 'Steel Analytics', path: ROUTES.steelAnalytics, active: location.pathname === ROUTES.steelAnalytics, group: 'Insights' },
+    { icon: Home, label: 'Dashboard', path: ROUTES.dashboard, active: location.pathname === ROUTES.dashboard, group: 'Workspace' },
+    { icon: History, label: 'History', path: ROUTES.history, active: location.pathname === ROUTES.history, group: 'Workspace' },
+    { icon: Truck, label: 'Drivers', path: ROUTES.drivers, active: location.pathname === ROUTES.drivers || location.pathname.startsWith(`${ROUTES.drivers}/`), group: 'Workspace' },
+    { icon: Building2, label: 'Clients', path: ROUTES.clients, active: location.pathname === ROUTES.clients || location.pathname.startsWith(`${ROUTES.clients}/`), group: 'Workspace' },
+    { icon: Warehouse, label: 'Inventory', path: ROUTES.inventory, active: location.pathname === ROUTES.inventory, group: 'Workspace' },
+    { icon: Scissors, label: 'Offcut Usage', path: ROUTES.offcutUsage, active: location.pathname === ROUTES.offcutUsage, group: 'Intelligence' },
+    { icon: BarChart3, label: 'Steel Analytics', path: ROUTES.steelAnalytics, active: location.pathname === ROUTES.steelAnalytics, group: 'Intelligence' },
     { icon: Users, label: 'Users', path: ROUTES.users, active: location.pathname === ROUTES.users, adminOnly: true, group: 'Admin' },
   ];
 
@@ -83,12 +83,18 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
             : 'w-64'
         }`}
       >
-      <div className={`sidebar-control-section flex h-14 shrink-0 items-center border-b ${!isMobile && sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-3'}`}>
-        {(isMobile || !sidebarCollapsed) && (
-          <p className="truncate text-[15px] font-semibold leading-5 text-gray-50">
-            Al Watania Steel
-          </p>
-        )}
+      {/* Logo Section */}
+      <div className={`sidebar-brand-section relative flex h-[82px] shrink-0 items-center justify-between overflow-hidden border-b ${!isMobile && sidebarCollapsed ? 'px-2' : 'px-3'}`}>
+        <div className="sidebar-brand-line pointer-events-none absolute inset-x-3 top-3 h-px" />
+        <div className={`flex min-w-0 items-center gap-3 ${!isMobile && sidebarCollapsed ? 'w-full justify-center' : 'flex-1'}`}>
+          <div className="brand-symbol" aria-hidden="true">W</div>
+          {(isMobile || !sidebarCollapsed) && (
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-semibold leading-5 text-gray-50">Watania Steel</p>
+              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">OPERATIONS / QATAR</p>
+            </div>
+          )}
+        </div>
         {isMobile ? (
           <Button
             variant="ghost"
@@ -102,6 +108,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
           <Button
             variant="ghost"
             size="icon"
+            aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="h-9 w-9 shrink-0 text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text)]"
           >
@@ -112,7 +119,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
 
       {/* Navigation */}
       <nav className="space-y-3 overflow-y-auto px-3 py-3">
-        {['Daily Work', 'Insights', 'Admin'].map((group) => {
+        {['Workspace', 'Intelligence', 'Admin'].map((group) => {
           const groupItems = menuItems.filter((item) => item.group === group);
           const visibleItems = groupItems.filter((item) => !item.adminOnly || hasPermission(user?.profile?.role, 'delete'));
 
@@ -137,7 +144,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
             <Button
               key={index}
               variant="ghost"
-              onClick={() => handleNavigation(item.path)}
+              aria-label={item.label} aria-current={item.active ? "page" : undefined} onClick={() => handleNavigation(item.path)}
               className={cn(
                 'nav-route-button group relative h-9 w-full justify-start gap-2 rounded-md border text-sm',
                 item.active
@@ -228,9 +235,6 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
             <DropdownMenuItem onClick={refreshProfile} className="text-popover-foreground cursor-pointer">
               Refresh Profile
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-popover-foreground cursor-pointer">
-              Settings
-            </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-white/10" />
             <DropdownMenuItem onClick={signOut} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
               Sign Out
@@ -242,3 +246,6 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
     </>
   );
 }
+
+
+

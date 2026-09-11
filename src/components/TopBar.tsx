@@ -45,7 +45,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
   };
 
   return (
-    <header className={`fixed top-0 right-0 z-40 h-16 border-b border-white/[0.12] bg-[var(--glass-panel)] shadow-glass backdrop-blur-2xl transition-all duration-300 ease-in-out ${
+    <header className={`workspace-topbar fixed top-0 right-0 z-40 h-16 border-b border-white/[0.12] bg-[var(--glass-panel)] shadow-glass backdrop-blur-2xl transition-all duration-300 ease-in-out ${
       isMobile ? 'left-0' : sidebarCollapsed ? 'left-16' : 'left-64'
     }`}>
       <div className={`flex h-full items-center justify-between ${isMobile ? 'px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]' : 'px-6'}`}>
@@ -62,7 +62,7 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
             </Button>
           )}
           <h1 className={`min-w-0 truncate font-headline font-bold text-foreground ${isMobile ? 'text-base' : 'text-xl'}`}>
-            {isMobile ? 'Watania ERP' : 'Factory Management System'}
+            {isMobile ? 'Watania ERP' : 'Factory workspace'}
           </h1>
         </div>
 
@@ -100,3 +100,4 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
     </header>
   );
 }
+

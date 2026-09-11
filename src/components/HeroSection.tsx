@@ -1,33 +1,20 @@
 import { AddOrderDialog } from './AddOrderDialog';
 import { RoleBasedComponent } from './RoleBasedComponent';
-import { useAuthStore } from '../stores/authStore';
 
 export function HeroSection() {
-  const { user } = useAuthStore();
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-
+  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   return (
-    <div className="mb-6">
-      <div className="page-header glass-panel rounded-2xl p-4 sm:p-5">
-        <div>
-          <h1 className="page-header-title">
-            Daily Overview
-          </h1>
-          <p className="page-header-subtitle">
-            {today} - Track and manage steel deliveries
-          </p>
-        </div>
-        <div className="page-header-actions">
-          <RoleBasedComponent action="create">
-            <AddOrderDialog />
-          </RoleBasedComponent>
-        </div>
+    <section className="operations-heading">
+      <div>
+        <p className="eyebrow">Operations / Daily overview</p>
+        <h1>Today, at Watania<span>.</span></h1>
+        <p className="operations-description">Your orders, materials and deliveries. All in view.</p>
       </div>
-    </div>
+      <div className="operations-heading-actions">
+        <span className="operations-date">{today}</span>
+        <RoleBasedComponent action="create"><AddOrderDialog /></RoleBasedComponent>
+      </div>
+    </section>
   );
 }
+
