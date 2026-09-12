@@ -1,3 +1,4 @@
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Home,
@@ -64,17 +65,22 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
     }
   };
 
+  const SidebarContainer = isMobile ? DialogPrimitive.Content : 'div';
+
   return (
-    <>
+    <DialogPrimitive.Root open={isMobile && mobileOpen} onOpenChange={(open) => { if (!open) onMobileClose?.(); }}>
       {isMobile && mobileOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-          onClick={onMobileClose}
-          aria-label="Close menu overlay"
-        />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/60" />
       )}
-      <div
+      <SidebarContainer
+        id={isMobile ? 'mobile-workspace-menu' : undefined}
+        {...(isMobile ? {
+          'aria-describedby': undefined,
+          onCloseAutoFocus: (event: Event) => {
+            event.preventDefault();
+            document.querySelector<HTMLButtonElement>('[aria-label="Open navigation menu"]')?.focus();
+          },
+        } : {})}
         aria-hidden={isMobile && !mobileOpen ? true : undefined}
         className={`app-sidebar fixed left-0 top-0 z-50 flex h-full flex-col border-r transition-all duration-300 ease-in-out ${
           isMobile
@@ -84,6 +90,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
             : 'w-64'
         }`}
       >
+      {isMobile && <DialogPrimitive.Title className="sr-only">Workspace navigation</DialogPrimitive.Title>}
       {/* Logo Section */}
       <div className={`sidebar-brand-section relative flex h-[82px] shrink-0 items-center justify-between overflow-hidden border-b ${!isMobile && sidebarCollapsed ? 'px-2' : 'px-3'}`}>
         <div className="sidebar-brand-line pointer-events-none absolute inset-x-3 top-3 h-px" />
@@ -227,7 +234,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="right" className="w-56">
+          <DropdownMenuContent align="end" side={isMobile ? "top" : "right"} className="w-56">
             <div className="px-3 py-2">
               <p className="text-sm font-medium text-popover-foreground">{user?.email}</p>
               <p className="text-xs text-muted-foreground">
@@ -245,8 +252,8 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      </div>
-    </>
+      </SidebarContainer>
+    </DialogPrimitive.Root>
   );
 }
 

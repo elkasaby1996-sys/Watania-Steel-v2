@@ -369,7 +369,7 @@ export function History() {
   const canEdit = hasPermission(user?.profile?.role, 'edit');
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="history-workspace space-y-4 sm:space-y-5">
       <section className="rounded-lg border border-border bg-card px-4 py-4 shadow-card sm:px-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 space-y-2">
@@ -444,7 +444,7 @@ export function History() {
 
           <div className="space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Date range</span>
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <div className="history-date-range grid grid-cols-[1fr_auto_1fr] items-center gap-2">
               <Input
                 aria-label="History start date"
                 id="history-date-from"

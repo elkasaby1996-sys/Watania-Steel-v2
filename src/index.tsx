@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import './workspace.css';
+import './mobile.css';
 
 const initializeTheme = () => {
   const savedTheme = localStorage.getItem('theme');

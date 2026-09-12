@@ -3,27 +3,27 @@ import {
   ArrowLeft,
   BarChart3,
   TrendingUp,
-  Calculator,
+  RotateCcw,
+  Layers,
+  Activity,
   Calendar,
-  Loader2,
   AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
+  ReferenceLine,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
+
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { formatNumber } from '@/lib/utils';
@@ -35,24 +35,13 @@ import {
 } from '@/lib/steelAnalytics';
 import { ROUTES } from '@/routes/routes';
 import { useAuthStore } from '@/stores/authStore';
+import './steel-analytics.css';
 
 const RANGE_OPTIONS = [30, 60, 90, 180, 365] as const;
 
-const COLORS = [
-  '#8B5CF6',
-  '#14B8A6',
-  '#F59E0B',
-  '#EC4899',
-  '#10B981',
-  '#F97316',
-  '#06B6D4',
-  '#EF4444',
-  '#6366F1',
-];
-
 const formatDateLabel = (dateString: string) => {
   const date = new Date(`${dateString}T00:00:00Z`);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 };
 
 const formatDateValue = (date: Date) => date.toISOString().split('T')[0];
@@ -160,7 +149,7 @@ export function SteelAnalytics() {
   const pieChartData = useMemo(() => {
     const totals = (analytics?.diameterTotals ?? []).filter((entry) => entry.tons > 0);
     const totalBreakdown = totals.reduce((sum, entry) => sum + entry.tons, 0);
-    return totals.map((entry) => ({
+    return totals.sort((a, b) => b.tons - a.tons).map((entry) => ({
       name: entry.label,
       value: entry.tons,
       percentage: totalBreakdown > 0 ? Math.round((entry.tons / totalBreakdown) * 1000) / 10 : 0,
@@ -169,309 +158,143 @@ export function SteelAnalytics() {
 
   const handleReset = () => {
     setSelectedRangeDays(30);
+    setFilterMode('all');
     setReloadToken((prev) => prev + 1);
   };
 
   const handleRetry = () => setReloadToken((prev) => prev + 1);
 
+  const peakDay = lineChartData.reduce<(typeof lineChartData)[number] | null>(
+    (peak, day) => !peak || day.tons > peak.tons ? day : peak, null,
+  );
+  const hasData = (analytics?.rowsAnalyzed ?? 0) > 0;
+  const scopeLabel = filterMode === 'all' ? 'All steel' : filterMode === 'straight-bar' ? 'Straight bar' : 'Cut-and-bend';
+
   return (
-    <div className="space-y-5 sm:space-y-6">
-      {/* Header */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-4">
-        <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(ROUTES.dashboard)}
-            className="text-foreground hover:bg-accent"
-          >
-          <ArrowLeft size={16} />
-          Back to Dashboard
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-headline font-bold text-foreground">
-            Steel Analytics
-          </h1>
-          <p className="text-muted-foreground">
-            Performance overview based on delivered steel usage
-          </p>
+    <div className="steel-analytics" aria-busy={loading}>
+      <header className="analytics-heading">
+        <div>
+          <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.dashboard)} className="analytics-back">
+            <ArrowLeft size={14} /> Back to dashboard
+          </Button>
+          <p className="eyebrow"><span className="heading-marker" />Delivery intelligence</p>
+          <h1>Steel analytics<span>.</span></h1>
+          <p className="analytics-subtitle">A closer look at delivered steel, daily output, and diameter mix.</p>
         </div>
-        {lastUpdated && (
-          <div className="text-xs text-muted-foreground">
-            Last updated: {lastUpdated.toLocaleString()}
-          </div>
-        )}
-      </div>
+        <div className="analytics-update">
+          <span><span className="analytics-status-dot" />Delivered steel only</span>
+          {lastUpdated && <small>Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>}
+        </div>
+      </header>
 
-      {/* Time Range Selector */}
-      <section className="rounded-xl border border-border/80 bg-card/70 p-4 sm:p-5">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                Analytics Range
-              </div>
-
-              <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-[minmax(220px,320px)_auto] md:items-end">
-                <div className="space-y-2">
-                  <Label htmlFor="time-range" className="text-xs uppercase tracking-[0.08em] text-muted-foreground">
-                    Time Range
-                  </Label>
-                  <Select
-                    value={selectedRangeDays.toString()}
-                    onValueChange={(value) => setSelectedRangeDays(Number(value) as (typeof RANGE_OPTIONS)[number])}
-                  >
-                    <SelectTrigger id="time-range" className="h-10 bg-background text-foreground border-border">
-                      <SelectValue placeholder="Select time range" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover text-popover-foreground">
-                      {RANGE_OPTIONS.map((days) => (
-                        <SelectItem key={days} value={days.toString()}>
-                          Last {days} Days
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="pb-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Analyzing
-                  </p>
-                  <p className="mt-1 whitespace-nowrap font-mono text-sm text-foreground">
-                    {range ? `${range.startDate} to ${range.endDate}` : 'No data'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={handleReset}
-              variant="outline"
-              className="h-10 w-full shrink-0 lg:w-36"
-            >
-              Reset
-            </Button>
-          </div>
-
-          <Tabs value={filterMode} onValueChange={(value) => setFilterMode(value as FilterMode)}>
-            <TabsList className="grid h-auto w-full grid-cols-1 gap-1 bg-muted/35 p-1 sm:grid-cols-3">
-              <TabsTrigger value="all" className="min-h-9 whitespace-normal px-3 text-xs sm:text-sm">
-                Total
-              </TabsTrigger>
-              <TabsTrigger value="straight-bar" className="min-h-9 whitespace-normal px-3 text-xs sm:text-sm">
-                Straight Bar
-              </TabsTrigger>
-              <TabsTrigger value="cut-and-bend" className="min-h-9 whitespace-normal px-3 text-xs sm:text-sm">
-                Cut-and-Bend
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+      <section className="analytics-controls" aria-label="Analytics filters">
+        <Tabs value={filterMode} onValueChange={(value) => setFilterMode(value as FilterMode)}>
+          <TabsList className="analytics-tabs">
+            <TabsTrigger value="all">All steel</TabsTrigger>
+            <TabsTrigger value="straight-bar">Straight bar</TabsTrigger>
+            <TabsTrigger value="cut-and-bend">Cut-and-bend</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="analytics-range-controls">
+          <Calendar size={16} aria-hidden="true" />
+          <Label htmlFor="time-range" className="sr-only">Time range</Label>
+          <Select value={selectedRangeDays.toString()} onValueChange={(value) => setSelectedRangeDays(Number(value) as (typeof RANGE_OPTIONS)[number])}>
+            <SelectTrigger id="time-range"><SelectValue /></SelectTrigger>
+            <SelectContent>{RANGE_OPTIONS.map(days => <SelectItem key={days} value={days.toString()}>Last {days} days</SelectItem>)}</SelectContent>
+          </Select>
+          <Button variant="ghost" size="sm" onClick={handleReset}><RotateCcw size={14} /> Reset</Button>
         </div>
       </section>
-
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-10">
-            <div className="text-center space-y-4">
-              <AlertCircle className="h-12 w-12 mx-auto text-destructive" />
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">Failed to Load Analytics</h3>
-                <p className="text-muted-foreground mt-1">
-                  {error}
-                </p>
-              </div>
-              <Button variant="outline" onClick={handleRetry}>
-                Try Again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Actual Totals Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Actual Totals
-          </CardTitle>
-          <CardDescription>
-            Summary metrics derived from actual tons in the selected range
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="grid gap-4">
-              <div className="h-6 w-40 bg-muted animate-pulse rounded" />
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {[0, 1, 2, 3].map((key) => (
-                  <div key={key} className="h-20 bg-muted animate-pulse rounded" />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="grid gap-6">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-primary/10 rounded-full">
-                  <Calculator className="h-10 w-10 text-primary" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-foreground">
-                    {formatNumber(analytics?.totalTons ?? 0)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Total Tons (Actual in Range)</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                <div className="glass-panel rounded-xl p-4">
-                  <p className="text-muted-foreground">Daily Average (Range)</p>
-                  <p className="font-semibold text-foreground">
-                    {formatNumber(analytics?.dailyAverage ?? 0)} tons
-                  </p>
-                </div>
-                <div className="glass-panel rounded-xl p-4">
-                  <p className="text-muted-foreground">Active Days</p>
-                  <p className="font-semibold text-foreground">{analytics?.activeDays ?? 0} days</p>
-                </div>
-                <div className="glass-panel rounded-xl p-4">
-                  <p className="text-muted-foreground">Rows Analyzed</p>
-                  <p className="font-semibold text-foreground">{analytics?.rowsAnalyzed ?? 0} rows</p>
-                </div>
-                <div className="glass-panel rounded-xl p-4">
-                  <p className="text-muted-foreground">Total Tons (Actual)</p>
-                  <p className="font-semibold text-foreground">
-                    {formatNumber(analytics?.totalTons ?? 0)} tons
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Tons vs Time Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Tons vs Time
-            </CardTitle>
-            <CardDescription>Steel delivery trends over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="h-80 bg-muted animate-pulse rounded" />
-            ) : (
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={lineChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                    <XAxis
-                      dataKey="date"
-                      stroke="var(--chart-axis)"
-                      fontSize={12}
-                    />
-                    <YAxis
-                      stroke="var(--chart-axis)"
-                      fontSize={12}
-                      label={{ value: 'Tons', angle: -90, position: 'insideLeft' }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--chart-tooltip-bg)',
-                        border: '1px solid var(--chart-tooltip-border)',
-                        borderRadius: '8px',
-                        color: 'var(--chart-tooltip-text)',
-                      }}
-                      formatter={(value) => [`${formatMaxThreeDecimals(value)} tons`, 'Total Delivered']}
-                      labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate ?? ''}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="tons"
-                      stroke="hsl(340, 80%, 60%)"
-                      strokeWidth={3}
-                      dot={{ fill: 'hsl(340, 80%, 60%)', strokeWidth: 2, r: 4 }}
-                      activeDot={{ r: 6, fill: 'hsl(340, 80%, 60%)' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Steel Breakdown Pie Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Steel Size Distribution</CardTitle>
-            <CardDescription>Breakdown by steel bar diameter</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="h-80 bg-muted animate-pulse rounded" />
-            ) : (
-              <div className="flex flex-col gap-6">
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieChartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={140}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {pieChartData.map((entry, index) => (
-                          <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'var(--chart-tooltip-bg)',
-                          border: '1px solid var(--chart-tooltip-border)',
-                          borderRadius: '8px',
-                          color: 'var(--chart-tooltip-text)',
-                        }}
-                        formatter={(value, _, props) => [
-                          `${formatTonsLabel(value)} (${formatPercentLabel(props?.payload?.percentage ?? 0)})`,
-                          props?.payload?.name ?? '',
-                        ]}
-                        labelFormatter={() => ''}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {pieChartData.map((item, index) => (
-                    <div key={item.name} className="flex items-center gap-2 text-sm">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                      />
-                      <span className="text-foreground">
-                        {item.name}: {formatTonsLabel(item.value)} ({formatPercentLabel(item.percentage)})
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="analytics-period">
+        <span>{scopeLabel} <span aria-hidden="true">/</span> {loading ? 'Updating period...' : range ? `${formatDateLabel(range.startDate)}, ${range.startDate.slice(0, 4)} to ${formatDateLabel(range.endDate)}, ${range.endDate.slice(0, 4)}` : 'No delivery period'}</span>
+        <span>Range ends on the latest recorded delivery</span>
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center text-sm text-muted-foreground gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading analytics...
+      {error ? (
+        <Card role="alert"><CardContent className="py-10 text-center space-y-4">
+          <AlertCircle className="h-8 w-8 mx-auto text-destructive" />
+          <h2 className="text-lg font-semibold">Unable to load analytics</h2>
+          <p className="text-muted-foreground">{error}</p>
+          <Button variant="outline" onClick={handleRetry}>Try again</Button>
+        </CardContent></Card>
+      ) : loading ? (
+        <div role="status" className="analytics-loading">
+          <span className="sr-only">Loading analytics</span>
+          <div className="analytics-skeleton analytics-skeleton-metrics" />
+          <div className="analytics-skeleton analytics-skeleton-chart" />
         </div>
-      )}
+      ) : !hasData ? (
+        <section className="analytics-empty">
+          <BarChart3 size={32} /><h2>No delivered steel in this range</h2>
+          <p>Choose another time range or steel type to explore your delivery data.</p>
+          <Button variant="outline" onClick={handleReset}>Reset filters</Button>
+        </section>
+      ) : (<>
+        <section className="analytics-metrics" aria-label="Delivery summary">
+          <div className="analytics-metric analytics-metric-main">
+            <span className="analytics-metric-label"><Layers size={15} />Total delivered</span>
+            <p>{formatNumber(analytics?.totalTons ?? 0)}<small>t</small></p>
+            <span>Actual tonnage in selected range</span>
+          </div>
+          <div className="analytics-metric">
+            <span className="analytics-metric-label"><TrendingUp size={15} />Daily average</span>
+            <p>{formatNumber(analytics?.dailyAverage ?? 0)}<small>t</small></p>
+            <span>Across {selectedRangeDays} calendar days</span>
+          </div>
+          <div className="analytics-metric">
+            <span className="analytics-metric-label"><Activity size={15} />Active days</span>
+            <p>{analytics?.activeDays ?? 0}<small>/ {selectedRangeDays}</small></p>
+            <span>Days with recorded deliveries</span>
+          </div>
+          <div className="analytics-metric">
+            <span className="analytics-metric-label"><BarChart3 size={15} />Records analyzed</span>
+            <p>{(analytics?.rowsAnalyzed ?? 0).toLocaleString()}</p>
+            <span>Delivered records in this range</span>
+          </div>
+        </section>
+
+        <div className="analytics-chart-grid">
+          <Card className="analytics-chart-panel">
+            <CardHeader className="analytics-panel-heading">
+              <div><p className="eyebrow">01 / Delivery performance</p><h2>Daily delivered tonnage</h2><CardDescription>Actual steel deliveries across the selected period</CardDescription></div>
+              <span className="analytics-unit">Metric tons</span>
+            </CardHeader>
+            <CardContent>
+              <div className="analytics-chart-legend"><span><i />Delivered tons</span><span><i className="average-key" />Period average</span></div>
+              <div className="analytics-trend-chart" role="img" aria-label={`Daily delivered tonnage. Average ${formatTonsLabel(analytics?.dailyAverage)}. Peak ${formatTonsLabel(peakDay?.tons)} on ${peakDay?.date}.`}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={lineChartData} margin={{ top: 20, right: 18, left: -20, bottom: 8 }}>
+                    <defs><linearGradient id="steelDeliveryFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.2} /><stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.01} /></linearGradient></defs>
+                    <CartesianGrid vertical={false} strokeDasharray="3 5" stroke="var(--chart-grid)" />
+                    <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={11} axisLine={false} tickLine={false} minTickGap={36} tickMargin={14} />
+                    <YAxis stroke="var(--chart-axis)" fontSize={11} axisLine={false} tickLine={false} tickMargin={8} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--chart-tooltip-bg)', border: '1px solid var(--chart-tooltip-border)', borderRadius: '8px', color: 'var(--chart-tooltip-text)' }} formatter={(value) => [`${formatMaxThreeDecimals(value)} tons`, 'Delivered']} labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate ?? ''} />
+                    <ReferenceLine y={analytics?.dailyAverage ?? 0} stroke="var(--chart-axis)" strokeDasharray="5 5" />
+                    <Area type="linear" dataKey="tons" stroke="var(--color-primary)" strokeWidth={2.5} fill="url(#steelDeliveryFill)" activeDot={{ r: 5, strokeWidth: 3, stroke: 'var(--color-card)' }} isAnimationActive={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="analytics-chart-note"><TrendingUp size={16} /><span>Peak delivery <strong>{formatTonsLabel(peakDay?.tons)}</strong> on <strong>{peakDay?.date}</strong></span></div>
+            </CardContent>
+          </Card>
+          <Card className="analytics-chart-panel">
+            <CardHeader className="analytics-panel-heading"><div><p className="eyebrow">02 / Material mix</p><h2>Steel by diameter</h2><CardDescription>Share of recorded diameter tonnage</CardDescription></div></CardHeader>
+            <CardContent>
+              {pieChartData.length === 0 ? <p className="analytics-no-breakdown">No diameter breakdown recorded for these deliveries.</p> : <>
+                <div className="analytics-mix-summary"><strong>{pieChartData[0].name}</strong><span>Most delivered diameter<br /><b>{formatPercentLabel(pieChartData[0].percentage)} of recorded mix</b></span></div>
+                <div className="analytics-distribution-head"><span>Diameter</span><span>Tons / share</span></div>
+                <ul className="analytics-distribution">{pieChartData.map((item, index) => (
+                  <li key={item.name}>
+                    <div><strong>{item.name}</strong><span>{formatMaxThreeDecimals(item.value)} <small>{formatPercentLabel(item.percentage)}</small></span></div>
+                    <div className="analytics-bar-track"><div className={index === 0 ? 'analytics-bar-fill leading' : 'analytics-bar-fill'} style={{ width: `${item.percentage}%` }} /></div>
+                  </li>
+                ))}</ul>
+              </>}
+            </CardContent>
+          </Card>
+        </div>
+        <footer className="analytics-footer"><span>Based on actual delivered steel. Undelivered orders are excluded.</span><span>Watania Steel / Operations</span></footer>
+      </>)}
     </div>
   );
 }

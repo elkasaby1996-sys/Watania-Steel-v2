@@ -160,16 +160,18 @@ export function OrderTable() {
                 ))
               ) : todayOrders.length > 0 ? (
                 todayOrders.map((order) => (
-                  <div key={order.id} className="glass-panel rounded-2xl p-4 space-y-3">
+                  <div key={order.id} className="mobile-delivery-card glass-panel rounded-2xl p-4 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <p className="min-w-0 break-all font-mono text-sm text-foreground">{order.id}</p>
                       <span className="shrink-0">{getStatusBadge(order.status)}</span>
                     </div>
-                    <p className="min-w-0 break-words text-base font-semibold text-foreground">{order.customerName}</p>
-                    <p className="min-w-0 break-words text-sm text-muted-foreground">Company: {order.company || 'N/A'}</p>
-                    <p className="min-w-0 break-words text-sm text-muted-foreground">Site: {order.site || 'N/A'}</p>
-                    <p className="min-w-0 break-words text-sm text-muted-foreground">Date: {order.date}</p>
-                    <p className="min-w-0 break-words text-sm text-muted-foreground">Tons: {order.tons} tons</p>
+                    <details className="mobile-order-title"><summary><span>{order.customerName}</span><small>Order description</small></summary><p>{order.customerName}</p></details>
+                    <dl className="mobile-order-facts">
+                      <div><dt>Company</dt><dd>{order.company || 'Not specified'}</dd></div>
+                      <div><dt>Site</dt><dd>{order.site || 'Not specified'}</dd></div>
+                      <div><dt>Scheduled</dt><dd>{order.date} / {order.shift === 'morning' ? 'Morning' : 'Night'}</dd></div>
+                      <div><dt>Weight</dt><dd className="mobile-order-weight">{order.tons} <small>tons</small></dd></div>
+                    </dl>
                     <div className="min-w-0 text-sm text-muted-foreground">
                       <p className="min-w-0 break-words">Driver: {order.driverName || 'N/A'}</p>
                       {order.phoneNumber ? (

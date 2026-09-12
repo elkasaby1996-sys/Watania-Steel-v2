@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { MobileNavigation } from './components/MobileNavigation';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { ImageAssets } from './components/ImageAssets';
@@ -30,7 +31,6 @@ const OffcutExecutivePrintPage = lazy(() =>
 function AppShell() {
   const userId = useAuthStore(state => state.user?.id);
   const sidebarCollapsed = useDashboardStore(state => state.sidebarCollapsed);
-  const setSidebarCollapsed = useDashboardStore(state => state.setSidebarCollapsed);
   const location = useLocation();
   const { isMobile } = useDeviceInfo();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -38,13 +38,8 @@ function AppShell() {
 
   useEffect(() => {
     if (isMobile) {
-      setSidebarCollapsed(true);
-    }
-  }, [isMobile, setSidebarCollapsed]);
-
-  useEffect(() => {
-    if (isMobile) {
       setMobileSidebarOpen(false);
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, [location.pathname, isMobile]);
 
@@ -68,6 +63,7 @@ function AppShell() {
           {!isReportRoute && (
             <TopBar
               isMobile={isMobile}
+              menuOpen={mobileSidebarOpen}
               onMenuClick={() => setMobileSidebarOpen((prev) => !prev)}
             />
           )}
@@ -94,6 +90,7 @@ function AppShell() {
             </div>
           </div>
         </main>
+        {!isReportRoute && isMobile && <MobileNavigation menuOpen={mobileSidebarOpen} onMenuClick={() => setMobileSidebarOpen(true)} />}
         <Toaster />
       </div>
     </ProtectedRoute>

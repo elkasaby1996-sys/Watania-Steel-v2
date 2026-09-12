@@ -9,10 +9,11 @@ import { useLocation } from 'react-router-dom';
 
 interface TopBarProps {
   isMobile?: boolean;
+  menuOpen?: boolean;
   onMenuClick?: () => void;
 }
 
-export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
+export function TopBar({ isMobile = false, menuOpen = false, onMenuClick }: TopBarProps) {
   const { sidebarCollapsed } = useDashboardStore();
   const { user } = useAuthStore();
   const { pathname } = useLocation();
@@ -61,6 +62,8 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
               onClick={onMenuClick}
               className="mr-2 h-11 w-11 text-foreground hover:bg-white/[0.07] hover:text-accent-foreground"
               aria-label="Open navigation menu"
+              aria-expanded={menuOpen}
+              aria-controls="mobile-workspace-menu"
             >
               <Menu size={18} />
             </Button>
