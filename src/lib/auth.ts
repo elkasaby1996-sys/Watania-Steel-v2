@@ -15,6 +15,8 @@ export interface AuthUser {
   profile: UserProfile | null;
 }
 
+const profileRequests = new Map<string, Promise<UserProfile | null>>();
+
 export const authService = {
   // Sign in with email and password
   async signIn(email: string, password: string) {
@@ -27,9 +29,6 @@ export const authService = {
       if (error) {
         return { user: null, error };
       }
-
-      // Wait for database triggers to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Get user profile with role from profiles table
       const profile = await this.getUserProfile(data.user.id);
@@ -105,7 +104,20 @@ export const authService = {
   },
 
   // Get user profile with role
-  async getUserProfile(userId: string): Promise<UserProfile | null> {
+  async getUserProfile(userId: string, createIfMissing = true): Promise<UserProfile | null> {
+    const key = `${userId}:${createIfMissing}`;
+    const pending = profileRequests.get(key);
+    if (pending) return pending;
+    const request = this.fetchUserProfile(userId, createIfMissing);
+    profileRequests.set(key, request);
+    try {
+      return await request;
+    } finally {
+      if (profileRequests.get(key) === request) profileRequests.delete(key);
+    }
+  },
+
+  async fetchUserProfile(userId: string, createIfMissing: boolean): Promise<UserProfile | null> {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -115,7 +127,7 @@ export const authService = {
 
       if (error) {
         // If profile doesn't exist, try to create it as fallback
-        if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+        if (createIfMissing && (error.code === 'PGRST116' || error.message?.includes('No rows'))) {
           return await this.createFallbackProfile(userId);
         }
         return null;
@@ -195,44 +207,50 @@ export const authService = {
 
   // Listen to auth state changes
   onAuthStateChange(callback: (user: AuthUser | null) => void) {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        // Wait for any database operations to complete
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        const profile = await this.getUserProfile(session.user.id);
-        const authUser = {
-          id: session.user.id,
-          email: session.user.email!,
-          profile
-        };
-        callback(authUser);
-      } else {
+    let revision = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let disposed = false;
+    let currentUser: AuthUser | null = null;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const requestRevision = ++revision;
+      clearTimeout(timer);
+      if (!session?.user) {
+        profileRequests.clear();
+        currentUser = null;
         callback(null);
+        return;
       }
+
+      const { id, email } = session.user;
+      if (currentUser?.id !== id) {
+        // Drop the previous account's permissions immediately.
+        currentUser = { id, email: email!, profile: null };
+        callback(currentUser);
+      }
+
+      // Return from the SDK callback before any request needs its auth lock.
+      timer = setTimeout(() => {
+        void this.getUserProfile(id).then((profile) => {
+          if (disposed || revision !== requestRevision) return;
+          currentUser = { id, email: email!, profile };
+          callback(currentUser);
+        }).catch((error) => {
+          if (!disposed && revision === requestRevision) console.error('Failed to refresh auth profile:', error);
+        });
+      }, 0);
     });
 
-    return { data: { subscription } };
+    return { data: { subscription: { unsubscribe: () => {
+      disposed = true;
+      revision++;
+      clearTimeout(timer);
+      subscription.unsubscribe();
+    } } } };
   },
 
   // Force refresh user profile
   async refreshUserProfile(userId: string): Promise<UserProfile | null> {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        return null;
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Failed to refresh profile:', error);
-      return null;
-    }
+    return this.getUserProfile(userId, false);
   }
 };
 

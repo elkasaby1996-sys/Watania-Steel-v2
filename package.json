@@ -9,6 +9,7 @@
     "build": "vite build --mode production",
     "preview": "vite preview",
     "typecheck": "tsc -b",
+    "test:performance": "node tests/performance.test.mjs",
     "check": "npm run typecheck && npm run build"
   },
   "dependencies": {

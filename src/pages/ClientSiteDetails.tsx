@@ -50,17 +50,11 @@ export function ClientSiteDetailsPage() {
 
     const loadSite = async () => {
       try {
-        const [summaryResult, ordersResult] = await Promise.all([
-          fetchClientSiteSummary(clientId, siteId, signal),
-          fetchClientSiteOrdersPage(clientId, siteId, 1, pageSize, signal)
-        ]);
+        const summaryResult = await fetchClientSiteSummary(clientId, siteId, signal);
         if (signal.aborted) return;
         setSiteSummary(summaryResult);
-        setOrders(ordersResult.rows);
-        setOrdersTotal(ordersResult.totalCount);
-        setPage(1);
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
+        if (signal.aborted) {
           return;
         }
         setError(err instanceof Error ? err.message : 'Failed to load site details');
@@ -79,7 +73,6 @@ export function ClientSiteDetailsPage() {
 
   useEffect(() => {
     if (!clientId || !siteId) return;
-    if (page === 1) return;
 
     const controller = new AbortController();
     const signal = controller.signal;
@@ -92,9 +85,7 @@ export function ClientSiteDetailsPage() {
         setOrders(pageData.rows);
         setOrdersTotal(pageData.totalCount);
       } catch (err) {
-        if (!(err instanceof DOMException && err.name === 'AbortError')) {
-          console.error(err);
-        }
+        if (!signal.aborted) setError(err instanceof Error ? err.message : 'Failed to load site orders');
       } finally {
         if (!signal.aborted) setOrdersLoading(false);
       }

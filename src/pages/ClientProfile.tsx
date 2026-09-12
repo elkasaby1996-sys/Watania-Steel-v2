@@ -349,47 +349,37 @@ export function ClientProfilePage() {
     setOrdersError(null);
     setAnalyticsError(null);
 
-    setOrdersPage(1);
-
-    // load summary + sites + analytics
-    (async () => {
-      try {
-        setLoadingSummary(true);
-        setLoadingSites(true);
-        setLoadingAnalytics(true);
-
-        const [summaryRes, masterSitesRes, sitesRes, analyticsRes] = await Promise.all([
-          fetchClientSummary(clientId, signal),
-          fetchClientSitesMaster(clientId, signal),
-          fetchClientSitesPerformance(clientId, signal),
-          fetchClientAnalytics(clientId, signal)
-        ]);
-
-        if (signal.aborted) return;
-
-        setSummary(summaryRes);
-        const masterSites = Array.isArray(masterSitesRes) ? masterSitesRes : [];
-        const performanceSites = Array.isArray(sitesRes) ? sitesRes : [];
-        setSites(mergeSites(masterSites, performanceSites));
-        setAnalyticsJson(analyticsRes ?? null);
-      } catch (err: any) {
-        if (signal.aborted) return;
-        const msg = err?.message || 'Failed to load client profile';
-        setSummaryError(msg);
-        setSitesError(msg);
-        setOrdersError(msg);
-        setAnalyticsError(msg);
-      } finally {
-        if (!signal.aborted) {
-          setLoadingSummary(false);
-          setLoadingSites(false);
-          setLoadingAnalytics(false);
-        }
-      }
-    })();
-
+    setLoadingSummary(true);
+    fetchClientSummary(clientId, signal)
+      .then(value => { if (!signal.aborted) setSummary(value); })
+      .catch(err => { if (!signal.aborted) setSummaryError(err?.message || 'Failed to load client summary'); })
+      .finally(() => { if (!signal.aborted) setLoadingSummary(false); });
     return () => controller.abort();
   }, [clientId, refreshKey]);
+
+  useEffect(() => {
+    if (!clientId || activeTab !== 'overview') return;
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setLoadingSites(true); setSitesError(null);
+    Promise.all([fetchClientSitesMaster(clientId, signal), fetchClientSitesPerformance(clientId, signal)])
+      .then(([master, performance]) => { if (!signal.aborted) setSites(mergeSites(master ?? [], performance ?? [])); })
+      .catch(err => { if (!signal.aborted) setSitesError(err?.message || 'Failed to load sites'); })
+      .finally(() => { if (!signal.aborted) setLoadingSites(false); });
+    return () => controller.abort();
+  }, [clientId, refreshKey, activeTab]);
+
+  useEffect(() => {
+    if (!clientId || activeTab !== 'analytics') return;
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setLoadingAnalytics(true); setAnalyticsError(null);
+    fetchClientAnalytics(clientId, signal)
+      .then(value => { if (!signal.aborted) setAnalyticsJson(value); })
+      .catch(err => { if (!signal.aborted) setAnalyticsError(err?.message || 'Failed to load analytics'); })
+      .finally(() => { if (!signal.aborted) setLoadingAnalytics(false); });
+    return () => controller.abort();
+  }, [clientId, refreshKey, activeTab]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -425,7 +415,7 @@ export function ClientProfilePage() {
     })();
 
     return () => controller.abort();
-  }, [clientId, ordersPage]);
+  }, [clientId, ordersPage, refreshKey]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -453,6 +443,7 @@ export function ClientProfilePage() {
   }, [isAdmin]);
 
   const handleClientsMerged = (primaryId: string, duplicateId: string) => {
+    setOrdersPage(1);
     setRefreshKey((prev) => prev + 1);
     if (duplicateId === clientId) {
       navigate(routeTo.clientProfile(primaryId));
@@ -460,6 +451,7 @@ export function ClientProfilePage() {
   };
 
   const handleSitesMerged = () => {
+    setOrdersPage(1);
     setRefreshKey((prev) => prev + 1);
   };
 

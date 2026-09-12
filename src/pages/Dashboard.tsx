@@ -5,11 +5,36 @@ import { DiameterDistributionChart } from '@/components/DiameterDistributionChar
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Warehouse, Truck, History } from 'lucide-react';
 import { ROUTES } from '@/routes/routes';
+import { useEffect } from 'react';
+import { useDashboardStore } from '@/stores/dashboardStore';
+import { useAuthStore } from '@/stores/authStore';
+import { Button } from '@/components/ui/button';
 
 export function Dashboard() {
+  const userId = useAuthStore(state => state.user?.id);
+  const loadOrders = useDashboardStore(state => state.loadOrders);
+  const refreshing = useDashboardStore(state => state.isRefreshingOrders);
+  const refreshError = useDashboardStore(state => state.refreshError);
+  useEffect(() => {
+    if (!userId) return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void loadOrders({ force: false });
+    };
+    void loadOrders({ force: false });
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [userId, loadOrders]);
   return (
     <div className="dashboard-workspace">
       <HeroSection />
+      {refreshing && <p role="status" className="text-xs text-muted-foreground">Updating orders…</p>}
+      {refreshError && <div role="alert" className="flex items-center justify-between gap-3 text-sm text-muted-foreground"><span>Couldn’t refresh orders. Showing the last loaded data.</span><Button variant="outline" size="sm" onClick={() => loadOrders()}>Retry</Button></div>}
       <DashboardCards />
       <OrderTable />
       <div className="dashboard-secondary">

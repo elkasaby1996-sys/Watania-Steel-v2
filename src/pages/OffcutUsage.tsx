@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { ArrowLeft, Calendar, Filter, Trophy, Plus, Edit, Trash2, FileDown, Hash, Scale, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -147,42 +147,49 @@ export function OffcutUsage() {
   }, [diameterTotals, filteredEntries]);
 
   // Fetch data based on view mode
+  const offcutAbortRef = useRef<AbortController | null>(null);
   const fetchData = async () => {
+    offcutAbortRef.current?.abort();
+    const controller = new AbortController();
+    offcutAbortRef.current = controller;
+    const signal = controller.signal;
     setLoading(true);
     try {
       let data: OffcutUsageEntry[] = [];
 
       switch (viewMode) {
         case 'daily':
-          data = await offcutUsageService.getByDate(selectedDate);
+          data = await offcutUsageService.getByDate(selectedDate, signal);
           break;
         case 'monthly': {
           const [year, month] = selectedMonth.split('-').map(Number);
-          data = await offcutUsageService.getByMonth(year, month);
+          data = await offcutUsageService.getByMonth(year, month, signal);
           break;
         }
         case 'range':
-          data = await offcutUsageService.getByDateRange(startDate, endDate);
+          data = await offcutUsageService.getByDateRange(startDate, endDate, signal);
           break;
       }
 
+      if (signal.aborted) return;
       setFilteredEntries(data);
     } catch (error) {
+      if (signal.aborted) return;
       console.error('Failed to fetch offcut usage data:', error);
       toast({
         title: 'Error',
         description: 'Failed to load offcut usage data. Please try again.',
         variant: 'destructive'
       });
-      setFilteredEntries([]);
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   };
 
   // Fetch data on mount and when filters change
   useEffect(() => {
     fetchData();
+    return () => offcutAbortRef.current?.abort();
   }, [viewMode, selectedDate, selectedMonth, startDate, endDate]);
 
   // Format date for display

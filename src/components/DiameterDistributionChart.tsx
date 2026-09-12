@@ -29,20 +29,18 @@ export function DiameterDistributionChart() {
   const total = rows.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="material-panel p-5 sm:p-6">
       <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <h3 className="text-lg font-headline font-semibold text-gray-50">
-          Diameter Distribution
-        </h3>
+        <div><p className="eyebrow">Material breakdown</p><h2 className="text-lg font-headline font-semibold text-foreground">Steel by diameter</h2></div>
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          {formatTons(total)} total tons
+          {isLoadingMetrics || metricsError ? '—' : formatTons(total)} total tons
         </p>
       </div>
 
       {isLoadingMetrics ? (
         <div className="space-y-4 animate-pulse">
-          <div className="h-6 w-32 rounded bg-white/[0.06]" />
-          <div className="h-56 rounded-xl bg-white/[0.06]" />
+          <div className="h-6 w-32 rounded bg-muted" />
+          <div className="h-56 rounded-xl bg-muted" />
         </div>
       ) : metricsError ? (
         <div className="flex flex-col gap-3">
@@ -54,27 +52,14 @@ export function DiameterDistributionChart() {
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No working orders to display.</p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-white/[0.10]">
-          <table className="w-full text-sm">
-            <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.08em] text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold">Diameter</th>
-                <th className="px-4 py-3 text-right font-semibold">Tons</th>
-                <th className="px-4 py-3 text-right font-semibold">Share</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.08]">
-              {rows.map((entry) => (
-                <tr key={entry.name} className="bg-card/30">
-                  <td className="px-4 py-3 font-semibold text-foreground">{entry.name}</td>
-                  <td className="px-4 py-3 text-right font-mono text-foreground">{formatTons(entry.value)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                    {total > 0 ? `${((entry.value / total) * 100).toFixed(1)}%` : '0%'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="diameter-bars" role="list" aria-label="Steel tonnage and share by diameter">
+          {rows.map((entry) => <div className="diameter-row" role="listitem" key={entry.name}>
+            <span className="diameter-name">{entry.name}</span>
+            <meter min={0} max={total} value={entry.value} aria-label={`${entry.name} share of steel`} />
+            <strong>{formatTons(entry.value)} <small>t</small></strong>
+            <span className="diameter-share">{((entry.value / total) * 100).toFixed(1)}%</span>
+          </div>)}
+          <p className="material-caption">Distribution across active production orders</p>
         </div>
       )}
     </Card>

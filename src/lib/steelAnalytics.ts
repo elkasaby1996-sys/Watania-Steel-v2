@@ -1,3 +1,4 @@
+import { cachedRead, invalidateQueries } from './queryCache';
 import { supabase } from './supabase';
 import { normalizeOrderType } from './orderTypes';
 
@@ -20,11 +21,6 @@ export type AnalyticsSummary = {
   dailyAverage: number;
   timeSeries: DailySeriesEntry[];
   diameterTotals: DiameterDistributionEntry[];
-};
-
-type AnalyticsCacheEntry = {
-  expiresAt: number;
-  data: AnalyticsSummary;
 };
 
 type AnalyticsOrderRow = {
@@ -50,9 +46,6 @@ type DeliveredAnalyticsRow = AnalyticsOrderRow & {
   sourcePriority: number;
 };
 
-const rangeCache = new Map<string, AnalyticsCacheEntry>();
-let deliveredRowsCache: { expiresAt: number; data: DeliveredAnalyticsRow[] } | null = null;
-const CACHE_TTL_MS = 60_000;
 const PAGE_SIZE = 1000;
 const ANALYTICS_COLUMNS = [
   'id',
@@ -86,10 +79,40 @@ const throwIfAborted = (signal?: AbortSignal) => {
   }
 };
 
+export const invalidateAnalyticsCache = () => invalidateQueries('analytics:');
+const sharedRead = <T>(key: string, read: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal) =>
+  cachedRead('analytics:' + key, read, signal, { ttlMs: 60_000 });
+
+type Source = 'history' | 'delivered' | 'fallback';
+const sources: Source[] = ['history', 'delivered', 'fallback'];
+const dateColumn = (source: Source) => source === 'delivered' ? 'delivered_at' : 'date';
+const sourceQuery = (source: Source, columns: string) => {
+  let query = supabase.from(source === 'history' ? 'history_orders' : 'orders')
+    .select(columns).eq('status', 'delivered');
+  if (source === 'delivered') query = query.not('delivered_at', 'is', null);
+  if (source === 'fallback') query = query.is('delivered_at', null);
+  return query;
+};
+
+// History takes precedence even when its date/type is outside the selected range.
+const historyIds = async (ids: string[], signal: AbortSignal) => {
+  const found = new Set<string>();
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    throwIfAborted(signal);
+    const { data, error } = await supabase.from('history_orders').select('id')
+      .eq('status', 'delivered').not('date', 'is', null)
+      .in('id', ids.slice(offset, offset + 100)).abortSignal(signal);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) found.add(row.id);
+  }
+  return found;
+};
+
 const fetchDeliveredRows = async (
-  table: 'history_orders' | 'orders',
-  sourcePriority: number,
-  signal?: AbortSignal
+  source: Source,
+  startDate: string,
+  endDate: string,
+  signal: AbortSignal
 ): Promise<DeliveredAnalyticsRow[]> => {
   const rows: DeliveredAnalyticsRow[] = [];
   let offset = 0;
@@ -97,16 +120,17 @@ const fetchDeliveredRows = async (
   while (true) {
     throwIfAborted(signal);
 
-    const query = supabase
-      .from(table)
-      .select(ANALYTICS_COLUMNS)
-      .eq('status', 'delivered')
-      .order('date', { ascending: false })
+    const column = dateColumn(source);
+    let query = sourceQuery(source, ANALYTICS_COLUMNS)
+      .gte(column, source === 'delivered' ? `${startDate}T00:00:00Z` : startDate)
+      .order(column, { ascending: false }).order('id', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
-
-    const { data, error } = signal
-      ? await query.abortSignal(signal)
-      : await query;
+    if (source === 'delivered') {
+      const nextDay = new Date(`${endDate}T00:00:00Z`);
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      query = query.lt(column, nextDay.toISOString());
+    } else query = query.lte(column, endDate);
+    const { data, error } = await query.abortSignal(signal);
 
     if (error) {
       throw new Error(error.message);
@@ -115,7 +139,7 @@ const fetchDeliveredRows = async (
     const page = (data ?? []) as unknown as AnalyticsOrderRow[];
 
     for (const row of page) {
-      const analyticsDate = table === 'orders'
+      const analyticsDate = source !== 'history'
         ? getDatePart(row.delivered_at) ?? getDatePart(row.date)
         : getDatePart(row.date);
 
@@ -123,7 +147,7 @@ const fetchDeliveredRows = async (
         rows.push({
           ...row,
           analyticsDate,
-          sourcePriority,
+          sourcePriority: source === 'history' ? 0 : 1,
         });
       }
     }
@@ -136,46 +160,63 @@ const fetchDeliveredRows = async (
   }
 };
 
-const fetchDeliveredAnalyticsRows = async (signal?: AbortSignal): Promise<DeliveredAnalyticsRow[]> => {
-  if (deliveredRowsCache && deliveredRowsCache.expiresAt > Date.now()) {
-    return deliveredRowsCache.data;
-  }
+const fetchDeliveredAnalyticsRows = (startDate: string, endDate: string, signal?: AbortSignal): Promise<DeliveredAnalyticsRow[]> =>
+  sharedRead(`rows|${startDate}|${endDate}`, async sharedSignal => {
+    const [historyRows, deliveredRows, fallbackRows] = await Promise.all(
+      sources.map(source => fetchDeliveredRows(source, startDate, endDate, sharedSignal))
+    );
+    const activeRows = [...deliveredRows, ...fallbackRows];
+    const inRangeIds = new Set(historyRows.map(row => row.id));
+    const archivedIds = await historyIds(activeRows.filter(row => !inRangeIds.has(row.id)).map(row => row.id), sharedSignal);
 
-  const [historyRows, activeRows] = await Promise.all([
-    fetchDeliveredRows('history_orders', 0, signal),
-    fetchDeliveredRows('orders', 1, signal),
-  ]);
+    const deduped = new Map<string, DeliveredAnalyticsRow>();
 
-  const deduped = new Map<string, DeliveredAnalyticsRow>();
-
-  for (const row of [...historyRows, ...activeRows]) {
-    const existing = deduped.get(row.id);
-    if (!existing || row.sourcePriority < existing.sourcePriority) {
-      deduped.set(row.id, row);
-    }
-  }
-
-  const rows = Array.from(deduped.values());
-  deliveredRowsCache = { data: rows, expiresAt: Date.now() + CACHE_TTL_MS };
-  return rows;
-};
-
-export const fetchMaxDateAcrossTables = async (mode: FilterMode = 'all', signal?: AbortSignal) => {
-  const rows = await fetchDeliveredAnalyticsRows(signal);
-  let maxDate: string | null = null;
-
-  for (const row of rows) {
-    if (mode !== 'all' && normalizeOrderType(row.order_type) !== mode) {
-      continue;
+    for (const row of [...historyRows, ...activeRows]) {
+      if (row.sourcePriority > 0 && archivedIds.has(row.id)) continue;
+      const existing = deduped.get(row.id);
+      if (!existing || row.sourcePriority < existing.sourcePriority) {
+        deduped.set(row.id, row);
+      }
     }
 
-    if (!maxDate || row.analyticsDate > maxDate) {
-      maxDate = row.analyticsDate;
-    }
-  }
+    return Array.from(deduped.values());
+  }, signal);
 
-  return maxDate;
-};
+export const fetchMaxDateAcrossTables = (mode: FilterMode = 'all', signal?: AbortSignal): Promise<string | null> =>
+  sharedRead(`latest|${mode}`, async sharedSignal => {
+    const latestFromSource = async (source: Source, floor?: string | null) => {
+      // Read only date/type metadata, stopping as soon as a matching row is found.
+      // Client normalization deliberately supports legacy type spellings.
+      const pageSize = source === 'history' && mode === 'all' ? 1 : 100;
+      for (let offset = 0; ; offset += pageSize) {
+        throwIfAborted(sharedSignal);
+        let query = sourceQuery(source, 'id, date, delivered_at, order_type')
+          .not(dateColumn(source), 'is', null)
+          .order(dateColumn(source), { ascending: false }).order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (floor) {
+          if (source === 'delivered') {
+            const nextDay = new Date(`${floor}T00:00:00Z`);
+            nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+            query = query.gte('delivered_at', nextDay.toISOString());
+          } else query = query.gt('date', floor);
+        }
+        const { data, error } = await query.abortSignal(sharedSignal);
+        if (error) throw new Error(error.message);
+        const page = (data ?? []) as unknown as AnalyticsOrderRow[];
+        const matching = page.filter(row => mode === 'all' || normalizeOrderType(row.order_type) === mode);
+        const archived = source === 'history' ? new Set<string>() : await historyIds(matching.map(row => row.id), sharedSignal);
+        const row = matching.find(row => !archived.has(row.id));
+        if (row) return getDatePart(source === 'delivered' ? row.delivered_at : row.date);
+        if (page.length < pageSize) return null;
+      }
+    };
+    const historyDate = await latestFromSource('history');
+    const dates = [historyDate, ...await Promise.all([
+      latestFromSource('delivered', historyDate), latestFromSource('fallback', historyDate),
+    ])];
+    return dates.reduce<string | null>((latest, date) => date && (!latest || date > latest) ? date : latest, null);
+  }, signal);
 
 const parseNumber = (value: unknown) => {
   if (value === null || value === undefined) {
@@ -215,7 +256,7 @@ const buildClientSideSummary = async ({
   mode: FilterMode;
   signal?: AbortSignal;
 }): Promise<AnalyticsSummary> => {
-  const rows = await fetchDeliveredAnalyticsRows(signal);
+  const rows = await fetchDeliveredAnalyticsRows(startDate, endDate, signal);
   const filtered = rows.filter((row) => (
     row.analyticsDate >= startDate
     && row.analyticsDate <= endDate
@@ -292,19 +333,12 @@ export const fetchAnalyticsSummary = async ({
   mode: FilterMode;
   signal?: AbortSignal;
 }): Promise<AnalyticsSummary> => {
-  const cacheKey = `${startDate}|${endDate}|${mode}`;
-  const cached = rangeCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data;
-  }
-
-  const normalized = await buildClientSideSummary({
+  return sharedRead(`summary|${startDate}|${endDate}|${mode}`, sharedSignal => buildClientSideSummary({
     startDate,
     endDate,
     mode,
-    signal,
-  });
-
-  rangeCache.set(cacheKey, { data: normalized, expiresAt: Date.now() + CACHE_TTL_MS });
-  return normalized;
+    signal: sharedSignal,
+  }), signal);
 };
+
+if (import.meta.hot) import.meta.hot.dispose(invalidateAnalyticsCache);

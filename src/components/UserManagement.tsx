@@ -1,3 +1,4 @@
+import { cachedRead, invalidateQueries } from '@/lib/queryCache';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,31 +36,25 @@ export function UserManagement() {
   const isAdmin = hasPermission(user?.profile?.role, 'delete');
 
   useEffect(() => {
-    if (isAdmin) {
-      loadUsers();
-    }
-  }, [isAdmin]);
+    const controller = new AbortController();
+    if (isAdmin) loadUsers(false, controller.signal);
+    return () => controller.abort();
+  }, [isAdmin, user?.id]);
 
-  const loadUsers = async () => {
+  const loadUsers = async (force = true, signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setUsers(data || []);
+      if (force) invalidateQueries('users:');
+      const data = await cachedRead<UserProfile[]>('users:list', async sharedSignal => {
+        const { data, error } = await supabase.from('profiles')
+          .select('id,email,role,full_name,created_at').order('created_at', { ascending: false }).abortSignal(sharedSignal);
+        if (error) throw error;
+        return data ?? [];
+      }, signal);
+      if (!signal?.aborted) setUsers(data);
     } catch (error) {
-      console.error('Error loading users:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load users",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+      if (!signal?.aborted) toast({ title: 'Error', description: 'Failed to load users', variant: 'destructive' });
+    } finally { if (!signal?.aborted) setLoading(false); }
   };
 
   const createUser = async () => {

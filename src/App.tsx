@@ -28,7 +28,9 @@ const OffcutExecutivePrintPage = lazy(() =>
 );
 
 function AppShell() {
-  const { sidebarCollapsed, setSidebarCollapsed } = useDashboardStore();
+  const userId = useAuthStore(state => state.user?.id);
+  const sidebarCollapsed = useDashboardStore(state => state.sidebarCollapsed);
+  const setSidebarCollapsed = useDashboardStore(state => state.setSidebarCollapsed);
   const location = useLocation();
   const { isMobile } = useDeviceInfo();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -72,7 +74,7 @@ function AppShell() {
           <div className={isReportRoute ? '' : isMobile ? 'workspace-main phone-safe-page' : 'workspace-main p-6'}>
             <div className={isReportRoute ? '' : 'mx-auto w-full max-w-[1500px]'}>
               <Suspense fallback={<RouteSkeleton />}>
-                <Routes>
+                <Routes key={`${userId}:${location.pathname}`}>
                   <Route path={ROUTES.dashboard} element={<Dashboard />} />
                   <Route path={ROUTES.history} element={<History />} />
                   <Route path={ROUTES.users} element={<Users />} />
@@ -99,71 +101,34 @@ function AppShell() {
 }
 
 function App() {
-  const { loadOrders, loadDashboardMetrics } = useDashboardStore();
-  const { initialize, refreshProfile, user, loading: authLoading, initialized } = useAuthStore();
-  const initializedRef = useRef(false);
+  const initialize = useAuthStore(state => state.initialize);
+  const refreshProfile = useAuthStore(state => state.refreshProfile);
+  const userId = useAuthStore(state => state.user?.id);
   const lastResumeRefreshAtRef = useRef(0);
 
   useEffect(() => {
-    // Guard against React StrictMode double-invoking effects in development.
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-    initialize();
+    // The store coalesces initialization, including StrictMode and hot reload.
+    void initialize();
   }, [initialize]);
 
   useEffect(() => {
-    if (!initialized || authLoading || !user) {
-      return;
-    }
-
-    // Load initial app data only after auth is ready.
-    loadOrders();
-    loadDashboardMetrics();
-
-    const dashboardStore = useDashboardStore.getState();
-    if (dashboardStore.loadHistoryOrders) {
-      dashboardStore.loadHistoryOrders();
-    }
-  }, [initialized, authLoading, user, loadOrders, loadDashboardMetrics]);
-
-  useEffect(() => {
-    if (!initialized || authLoading || !user) {
-      return;
-    }
-
+    if (!userId) return;
     const refreshOnResume = () => {
+      if (document.visibilityState !== 'visible') return;
       const now = Date.now();
-      // Avoid firing multiple times for focus + visibilitychange bursts.
-      if (now - lastResumeRefreshAtRef.current < 10_000) {
-        return;
-      }
+      if (now - lastResumeRefreshAtRef.current < 30_000) return;
       lastResumeRefreshAtRef.current = now;
-
-      refreshProfile();
-      loadOrders();
-      loadDashboardMetrics();
-      const dashboardStore = useDashboardStore.getState();
-      if (dashboardStore.loadHistoryOrders) {
-        dashboardStore.loadHistoryOrders();
-      }
+      void refreshProfile();
     };
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refreshOnResume();
-      }
-    };
-
     window.addEventListener('focus', refreshOnResume);
     window.addEventListener('online', refreshOnResume);
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
+    document.addEventListener('visibilitychange', refreshOnResume);
     return () => {
       window.removeEventListener('focus', refreshOnResume);
       window.removeEventListener('online', refreshOnResume);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
+      document.removeEventListener('visibilitychange', refreshOnResume);
     };
-  }, [initialized, authLoading, user, refreshProfile, loadOrders, loadDashboardMetrics]);
+  }, [userId, refreshProfile]);
 
   return (
     <ErrorBoundary>
@@ -180,5 +145,3 @@ function App() {
 }
 
 export default App;
-
-

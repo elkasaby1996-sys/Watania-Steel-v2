@@ -1,3 +1,5 @@
+import { inventoryService } from '../lib/supabase';
+import { getQuerySession } from '../lib/queryCache';
 import { create } from 'zustand';
 
 // Define inventory data types
@@ -18,6 +20,8 @@ interface InventoryState {
   error: string | null;
   loadingTable: InventoryTableName | null;
 
+  resetSessionData: () => void;
+  hasLoaded: boolean;
   // Actions
   loadAllInventory: () => Promise<void>;
   loadTableData: (tableName: InventoryTableName) => Promise<void>;
@@ -37,33 +41,48 @@ const initialData: InventoryData = {
   coupler: [],
 };
 
+let inventoryRevision = 0;
+let inventoryRequest: Promise<void> | null = null;
 export const useInventoryStore = create<InventoryState>((set, get) => ({
   data: initialData,
+  hasLoaded: false,
+  resetSessionData: () => { inventoryRevision++; inventoryRequest = null;
+    set({ data: initialData, hasLoaded: false, loading: false, loadingTable: null, error: null }); },
   loading: false,
   error: null,
   loadingTable: null,
 
-  loadAllInventory: async () => {
-    set({ loading: true, error: null });
-    try {
-      const { inventoryService } = await import('../lib/supabase');
-      const data = await inventoryService.getAllInventory();
-      set({ data, loading: false });
-    } catch (error) {
-      console.error('Failed to load inventory:', error);
-      set({
-        data: initialData,
-        error: error instanceof Error ? error.message : 'Failed to load inventory',
-        loading: false,
-      });
-    }
+  loadAllInventory: () => {
+    if (inventoryRequest) return inventoryRequest;
+    const session = getQuerySession();
+    const revision = inventoryRevision;
+    set({ loading: !get().hasLoaded, error: null });
+    const request = (async () => {
+      try {
+        await Promise.all((Object.keys(initialData) as InventoryTableName[]).map(async table => {
+          try {
+            const rows = await inventoryService.getTableData(table);
+            if (session === getQuerySession() && revision === inventoryRevision) set(state => ({ data: { ...state.data, [table]: rows } }));
+          } catch (error) {
+            if (session === getQuerySession() && revision === inventoryRevision) set({ error: error instanceof Error ? error.message : 'Failed to load inventory' });
+          }
+        }));
+        if (session === getQuerySession() && revision === inventoryRevision) set({ hasLoaded: true });
+      } finally {
+        if (session === getQuerySession() && revision === inventoryRevision) { inventoryRequest = null; set({ loading: false }); }
+      }
+    })();
+    inventoryRequest = request;
+    return request;
   },
 
   loadTableData: async (tableName: InventoryTableName) => {
+    const session = getQuerySession();
+    const revision = inventoryRevision;
     set({ loadingTable: tableName, error: null });
     try {
-      const { inventoryService } = await import('../lib/supabase');
       const tableData = await inventoryService.getTableData(tableName);
+      if (session !== getQuerySession() || revision !== inventoryRevision) return;
       set(state => ({
         data: {
           ...state.data,
@@ -72,6 +91,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         loadingTable: null,
       }));
     } catch (error) {
+      if (session !== getQuerySession() || revision !== inventoryRevision) return;
       console.error(`Failed to load ${tableName}:`, error);
       set({
         error: error instanceof Error ? error.message : `Failed to load ${tableName}`,
@@ -81,9 +101,10 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   },
 
   updateTableData: async (tableName, updates) => {
+    inventoryRevision++; inventoryRequest = null;
+    set({ loading: false });
     set({ loadingTable: tableName, error: null });
     try {
-      const { inventoryService } = await import('../lib/supabase');
       await inventoryService.updateMultipleRows(tableName, updates);
 
       // Reload the table data after successful update

@@ -12,6 +12,7 @@ import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
 import { useToast } from '../hooks/use-toast';
 import { CalculatorInput } from './CalculatorInput';
+import { orderService } from '../lib/supabase';
 
 interface OrderFormData {
   deliveryNumber: string;
@@ -182,6 +183,12 @@ export function AddOrderDialog() {
 
     try {
       const orderId = formData.deliveryNumber;
+      // Validate against both tables without preloading historical records on startup.
+      if (await orderService.deliveryNumberExists(orderId)) {
+        setErrors(current => ({ ...current, deliveryNumber: `Delivery number "${orderId}" already exists` }));
+        setLoading(false);
+        return;
+      }
       const tons = Number(formData.tons);
 
       const newOrder = {

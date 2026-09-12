@@ -3,6 +3,7 @@ import { orderService, activityService, historyService, supabase, ensureOrderCli
 import { roundTo3Decimals } from '../lib/utils';
 import { logger } from '../lib/logger';
 import { normalizeOrderType } from '../lib/orderTypes';
+import { invalidateAnalyticsCache } from '../lib/steelAnalytics';
 
 // Transform database types to frontend types
 interface Order {
@@ -132,6 +133,40 @@ interface DashboardMetrics {
   };
 }
 
+function summarizeOrders(orders: Order[], delivered: number) {
+  const current = orders.filter(isCurrentActiveOrder);
+  const dashboardMetrics: DashboardMetrics = {
+    todayOrders: current.length, totalOrders: current.length, cutAndBendTons: 0,
+    straightBarTons: 0, totalTons: 0, signedOrders: 0,
+    steelMix: { '8mm': 0, '10mm': 0, '12mm': 0, '14mm': 0, '16mm': 0, '18mm': 0, '20mm': 0, '25mm': 0, '32mm': 0 },
+  };
+  for (const order of current) {
+    const tons = Number(order.tons) || 0;
+    dashboardMetrics.totalTons += tons;
+    if (normalizeOrderType(order.orderType) === 'cut-and-bend') dashboardMetrics.cutAndBendTons += tons;
+    else dashboardMetrics.straightBarTons += tons;
+    if (order.signedDeliveryNote) dashboardMetrics.signedOrders++;
+    if (order.status === 'in-progress' || order.status === 'delayed') {
+      for (const diameter of Object.keys(dashboardMetrics.steelMix) as Array<keyof DashboardMetrics['steelMix']>) {
+        dashboardMetrics.steelMix[diameter] += Number(order.breakdown?.[diameter]) || 0;
+      }
+    }
+  }
+  return { dashboardMetrics, stats: {
+    todayOrders: current.length, delivered,
+    inProgress: current.filter(order => order.status === 'in-progress').length,
+    completed: current.filter(order => order.status === 'completed').length,
+    delayed: current.filter(order => order.status === 'delayed').length,
+  } };
+}
+
+type LoadOptions = { force?: boolean };
+let ordersRequest: Promise<void> | null = null;
+let ordersController: AbortController | null = null;
+let dataRevision = 0;
+let sessionRevision = 0;
+let historyRequest: Promise<void> | null = null;
+
 interface ActivityItem {
   id: string;
   type: 'order_created' | 'order_updated' | 'order_completed';
@@ -153,12 +188,19 @@ interface DashboardState {
   isLoadingMetrics: boolean;
   metricsError: string | null;
   error: string | null;
+  hasLoadedOrders: boolean;
+  ordersLoadedAt: number;
+  ordersLoadedDate: string;
+  isRefreshingOrders: boolean;
+  refreshError: string | null;
+  resetSessionData: () => void;
+  invalidateOrders: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSearchQuery: (query: string) => void;
-  loadOrders: () => Promise<void>;
+  loadOrders: (options?: LoadOptions) => Promise<void>;
   loadHistoryOrders: () => Promise<void>;
   loadActivities: () => Promise<void>;
-  loadDashboardMetrics: () => Promise<void>;
+  loadDashboardMetrics: (options?: LoadOptions) => Promise<void>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
   markAsDelivered: (orderId: string) => Promise<void>;
   addOrder: (order: Order) => Promise<void>;
@@ -211,81 +253,91 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   isLoadingMetrics: false,
   metricsError: null,
   error: null,
+  hasLoadedOrders: false,
+  ordersLoadedAt: 0,
+  ordersLoadedDate: '',
+  isRefreshingOrders: false,
+  refreshError: null,
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   
-  loadOrders: async () => {
-    if (get().isLoadingOrders) {
-      return;
+  loadOrders: (options = {}) => {
+    if (ordersRequest) return ordersRequest;
+    const state = get();
+    if (options.force === false && state.hasLoadedOrders &&
+        state.ordersLoadedDate === getTodayDate() && Date.now() - state.ordersLoadedAt < 30_000) {
+      return Promise.resolve();
     }
-
-    set({ isLoadingOrders: true, ordersError: null });
-    try {
-      const dbOrders = await orderService.getAll();
-      const orders = dbOrders.map(dbToFrontend);
-      
-      // Keep all active orders available in state, while dashboard-facing views include carryover work.
-      const activeOrderCandidates = orders.filter(o => o.status !== 'delivered');
-      const deliveredHistoryIds = await historyService.getDeliveredOrderIds(
-        activeOrderCandidates.map(order => order.id)
-      );
-      const activeOrders = activeOrderCandidates.filter(o => !deliveredHistoryIds.has(String(o.id)));
-      const currentActiveOrders = activeOrders.filter(isCurrentActiveOrder);
-      
-      logger.debug('📊 Loaded orders:', {
-        total: orders.length,
-        active: activeOrders.length,
-        statuses: orders.reduce((acc: any, o) => {
-          acc[o.status] = (acc[o.status] || 0) + 1;
-          return acc;
-        }, {})
-      });
-      
-      const stats = {
-        todayOrders: currentActiveOrders.length,
-        inProgress: currentActiveOrders.filter(o => o.status === 'in-progress').length,
-        completed: currentActiveOrders.filter(o => o.status === 'completed').length,
-        delayed: currentActiveOrders.filter(o => o.status === 'delayed').length,
-        delivered: get().stats?.delivered || 0
-      };
-      
-      set({ orders: activeOrders, stats });
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
+    const revision = dataRevision;
+    const controller = new AbortController();
+    ordersController = controller;
+    set({ isLoadingOrders: !state.hasLoadedOrders, isLoadingMetrics: !state.hasLoadedOrders,
+      isRefreshingOrders: state.hasLoadedOrders, ordersError: null, metricsError: null, refreshError: null });
+    const request = (async () => {
+      try {
+        const dbOrders = await orderService.getActive(controller.signal);
+        const deliveredIds = await historyService.getDeliveredOrderIds(dbOrders.map(order => order.id), controller.signal);
+        if (revision !== dataRevision || controller.signal.aborted) return;
+        const orders = dbOrders.filter(order => !deliveredIds.has(String(order.id))).map(dbToFrontend);
+        set({ orders, ...summarizeOrders(orders, get().stats.delivered), hasLoadedOrders: true,
+          ordersLoadedAt: Date.now(), ordersLoadedDate: getTodayDate() });
+      } catch (error) {
+        if (revision !== dataRevision || controller.signal.aborted) return;
+        const message = error instanceof Error ? error.message : (error as { message?: string })?.message || 'Failed to load orders';
+        set(get().hasLoadedOrders ? { refreshError: message } : { ordersError: message, metricsError: message });
+      } finally {
+        if (revision === dataRevision) {
+          ordersRequest = null;
+          ordersController = null;
+          set({ isLoadingOrders: false, isLoadingMetrics: false, isRefreshingOrders: false });
+        }
       }
-      console.error('Failed to load orders:', error);
-      set({ ordersError: error instanceof Error ? error.message : 'Failed to load orders' });
-    } finally {
-      set({ isLoadingOrders: false });
-    }
+    })();
+    ordersRequest = request;
+    return request;
   },
 
-  loadHistoryOrders: async () => {
-    try {
-      logger.debug('📚 Loading history orders...');
-      const historyOrders = await historyService.getAll();
-      logger.debug('📊 History orders loaded:', historyOrders.length, 'orders');
-      
-      set(state => ({
-        historyOrders,
-        stats: {
-          ...state.stats,
-          delivered: historyOrders.length
-        }
-      }));
-    } catch (error) {
-      console.error('Failed to load history orders:', error);
-      set({ 
-        historyOrders: [],
-        error: error instanceof Error ? error.message : 'Failed to load history' 
-      });
-    }
+  resetSessionData: () => {
+    sessionRevision++;
+    historyRequest = null;
+    get().invalidateOrders();
+    set({ orders: [], historyOrders: [], activities: [], ...summarizeOrders([], 0),
+      hasLoadedOrders: false, ordersLoadedAt: 0, ordersLoadedDate: '',
+      isLoadingOrders: false, isLoadingMetrics: false, isRefreshingOrders: false,
+      ordersError: null, metricsError: null, refreshError: null, error: null, searchQuery: '' });
+  },
+
+  invalidateOrders: () => {
+    invalidateAnalyticsCache();
+    dataRevision++;
+    ordersController?.abort();
+    ordersController = null;
+    ordersRequest = null;
+    set({ ordersLoadedAt: 0, isLoadingOrders: false, isLoadingMetrics: false, isRefreshingOrders: false });
+  },
+
+  loadHistoryOrders: () => {
+    if (historyRequest) return historyRequest;
+    const revision = sessionRevision;
+    historyRequest = (async () => {
+      try {
+        const historyOrders = await historyService.getAll();
+        if (revision !== sessionRevision) return;
+        set(state => ({ historyOrders, stats: { ...state.stats, delivered: historyOrders.length } }));
+      } catch (error) {
+        if (revision === sessionRevision) set({ error: error instanceof Error ? error.message : 'Failed to load history' });
+      } finally {
+        if (revision === sessionRevision) historyRequest = null;
+      }
+    })();
+    return historyRequest;
   },
 
   loadActivities: async () => {
+    const revision = sessionRevision;
     try {
       const dbActivities = await activityService.getRecent(10);
+      if (revision !== sessionRevision) return;
       const activities = dbActivities.map(activity => ({
         id: activity.id,
         type: activity.type,
@@ -298,113 +350,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  loadDashboardMetrics: async () => {
-    if (get().isLoadingMetrics) {
-      return;
-    }
-
-    set({ isLoadingMetrics: true, metricsError: null });
-    const todayDate = getTodayDate();
-
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          date,
-          status,
-          tons,
-          order_type,
-          signed_delivery_note,
-          breakdown_8mm,
-          breakdown_10mm,
-          breakdown_12mm,
-          breakdown_14mm,
-          breakdown_16mm,
-          breakdown_18mm,
-          breakdown_20mm,
-          breakdown_25mm,
-          breakdown_32mm
-        `)
-        .neq('status', 'delivered')
-        .lte('date', todayDate);
-
-      if (error) {
-        throw error;
-      }
-
-      const orderRows = data || [];
-      const deliveredHistoryIds = await historyService.getDeliveredOrderIds(
-        orderRows.map(order => order.id)
-      );
-      const orders = orderRows.filter(order => !deliveredHistoryIds.has(String(order.id)));
-      const totalOrders = orders.length;
-      let cutAndBendTons = 0;
-      let straightBarTons = 0;
-      let totalTons = 0;
-      let signedOrders = 0;
-      const steelMixTotals = {
-        '8mm': 0,
-        '10mm': 0,
-        '12mm': 0,
-        '14mm': 0,
-        '16mm': 0,
-        '18mm': 0,
-        '20mm': 0,
-        '25mm': 0,
-        '32mm': 0,
-      };
-
-      orders.forEach(order => {
-        const tons = Number(order.tons) || 0;
-        totalTons += tons;
-
-        const orderType = normalizeOrderType(order.order_type);
-
-        if (orderType === 'cut-and-bend') {
-          cutAndBendTons += tons;
-        } else if (orderType === 'straight-bar') {
-          straightBarTons += tons;
-        }
-
-        if (order.signed_delivery_note) {
-          signedOrders += 1;
-        }
-
-        if (order.status === 'in-progress' || order.status === 'delayed') {
-          steelMixTotals['8mm'] += Number(order.breakdown_8mm) || 0;
-          steelMixTotals['10mm'] += Number(order.breakdown_10mm) || 0;
-          steelMixTotals['12mm'] += Number(order.breakdown_12mm) || 0;
-          steelMixTotals['14mm'] += Number(order.breakdown_14mm) || 0;
-          steelMixTotals['16mm'] += Number(order.breakdown_16mm) || 0;
-          steelMixTotals['18mm'] += Number(order.breakdown_18mm) || 0;
-          steelMixTotals['20mm'] += Number(order.breakdown_20mm) || 0;
-          steelMixTotals['25mm'] += Number(order.breakdown_25mm) || 0;
-          steelMixTotals['32mm'] += Number(order.breakdown_32mm) || 0;
-        }
-      });
-
-      set({
-        dashboardMetrics: {
-          todayOrders: totalOrders,
-          cutAndBendTons,
-          straightBarTons,
-          totalTons,
-          signedOrders,
-          totalOrders,
-          steelMix: steelMixTotals
-        }
-      });
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
-      }
-      console.error('Failed to load dashboard metrics:', error);
-      set({ metricsError: error instanceof Error ? error.message : 'Failed to load dashboard metrics' });
-    } finally {
-      set({ isLoadingMetrics: false });
-    }
-  },
+  // Compatibility entry point: totals and rows always share one request and snapshot.
+  loadDashboardMetrics: (options) => get().loadOrders(options),
 
   updateOrderStatus: async (orderId, status) => {
     try {
@@ -412,12 +359,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         const order = get().orders.find(o => String(o.id) === String(orderId));
         if (order) {
           await historyService.moveOrderToHistory(order);
+          get().invalidateOrders();
           await get().loadOrders();
-          await get().loadHistoryOrders();
         }
       } else {
         const updateData = { status };
         await orderService.update(orderId, updateData);
+        get().invalidateOrders();
         await get().loadOrders();
       }
 
@@ -439,6 +387,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       }
       
       await historyService.moveOrderToHistory(order);
+      get().invalidateOrders();
 
       // Remove from dashboard immediately so delivered orders are never visible in active table.
       set(state => {
@@ -446,6 +395,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         const todayOrders = orders.filter(isCurrentActiveOrder);
         return {
           orders,
+          dashboardMetrics: summarizeOrders(orders, state.stats.delivered).dashboardMetrics,
           stats: {
             ...state.stats,
             todayOrders: todayOrders.length,
@@ -457,7 +407,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       });
 
       // Refresh in background to keep active/history data fully in sync with DB.
-      await Promise.all([get().loadOrders(), get().loadHistoryOrders()]);
+      await get().loadOrders();
 
       await activityService.create({
         type: 'order_completed',
@@ -539,6 +489,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         }));
       } else {
         const createdOrder = await orderService.create(dbOrder);
+        get().invalidateOrders();
         const newOrder = dbToFrontend(createdOrder);
         
         set(state => {
@@ -551,7 +502,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
             delayed: todayOrders.filter(o => o.status === 'delayed').length,
             delivered: state.stats.delivered
           };
-          return { orders, stats, loading: false };
+          return { orders, stats, dashboardMetrics: summarizeOrders(orders, stats.delivered).dashboardMetrics, loading: false };
         });
       }
 
@@ -581,12 +532,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       if (updatedOrder.status === 'delivered') {
         logger.debug('📤 Status changed to delivered, moving to history');
         await historyService.moveOrderToHistory(updatedOrder);
+        get().invalidateOrders();
         await get().loadOrders();
-        await get().loadHistoryOrders();
       } else {
         logger.debug('📝 Updating in active orders');
         const dbOrder = frontendToDb(updatedOrder);
         await orderService.update(updatedOrder.id, dbOrder);
+        get().invalidateOrders();
         await get().loadOrders();
       }
 
@@ -610,6 +562,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   deleteOrder: async (orderId) => {
     try {
       await orderService.delete(orderId);
+      get().invalidateOrders();
       
       set(state => {
         const orders = state.orders.filter(order => order.id !== orderId);
@@ -621,7 +574,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           delayed: todayOrders.filter(o => o.status === 'delayed').length,
           delivered: state.stats.delivered
         };
-        return { orders, stats };
+        return { orders, stats, dashboardMetrics: summarizeOrders(orders, stats.delivered).dashboardMetrics };
       });
 
       await activityService.create({
@@ -635,10 +588,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   getTodayOrders: () => {
-    const historyIds = new Set((get().historyOrders || []).map(order => String(order.id)));
-    return get().orders.filter(
-      (order) => isCurrentActiveOrder(order) && !historyIds.has(String(order.id))
-    );
+    return get().orders.filter(isCurrentActiveOrder);
   },
 
   getDeliveredOrders: () => {
@@ -779,6 +729,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         logger.debug('📤 Store: Moving order back to active orders');
         
         await historyService.moveOrderToActive(order);
+        get().invalidateOrders();
         
         set(state => ({
           historyOrders: state.historyOrders.filter(o => o.id !== order.id),
@@ -832,3 +783,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   }
 }));
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => useDashboardStore.getState().resetSessionData());
+}

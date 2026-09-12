@@ -75,9 +75,10 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
         />
       )}
       <div
+        aria-hidden={isMobile && !mobileOpen ? true : undefined}
         className={`app-sidebar fixed left-0 top-0 z-50 flex h-full flex-col border-r transition-all duration-300 ease-in-out ${
           isMobile
-            ? `w-72 max-w-[calc(100vw-1rem)] rounded-r-xl ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`
+            ? `w-72 max-w-[calc(100vw-1rem)] rounded-r-xl ${mobileOpen ? 'translate-x-0 visible' : '-translate-x-full invisible'}`
             : sidebarCollapsed
             ? 'w-16'
             : 'w-64'
@@ -100,6 +101,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
             variant="ghost"
             size="icon"
             onClick={onMobileClose}
+            aria-label="Close navigation menu"
             className="h-10 w-10 text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text)]"
           >
             <X size={18} />
@@ -118,7 +120,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
       </div>
 
       {/* Navigation */}
-      <nav className="space-y-3 overflow-y-auto px-3 py-3">
+      <nav aria-label="Main navigation" className="space-y-3 overflow-y-auto px-3 py-3">
         {['Workspace', 'Intelligence', 'Admin'].map((group) => {
           const groupItems = menuItems.filter((item) => item.group === group);
           const visibleItems = groupItems.filter((item) => !item.adminOnly || hasPermission(user?.profile?.role, 'delete'));
@@ -200,6 +202,7 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
+              aria-label="Account menu"
               className={cn(
                 'w-full hover:text-[var(--sidebar-text)]',
                 !isMobile && sidebarCollapsed
@@ -246,6 +249,4 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
     </>
   );
 }
-
-
 

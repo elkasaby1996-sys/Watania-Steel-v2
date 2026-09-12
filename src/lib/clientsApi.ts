@@ -1,3 +1,4 @@
+import { cachedRead, invalidateQueries } from './queryCache';
 import { supabase } from '@/lib/supabase';
 
 type RpcError = {
@@ -17,10 +18,17 @@ const isTransientRpcError = (error: RpcError) => {
   return message.includes('timeout') || message.includes('temporarily') || message.includes('network');
 };
 
-async function rpc<T>(fnName: string, args: Record<string, any>, _signal?: AbortSignal): Promise<T> {
-  const { data, error } = await supabase.rpc(fnName as any, args as any);
-  if (error) throw error;
-  return data as T;
+async function rpc<T>(fnName: string, args: Record<string, any>, signal?: AbortSignal): Promise<T> {
+  const read = fnName.startsWith('get_');
+  const run = async (readSignal?: AbortSignal) => {
+    let query = supabase.rpc(fnName as any, args as any);
+    if (readSignal) query = query.abortSignal(readSignal);
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!read) ['clients:', 'history:', 'drivers:', 'analytics:'].forEach(invalidateQueries);
+    return data as T;
+  };
+  return read ? cachedRead('clients:' + fnName + ':' + JSON.stringify(args), run, signal) : run();
 }
 
 async function rpcWithRetry<T>(
@@ -37,6 +45,7 @@ async function rpcWithRetry<T>(
     try {
       return await rpc<T>(fnName, args, signal);
     } catch (error) {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
       const err = error as RpcError;
       if (attempt >= retries || !isTransientRpcError(err)) {
         throw error;
@@ -186,20 +195,14 @@ export async function fetchClientSitesPerformance(clientId: string, signal?: Abo
   return data ?? [];
 }
 
-export async function fetchClientSitesMaster(clientId: string, signal?: AbortSignal) {
-  let query = supabase
-    .from('client_sites')
-    .select('id, client_id, name, contact_name, contact_phone, contact_email, location_text, address, google_maps_url, notes')
-    .eq('client_id', clientId)
-    .order('name');
-
-  if (signal) {
-    query = query.abortSignal(signal);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data ?? [];
+export function fetchClientSitesMaster(clientId: string, signal?: AbortSignal) {
+  return cachedRead('clients:sites:' + clientId, async sharedSignal => {
+    const { data, error } = await supabase.from('client_sites')
+      .select('id, client_id, name, contact_name, contact_phone, contact_email, location_text, address, google_maps_url, notes')
+      .eq('client_id', clientId).order('name').abortSignal(sharedSignal);
+    if (error) throw error;
+    return data ?? [];
+  }, signal);
 }
 
 export async function fetchClientSiteSummary(clientId: string, siteId: string, signal?: AbortSignal) {

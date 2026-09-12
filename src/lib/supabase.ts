@@ -1,3 +1,4 @@
+import { cachedRead, invalidateQueries } from './queryCache';
 import { createClient } from '@supabase/supabase-js'
 import { getEnvVar } from './env'
 import { roundTo3Decimals } from './utils'
@@ -15,10 +16,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create Supabase client with the environment credentials
-export const supabase = createClient(
+const createSupabaseClient = () => createClient(
   supabaseUrl,
   supabaseAnonKey
 );
+export const supabase: ReturnType<typeof createSupabaseClient> = import.meta.hot?.data.supabase ?? createSupabaseClient();
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(data => { data.supabase = supabase; });
+}
 
 // Database types
 export interface Order {
@@ -295,6 +301,31 @@ export const frontendToDb = (order: any): any => {
 
 // Database operations
 export const orderService = {
+  async getActive(signal?: AbortSignal): Promise<Order[]> {
+    const rows: Order[] = [];
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      let query = supabase.from('orders').select('*')
+        .neq('status', 'delivered')
+        .order('created_at', { ascending: false }).order('id')
+        .range(offset, offset + pageSize - 1);
+      if (signal) query = query.abortSignal(signal);
+      const { data, error } = await query;
+      if (error) throw error;
+      rows.push(...(data || []));
+      if ((data || []).length < pageSize) return rows;
+    }
+  },
+
+  async deliveryNumberExists(id: string): Promise<boolean> {
+    const responses = await Promise.all([
+      supabase.from('orders').select('id').eq('id', id).limit(1),
+      supabase.from('history_orders').select('id').eq('id', id).limit(1),
+    ]);
+    for (const response of responses) if (response.error) throw response.error;
+    return responses.some(({ data }) => Boolean(data?.length));
+  },
+
   async getAll(): Promise<Order[]> {
     try {
       logger.debug('Fetching all orders from database...');
@@ -389,17 +420,20 @@ export const orderService = {
 };
 
 export const driverService = {
-  async getAll(): Promise<Driver[]> {
+  getAll(signal?: AbortSignal): Promise<Driver[]> {
+    return cachedRead('drivers:list', sharedSignal => this.getAllRaw(sharedSignal), signal);
+  },
+  async getAllRaw(signal?: AbortSignal): Promise<Driver[]> {
     try {
       const { data, error } = await supabase
         .from('drivers')
         .select('*')
-        .order('name', { ascending: true });
+        .order('name', { ascending: true }).abortSignal(signal);
       
       if (error) {
         if (error.code === 'PGRST116' || error.message?.includes('relation "drivers" does not exist')) {
           console.warn('Drivers table does not exist yet.');
-          return [];
+          throw new Error('Failed to load drivers');
         }
         throw error;
       }
@@ -407,7 +441,7 @@ export const driverService = {
       return data || [];
     } catch (error) {
       console.error('Failed to fetch drivers:', error);
-      return [];
+      throw new Error('Failed to load drivers');
     }
   },
 
@@ -466,13 +500,16 @@ export const driverService = {
     }
   },
 
-  async getById(id: string): Promise<Driver | null> {
+  getById(id: string, signal?: AbortSignal): Promise<Driver | null> {
+    return cachedRead('drivers:detail:' + id, sharedSignal => this.getByIdRaw(id, sharedSignal), signal);
+  },
+  async getByIdRaw(id: string, signal?: AbortSignal): Promise<Driver | null> {
     try {
       const { data, error } = await supabase
         .from('drivers')
         .select('*')
         .eq('id', id)
-        .single();
+        .abortSignal(signal).single();
       
       if (error) {
         if (error.code === 'PGRST116') {
@@ -483,83 +520,60 @@ export const driverService = {
       
       return data;
     } catch (error) {
-      console.error('Failed to get driver by ID:', error);
-      return null;
+      throw error;
     }
   },
 
-  async getDriverOrders(driverName: string, startDate?: string, endDate?: string): Promise<Order[]> {
-    try {
-      let activeQuery = supabase
-        .from('orders')
-        .select('*')
-        .eq('driver_name', driverName)
-        .order('date', { ascending: false });
-      
-      if (startDate) {
-        activeQuery = activeQuery.gte('date', startDate);
-      }
-      
-      if (endDate) {
-        activeQuery = activeQuery.lte('date', endDate);
-      }
-      
-      const { data: activeOrders } = await activeQuery;
-      
-      let historyQuery = supabase
-        .from('history_orders')
-        .select('*')
-        .eq('driver_name', driverName)
-        .order('date', { ascending: false });
-      
-      if (startDate) {
-        historyQuery = historyQuery.gte('date', startDate);
-      }
-      
-      if (endDate) {
-        historyQuery = historyQuery.lte('date', endDate);
-      }
-      
-      const { data: historyOrders } = await historyQuery;
-      
-      const allOrders = [
-        ...(activeOrders || []),
-        ...(historyOrders || [])
-      ];
-      
-      allOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      return allOrders || [];
-    } catch (error) {
-      console.error('Failed to fetch driver orders:', error);
-      return [];
-    }
+  getDriverOrdersPage(driverName: string, page = 1, pageSize = 50, signal?: AbortSignal): Promise<{ data: Order[]; totalCount: number }> {
+    const safePage = Math.max(1, page);
+    const limit = safePage * pageSize;
+    return cachedRead('drivers:orders:' + JSON.stringify([driverName, safePage, pageSize]), async sharedSignal => {
+      const tables = await Promise.all(['orders', 'history_orders'].map(async table => {
+        const rows: Order[] = [];
+        let totalCount = 0;
+        for (let offset = 0; offset < limit; offset += 1000) {
+          const { data, error, count } = await supabase.from(table)
+            .select('id,customer_name,date,status,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at',
+              offset === 0 ? { count: 'exact' } : {})
+            .eq('driver_name', driverName).order('date', { ascending: false }).order('id', { ascending: true })
+            .range(offset, Math.min(offset + 999, limit - 1)).abortSignal(sharedSignal);
+          if (error) throw new Error(error.message);
+          if (offset === 0) totalCount = count ?? 0;
+          rows.push(...(data ?? []));
+          if ((data?.length ?? 0) < Math.min(1000, limit - offset)) break;
+        }
+        return { rows, totalCount };
+      }));
+      const rows = tables.flatMap(table => table.rows).sort((a, b) =>
+        String(b.date).localeCompare(String(a.date)) || String(a.id).localeCompare(String(b.id)));
+      return { data: rows.slice((safePage - 1) * pageSize, limit), totalCount: tables.reduce((sum, table) => sum + table.totalCount, 0) };
+    }, signal);
   },
 
-  async getDriverMetricsForDateRange(driverName: string, startDate: string, endDate: string): Promise<any> {
-    try {
-      const orders = await this.getDriverOrders(driverName, startDate, endDate);
-      
-      const totalOrders = orders.length;
-      const completedOrders = orders.filter(o => o.status === 'delivered').length;
-      const pendingOrders = orders.filter(o => o.status === 'in-progress').length;
-      const totalTons = orders.reduce((sum, o) => sum + (Number(o.tons) || 0), 0);
-      
-      return {
-        total_orders: totalOrders,
-        completed_orders: completedOrders,
-        pending_orders: pendingOrders,
-        total_tons: roundTo3Decimals(totalTons)
-      };
-    } catch (error) {
-      console.error('Failed to get driver metrics for date range:', error);
-      return {
-        total_orders: 0,
-        completed_orders: 0,
-        pending_orders: 0,
-        total_tons: 0
-      };
-    }
+  getDriverOrders(driverName: string, startDate?: string, endDate?: string, signal?: AbortSignal): Promise<Order[]> {
+    return cachedRead('drivers:range:' + JSON.stringify([driverName, startDate, endDate]), async sharedSignal => {
+      const tables = await Promise.all(['orders', 'history_orders'].map(async table => {
+        const rows: Order[] = [];
+        for (let offset = 0; ; offset += 1000) {
+          let query = supabase.from(table).select('*').eq('driver_name', driverName)
+            .order('date', { ascending: false }).order('id', { ascending: true }).range(offset, offset + 999);
+          if (startDate) query = query.gte('date', startDate);
+          if (endDate) query = query.lte('date', endDate);
+          const { data, error } = await query.abortSignal(sharedSignal);
+          if (error) throw new Error(error.message);
+          rows.push(...(data ?? []));
+          if ((data?.length ?? 0) < 1000) return rows;
+        }
+      }));
+      return tables.flat().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    }, signal);
+  },
+
+  async getDriverMetricsForDateRange(driverName: string, startDate: string, endDate: string, signal?: AbortSignal): Promise<any> {
+    const orders = await this.getDriverOrders(driverName, startDate, endDate, signal);
+    return { total_orders: orders.length, completed_orders: orders.filter(o => o.status === 'delivered').length,
+      pending_orders: orders.filter(o => o.status === 'in-progress').length,
+      total_tons: roundTo3Decimals(orders.reduce((sum, o) => sum + (Number(o.tons) || 0), 0)) };
   },
 
   async delete(id: string): Promise<void> {
@@ -578,96 +592,40 @@ export const driverService = {
     }
   },
 
-  async getMetrics(): Promise<DriverMetrics[]> {
-    try {
-      const now = new Date();
-      const currentDay = now.getDate();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-      
-      let cycleStart: Date;
-      let cycleEnd: Date;
-      
-      if (currentDay >= 25) {
-        cycleStart = new Date(currentYear, currentMonth, 25);
-        cycleEnd = new Date(currentYear, currentMonth + 1, 25, 23, 59, 59);
-      } else {
-        cycleStart = new Date(currentYear, currentMonth - 1, 25);
-        cycleEnd = new Date(currentYear, currentMonth, 25, 23, 59, 59);
-      }
-      
-      const cycleStartStr = cycleStart.toISOString().split('T')[0];
-      const cycleEndStr = cycleEnd.toISOString().split('T')[0];
-      
-      let drivers: Driver[] = [];
-      try {
-        drivers = await this.getAll();
-      } catch (error) {
-        console.warn('Drivers table may not exist yet, returning empty metrics');
-        return [];
-      }
-      
-      const metricsPromises = drivers.map(async (driver) => {
-        try {
-          let { data: activeOrders } = await supabase
-            .from('orders')
-            .select('*')
-            .eq('driver_name', driver.name)
-            .gte('date', cycleStartStr)
-            .lte('date', cycleEndStr);
-          
-          let { data: historyOrders } = await supabase
-            .from('history_orders')
-            .select('*')
-            .eq('driver_name', driver.name)
-            .gte('date', cycleStartStr)
-            .lte('date', cycleEndStr);
-          
-          const allDriverOrders = [
-            ...(activeOrders || []),
-            ...(historyOrders || [])
-          ];
-          
-          const totalOrders = allDriverOrders.length || 0;
-          const completedOrders = allDriverOrders.filter(o => o.status === 'delivered').length || 0;
-          const pendingOrders = allDriverOrders.filter(o => o.status !== 'delivered').length || 0;
-          const totalTons = allDriverOrders.reduce((sum, o) => sum + (Number(o.tons) || 0), 0) || 0;
-          
-          return {
-            driver_id: driver.id,
-            driver_name: driver.name,
-            phone_number: driver.phone_number,
-            is_active: driver.is_active,
-            total_orders: totalOrders,
-            completed_orders: completedOrders,
-            pending_orders: pendingOrders,
-            total_tons: roundTo3Decimals(totalTons),
-            cycle_start: cycleStartStr,
-            cycle_end: cycleEndStr
-          };
-        } catch (error) {
-          console.error('Error processing driver metrics:', driver.name, error);
-          return {
-            driver_id: driver.id,
-            driver_name: driver.name,
-            phone_number: driver.phone_number,
-            is_active: driver.is_active,
-            total_orders: 0,
-            completed_orders: 0,
-            pending_orders: 0,
-            total_tons: 0,
-            cycle_start: cycleStartStr,
-            cycle_end: cycleEndStr
-          };
+  async getMetrics(drivers?: Driver[], signal?: AbortSignal): Promise<DriverMetrics[]> {
+    const now = new Date();
+    const month = now.getMonth() - (now.getDate() < 25 ? 1 : 0);
+    const cycleStartStr = new Date(now.getFullYear(), month, 25).toISOString().split('T')[0];
+    const cycleEndStr = new Date(now.getFullYear(), month + 1, 25, 23, 59, 59).toISOString().split('T')[0];
+    const list = drivers ?? await this.getAll();
+    if (!list.length) return [];
+    return cachedRead('drivers:metrics:' + cycleStartStr + ':' + JSON.stringify(list), async sharedSignal => {
+      const pages = await Promise.all(['orders', 'history_orders'].map(async table => {
+        const rows: { driver_name: string; status: string; tons: number }[] = [];
+        for (let offset = 0; ; offset += 1000) {
+          const { data, error } = await supabase.from(table).select('id,driver_name,status,tons')
+            .gte('date', cycleStartStr).lte('date', cycleEndStr)
+            .order('id', { ascending: true }).range(offset, offset + 999).abortSignal(sharedSignal);
+          if (error) throw new Error(error.message);
+          rows.push(...(data ?? []));
+          if ((data?.length ?? 0) < 1000) return rows;
         }
+      }));
+      const grouped = new Map<string, { total: number; completed: number; tons: number }>();
+      for (const row of pages.flat()) {
+        const metrics = grouped.get(row.driver_name) ?? { total: 0, completed: 0, tons: 0 };
+        metrics.total++; metrics.completed += Number(row.status === 'delivered');
+        metrics.tons += Number(row.tons) || 0;
+        grouped.set(row.driver_name, metrics);
+      }
+      return list.map(driver => {
+        const metrics = grouped.get(driver.name) ?? { total: 0, completed: 0, tons: 0 };
+        return { driver_id: driver.id, driver_name: driver.name, phone_number: driver.phone_number,
+          is_active: driver.is_active, total_orders: metrics.total, completed_orders: metrics.completed,
+          pending_orders: metrics.total - metrics.completed, total_tons: roundTo3Decimals(metrics.tons),
+          cycle_start: cycleStartStr, cycle_end: cycleEndStr };
       });
-      
-      const metrics = await Promise.all(metricsPromises);
-      return metrics;
-    } catch (error) {
-      console.error('❌ Failed to fetch driver metrics:', error);
-      return [];
-    }
+    }, signal);
   }
 };
 
@@ -675,18 +633,20 @@ const HISTORY_ORDER_LIST_COLUMNS =
   'id,customer_name,date,status,tons,shift,delivery_number,company,site,driver_name,phone_number,delivered_at,signed_delivery_note,order_type,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm';
 
 export const historyService = {
-  async getDeliveredOrderIds(orderIds: string[]): Promise<Set<string>> {
+  async getDeliveredOrderIds(orderIds: string[], signal?: AbortSignal): Promise<Set<string>> {
     const uniqueIds = Array.from(new Set(orderIds.map(id => String(id)).filter(Boolean)));
     const deliveredIds = new Set<string>();
     const chunkSize = 100;
 
     for (let index = 0; index < uniqueIds.length; index += chunkSize) {
       const chunk = uniqueIds.slice(index, index + chunkSize);
-      const { data, error } = await supabase
+      let query = supabase
         .from('history_orders')
         .select('id')
         .eq('status', 'delivered')
         .in('id', chunk);
+      if (signal) query = query.abortSignal(signal);
+      const { data, error } = await query;
 
       if (error) {
         if (error.code === 'PGRST116' || error.message?.includes('relation "history_orders" does not exist')) {
@@ -728,7 +688,18 @@ export const historyService = {
     }
   },
 
-  async getPaginated(options: {
+  getPaginated(options: {
+    page: number; pageSize: number; filters?: HistoryOrderFilters; signal?: AbortSignal; force?: boolean;
+  }): Promise<HistoryOrderPage> {
+    const { signal, force, ...params } = options;
+    return cachedRead('history:' + JSON.stringify(params), async sharedSignal => {
+      const result = await this.getPaginatedRaw({ ...params, signal: sharedSignal });
+      if (result.aborted) throw new DOMException('Aborted', 'AbortError');
+      return result;
+    }, signal, { force });
+  },
+
+  async getPaginatedRaw(options: {
     page: number;
     pageSize: number;
     filters?: HistoryOrderFilters;
@@ -802,7 +773,7 @@ export const historyService = {
         supabase
           .from('history_orders')
           .select(HISTORY_ORDER_LIST_COLUMNS, { count: 'exact' })
-          .order('delivered_at', { ascending: false })
+          .order('delivered_at', { ascending: false }).order('id', { ascending: true })
           .range(from, to)
       );
 
@@ -820,8 +791,7 @@ export const historyService = {
           console.warn('History orders table does not exist yet.');
           return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
         }
-        console.error('Database error fetching history orders:', error);
-        return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
+        throw new Error(error.message);
       }
 
       const totalCount = count || 0;
@@ -843,8 +813,7 @@ export const historyService = {
       if (isAbortError(error)) {
         return { data: [], count: 0, aborted: true };
       }
-      console.error('Failed to fetch paginated history orders:', error);
-      return { data: [], count: 0, totalPages: 1, pageStart: 0, pageEnd: 0 };
+      throw error;
     }
   },
 
@@ -1075,22 +1044,12 @@ export const historyService = {
 // Inventory service for managing steel inventory tables
 export const inventoryService = {
   // Fetch all data from a specific inventory table
-  async getTableData(tableName: string): Promise<Record<string, any>[]> {
-    try {
-      const { data, error } = await supabase
-        .from(tableName)
-        .select('*');
-
-      if (error) {
-        console.error(`Error fetching ${tableName}:`, error);
-        throw error;
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error(`Failed to fetch ${tableName}:`, error);
-      return [];
-    }
+  getTableData(tableName: string, signal?: AbortSignal): Promise<Record<string, any>[]> {
+    return cachedRead('inventory:' + tableName, async sharedSignal => {
+      const { data, error } = await supabase.from(tableName).select('*').abortSignal(sharedSignal);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    }, signal);
   },
 
   // Fetch all inventory data from all 6 tables
@@ -1210,77 +1169,27 @@ export interface DiameterTotal {
 
 // Offcut Usage service for tracking offcut steel usage
 export const offcutUsageService = {
-  // Get entries by a specific date
-  async getByDate(date: string): Promise<OffcutUsageEntry[]> {
-    try {
-      const { data, error } = await supabase
-        .from('offcut_usage')
-        .select('*')
-        .eq('date', date)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching offcut usage by date:', error);
-        throw error;
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Failed to fetch offcut usage by date:', error);
-      return [];
-    }
+  getByDate(date: string, signal?: AbortSignal): Promise<OffcutUsageEntry[]> {
+    return this.getByDateRange(date, date, signal);
   },
-
-  // Get entries for a specific month/year
-  async getByMonth(year: number, month: number): Promise<OffcutUsageEntry[]> {
-    try {
-      // Create date range for the month
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      const lastDay = new Date(year, month, 0).getDate();
-      const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
-
-      const { data, error } = await supabase
-        .from('offcut_usage')
-        .select('*')
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching offcut usage by month:', error);
-        throw error;
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Failed to fetch offcut usage by month:', error);
-      return [];
-    }
+  getByMonth(year: number, month: number, signal?: AbortSignal): Promise<OffcutUsageEntry[]> {
+    const start = String(year) + '-' + String(month).padStart(2, '0') + '-01';
+    const end = String(year) + '-' + String(month).padStart(2, '0') + '-' + String(new Date(year, month, 0).getDate());
+    return this.getByDateRange(start, end, signal);
   },
-
-  // Get entries within a date range (inclusive)
-  async getByDateRange(startDate: string, endDate: string): Promise<OffcutUsageEntry[]> {
-    try {
-      const { data, error } = await supabase
-        .from('offcut_usage')
-        .select('*')
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching offcut usage by date range:', error);
-        throw error;
+  getByDateRange(startDate: string, endDate: string, signal?: AbortSignal): Promise<OffcutUsageEntry[]> {
+    return cachedRead('offcut:' + startDate + ':' + endDate, async sharedSignal => {
+      const rows: OffcutUsageEntry[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase.from('offcut_usage').select('*')
+          .gte('date', startDate).lte('date', endDate)
+          .order('date', { ascending: false }).order('created_at', { ascending: false }).order('id', { ascending: true })
+          .range(offset, offset + 999).abortSignal(sharedSignal);
+        if (error) throw new Error(error.message);
+        rows.push(...(data ?? []));
+        if ((data?.length ?? 0) < 1000) return rows;
       }
-
-      return data || [];
-    } catch (error) {
-      console.error('Failed to fetch offcut usage by date range:', error);
-      return [];
-    }
+    }, signal);
   },
 
   // Create a new offcut usage entry
@@ -1494,3 +1403,21 @@ export const activityService = {
     }
   }
 };
+
+// Invalidate dependent reads only after a write succeeds. Each changed inventory
+// row invalidates independently so partial batch success cannot leave stale data.
+function invalidateAfterWrites<T extends object>(service: T, methods: (keyof T)[], prefixes: string[]) {
+  for (const method of methods) {
+    const original = service[method] as (...args: any[]) => Promise<any>;
+    service[method] = (async function(this: T, ...args: any[]) {
+      const result = await original.apply(this, args);
+      prefixes.forEach(prefix => invalidateQueries(prefix));
+      return result;
+    }) as T[keyof T];
+  }
+}
+invalidateAfterWrites(orderService, ['create', 'update', 'delete'], ['history:', 'drivers:', 'clients:', 'analytics:']);
+invalidateAfterWrites(historyService, ['update', 'moveOrderToHistory', 'moveOrderToActive'], ['history:', 'drivers:', 'clients:', 'analytics:']);
+invalidateAfterWrites(driverService, ['create', 'update', 'delete'], ['drivers:']);
+invalidateAfterWrites(inventoryService, ['updateRow'], ['inventory:']);
+invalidateAfterWrites(offcutUsageService, ['create', 'update', 'delete', 'createBulk'], ['offcut:']);

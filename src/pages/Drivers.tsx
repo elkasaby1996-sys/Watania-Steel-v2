@@ -25,11 +25,8 @@ export function Drivers() {
   const error = driversStore?.error || null;
 
   useEffect(() => {
-    if (loadDrivers && loadMetrics) {
-      loadDrivers();
-      loadMetrics();
-    }
-  }, [loadDrivers, loadMetrics]);
+    loadMetrics();
+  }, [loadMetrics]);
 
 
   // Show database setup alert if drivers table doesn't exist OR is_active column is missing

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
 import { getRoleDisplayName } from '../lib/auth';
+import { useLocation } from 'react-router-dom';
 
 interface TopBarProps {
   isMobile?: boolean;
@@ -14,6 +15,9 @@ interface TopBarProps {
 export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
   const { sidebarCollapsed } = useDashboardStore();
   const { user } = useAuthStore();
+  const { pathname } = useLocation();
+  const section = pathname.split('/').filter(Boolean)[0] || 'dashboard';
+  const pageLabel = section.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     document.documentElement.classList.contains('light') ? 'light' : 'dark'
   );
@@ -61,15 +65,13 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
               <Menu size={18} />
             </Button>
           )}
-          <h1 className={`min-w-0 truncate font-headline font-bold text-foreground ${isMobile ? 'text-base' : 'text-xl'}`}>
-            {isMobile ? 'Watania ERP' : 'Factory workspace'}
-          </h1>
+          <div className="workspace-breadcrumb"><span>{isMobile ? 'Watania' : 'Factory workspace'}</span><span aria-hidden="true">/</span><strong>{pageLabel}</strong></div>
         </div>
 
         <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-4'}`}>
           <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}>
             {!isMobile && user?.profile?.role && (
-              <Badge variant={getRoleBadgeVariant(user.profile.role) as any}>
+              <Badge className="workspace-role" variant={getRoleBadgeVariant(user.profile.role) as any}>
                 <Shield size={12} className="mr-1" />
                 {getRoleDisplayName(user.profile.role)}
               </Badge>
@@ -100,4 +102,3 @@ export function TopBar({ isMobile = false, onMenuClick }: TopBarProps) {
     </header>
   );
 }
-

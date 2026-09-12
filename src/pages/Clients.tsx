@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Search, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,27 +24,29 @@ export function Clients() {
   const { isAdmin } = useIsAdmin();
   const { isMobile } = useDeviceInfo();
 
+  const requestIdRef = useRef(0);
   const fetchClients = useCallback(async (searchText?: string, signal?: AbortSignal) => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const data = await fetchClientsSummary(searchText, signal);
+      if (signal?.aborted || requestId !== requestIdRef.current) return;
       setClients(data);
       setLastUpdated(new Date());
     } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
+      if (signal?.aborted || requestId !== requestIdRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
         return;
       }
       const message = err instanceof Error ? err.message : 'Failed to load clients';
       setError(message);
-      setClients([]);
       toast({
         title: 'Failed to load clients',
         description: message,
         variant: 'destructive'
       });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted && requestId === requestIdRef.current) setLoading(false);
     }
   }, [toast]);
 

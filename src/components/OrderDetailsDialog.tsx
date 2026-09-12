@@ -93,10 +93,7 @@ export function OrderDetailsDialog({
       return;
     }
 
-    const dashboardState = useDashboardStore.getState();
-    if (dashboardState.loadHistoryOrders) {
-      await dashboardState.loadHistoryOrders();
-    }
+    // History pages refresh their current page; service writes invalidate cached pages.
   };
 
   const { user } = useAuthStore();

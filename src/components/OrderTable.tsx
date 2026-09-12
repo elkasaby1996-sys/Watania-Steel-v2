@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Edit, Truck, Trash2, Eye, CheckCircle, XCircle } from 'lucide-react';
+import { Edit, Truck, Trash2, Eye, CheckCircle, XCircle, ArrowUpRight, PackageOpen } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '@/routes/routes';
 import { useDashboardStore } from '@/stores/dashboardStore';
 import { OrderDetailsDialog } from './OrderDetailsDialog';
 import { RoleBasedComponent } from './RoleBasedComponent';
@@ -16,30 +18,48 @@ import { logger } from '@/lib/logger';
 import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 
 export function OrderTable() {
-  const { getFilteredTodayOrders, deleteOrder, isLoadingOrders, ordersError, loadOrders } = useDashboardStore();
+  const { getTodayOrders, deleteOrder, isLoadingOrders, ordersError, loadOrders } = useDashboardStore();
   const { user } = useAuthStore();
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const { isMobile } = useDeviceInfo();
 
-  const todayOrders = getFilteredTodayOrders();
+  const [statusFilter, setStatusFilter] = useState('all');
+  const activeOrders = getTodayOrders();
+  const todayOrders = activeOrders.filter((order) =>
+    statusFilter === 'all' || order.status === statusFilter
+  );
+  const filters = [
+    { value: 'all', label: 'All deliveries' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'in-progress', label: 'In progress' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'delayed', label: 'Delayed' },
+  ];
+  const hasFilters = statusFilter !== 'all';
+  const emptyState = <div className="queue-empty">
+    <PackageOpen size={30} strokeWidth={1.3} />
+    <strong>{hasFilters ? 'No matching deliveries' : 'Your delivery queue is clear'}</strong>
+    <p>{hasFilters ? 'Try a different status.' : 'New active orders will appear here, ready to coordinate.'}</p>
+    {hasFilters && <Button variant="outline" size="sm" onClick={() => setStatusFilter('all')}>Clear filters</Button>}
+  </div>;
   const userRole = user?.profile?.role;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-success text-success-foreground">Completed</Badge>;
+        return <Badge className="queue-status queue-status-success">Completed</Badge>;
       case 'in-progress':
-        return <Badge className="bg-tertiary text-tertiary-foreground">In Progress</Badge>;
+        return <Badge className="queue-status queue-status-progress">In progress</Badge>;
       case 'delayed':
-        return <Badge className="bg-warning text-warning-foreground">Delayed</Badge>;
+        return <Badge className="queue-status queue-status-delayed">Delayed</Badge>;
       case 'pending':
-        return <Badge className="bg-gray-400 text-white">Pending</Badge>;
+        return <Badge className="queue-status">Pending</Badge>;
       case 'delivered':
-        return <Badge className="bg-green-600 text-white">Delivered</Badge>;
+        return <Badge className="queue-status queue-status-success">Delivered</Badge>;
       default:
-        return <Badge className="bg-gray-400 text-white">{status}</Badge>;
+        return <Badge className="queue-status">{status}</Badge>;
     }
   };
 
@@ -107,13 +127,18 @@ export function OrderTable() {
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="delivery-queue overflow-hidden" id="delivery-queue">
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-foreground">Active deliveries</h3>
-          <p className="text-sm text-muted-foreground">
-            {isLoadingOrders ? 'Loading...' : `${todayOrders.length} active orders`}
-          </p>
+        <div className="queue-heading">
+          <div><p className="eyebrow">Dispatch board</p><h2>Active deliveries</h2></div>
+          <Link className="queue-history" to={ROUTES.history}>Order history <ArrowUpRight size={15} /></Link>
+        </div>
+        <div className="queue-toolbar">
+          <div className="queue-filters" role="group" aria-label="Filter deliveries by status">
+            {filters.map((filter) => <button type="button" key={filter.value} aria-pressed={statusFilter === filter.value} onClick={() => setStatusFilter(filter.value)}>
+              {filter.label}<span>{isLoadingOrders || ordersError ? '—' : activeOrders.filter((order) => filter.value === 'all' || order.status === filter.value).length}</span>
+            </button>)}
+          </div>
         </div>
 
         {ordersError ? (
@@ -249,9 +274,7 @@ export function OrderTable() {
                   </div>
                 ))
               ) : (
-                <div className="text-center text-muted-foreground py-8">
-                  No active deliveries. New orders will appear here.
-                </div>
+                emptyState
               )}
             </div>
           ) : (
@@ -259,14 +282,11 @@ export function OrderTable() {
             <Table>
               <TableHeader>
                 <TableRow className="border-border">
-                  <TableHead className="text-foreground">Delivery Number</TableHead>
-                  <TableHead className="text-foreground">Delivery Name</TableHead>
-                  <TableHead className="text-foreground">Company</TableHead>
-                  <TableHead className="text-foreground">Site</TableHead>
-                  <TableHead className="text-foreground">Date</TableHead>
+                  <TableHead className="text-foreground">Delivery</TableHead>
+                  <TableHead className="text-foreground">Destination</TableHead>
+                  <TableHead className="text-foreground">Schedule</TableHead>
                   <TableHead className="text-foreground">Status</TableHead>
-                  <TableHead className="text-foreground">Tons</TableHead>
-                  <TableHead className="text-foreground">Shift</TableHead>
+                  <TableHead className="text-foreground">Weight</TableHead>
                   <TableHead className="text-foreground">Delivery Note</TableHead>
                   <TableHead className="text-foreground">Contact</TableHead>
                   <TableHead className="text-foreground">Actions</TableHead>
@@ -276,7 +296,7 @@ export function OrderTable() {
                 {isLoadingOrders ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={`skeleton-${index}`} className="border-border">
-                      {Array.from({ length: 11 }).map((_, cellIndex) => (
+                      {Array.from({ length: 8 }).map((_, cellIndex) => (
                         <TableCell key={cellIndex}>
                           <div className="h-4 w-full animate-pulse rounded bg-muted" />
                         </TableCell>
@@ -286,18 +306,11 @@ export function OrderTable() {
                 ) : todayOrders.length > 0 ? (
                   todayOrders.map((order) => (
                     <TableRow key={order.id} className="border-border hover:bg-muted/50">
-                    <TableCell className="font-mono text-foreground">{order.id}</TableCell>
-                    <TableCell className="text-foreground">{order.customerName}</TableCell>
-                    <TableCell className="text-foreground">{order.company || 'N/A'}</TableCell>
-                    <TableCell className="text-foreground">{order.site || 'N/A'}</TableCell>
-                    <TableCell className="text-foreground">{order.date}</TableCell>
+                    <TableCell><strong className="queue-primary-text queue-order-name" title={order.customerName}>{order.customerName}</strong><span className="queue-secondary-text font-mono">{order.id}</span></TableCell>
+                    <TableCell><span className="queue-primary-text">{order.company || 'N/A'}</span><span className="queue-secondary-text">{order.site || 'No site specified'}</span></TableCell>
+                    <TableCell><span className="queue-primary-text">{order.date}</span><span className="queue-secondary-text">{order.shift === 'morning' ? 'Morning shift' : 'Night shift'}</span></TableCell>
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell className="text-foreground">{order.tons} tons</TableCell>
-                    <TableCell>
-                      <Badge className={order.shift === 'morning' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
-                        {order.shift === 'morning' ? 'Morning' : 'Night'}
-                      </Badge>
-                    </TableCell>
+                    <TableCell className="queue-weight">{order.tons}<span> t</span></TableCell>
                     <TableCell>
                       <RoleBasedComponent action="edit" fallback={
                         order.signedDeliveryNote ? (
@@ -353,7 +366,7 @@ export function OrderTable() {
                             className="text-sm text-primary hover:text-primary/80 underline cursor-pointer"
                             title="Click to call"
                           >
-                            📞 {order.phoneNumber}
+                            {order.phoneNumber}
                           </a>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
@@ -447,8 +460,8 @@ export function OrderTable() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
-                    No active deliveries. New orders will appear here.
+                  <TableCell colSpan={8}>
+                    {emptyState}
                   </TableCell>
                 </TableRow>
               )}
@@ -456,6 +469,7 @@ export function OrderTable() {
           </Table>
         </div>
         ))}
+        {!ordersError && !isLoadingOrders && activeOrders.length > 0 && <div className="queue-footer" role="status"><span>Showing {todayOrders.length} of {activeOrders.length} active deliveries</span><span>Weight in metric tons</span></div>}
       </div>
       
       <OrderDetailsDialog 
@@ -466,4 +480,3 @@ export function OrderTable() {
     </Card>
   );
 }
-

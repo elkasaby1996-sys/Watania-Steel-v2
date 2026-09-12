@@ -34,6 +34,7 @@ import {
   type FilterMode,
 } from '@/lib/steelAnalytics';
 import { ROUTES } from '@/routes/routes';
+import { useAuthStore } from '@/stores/authStore';
 
 const RANGE_OPTIONS = [30, 60, 90, 180, 365] as const;
 
@@ -76,6 +77,7 @@ const subtractDays = (dateString: string, days: number) => {
 };
 
 export function SteelAnalytics() {
+  const userId = useAuthStore(state => state.user?.id);
   const navigate = useNavigate();
   const [selectedRangeDays, setSelectedRangeDays] = useState<(typeof RANGE_OPTIONS)[number]>(30);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
@@ -130,7 +132,7 @@ export function SteelAnalytics() {
       } catch (err) {
         if (!isMounted) return;
 
-        if (err instanceof DOMException && err.name === 'AbortError') {
+        if (controller.signal.aborted) {
           return;
         }
 
@@ -145,7 +147,7 @@ export function SteelAnalytics() {
       isMounted = false;
       controller.abort();
     };
-  }, [selectedRangeDays, filterMode, reloadToken]);
+  }, [selectedRangeDays, filterMode, reloadToken, userId]);
 
   const lineChartData = useMemo(() => (
     (analytics?.timeSeries ?? []).map((entry) => ({

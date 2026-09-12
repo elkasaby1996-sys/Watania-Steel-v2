@@ -43,6 +43,11 @@ export function DriverDetail() {
   
   const [driver, setDriver] = useState<Driver | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const pageSize = 50;
   const [cycleMetrics, setCycleMetrics] = useState({
     total_orders: 0,
     completed_orders: 0,
@@ -93,63 +98,48 @@ export function DriverDetail() {
   }
 
   useEffect(() => {
-    if (driverId) {
-      loadDriverData();
-    }
-  }, [driverId]);
+    if (!driverId) return;
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setLoading(true); setLoadError(null);
+    driverService.getById(driverId, signal).then(value => {
+      if (signal.aborted) return;
+      if (!value) { navigate(ROUTES.drivers); return; }
+      setDriver(value);
+    }).catch(error => { if (!signal.aborted) setLoadError(error.message || 'Failed to load driver'); })
+      .finally(() => { if (!signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [driverId, navigate]);
 
   useEffect(() => {
-    if (driver && startDate && endDate) {
-      loadCustomRangeMetrics();
-    }
-  }, [driver, startDate, endDate]);
+    if (!driver) return;
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setOrdersLoading(true);
+    driverService.getDriverOrdersPage(driver.name, ordersPage, pageSize, signal).then(result => {
+      if (!signal.aborted) { setOrders(result.data); setOrdersTotal(result.totalCount); }
+    }).catch(error => { if (!signal.aborted) setLoadError(error.message || 'Failed to load driver orders'); })
+      .finally(() => { if (!signal.aborted) setOrdersLoading(false); });
+    return () => controller.abort();
+  }, [driver, ordersPage]);
 
-  const loadDriverData = async () => {
-    if (!driverId) return;
-    
-    setLoading(true);
-    try {
-      // Load driver details
-      const driverData = await driverService.getById(driverId);
-      if (!driverData) {
-        navigate(ROUTES.drivers);
-        return;
-      }
-      setDriver(driverData);
+  useEffect(() => {
+    if (!driver) return;
+    const controller = new AbortController();
+    driverService.getDriverMetricsForDateRange(driver.name, currentCycleStart, currentCycleEnd, controller.signal)
+      .then(value => { if (!controller.signal.aborted) setCycleMetrics(value); })
+      .catch(error => { if (!controller.signal.aborted) setLoadError(error.message || 'Failed to load cycle metrics'); });
+    return () => controller.abort();
+  }, [driver, currentCycleStart, currentCycleEnd]);
 
-      // Load all orders for this driver
-      const allOrders = await driverService.getDriverOrders(driverData.name);
-      setOrders(allOrders);
-
-      // Load current cycle metrics
-      const metrics = await driverService.getDriverMetricsForDateRange(
-        driverData.name,
-        currentCycleStart,
-        currentCycleEnd
-      );
-      setCycleMetrics(metrics);
-
-    } catch (error) {
-      console.error('Failed to load driver data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCustomRangeMetrics = async () => {
-    if (!driver || !startDate || !endDate) return;
-
-    try {
-      const metrics = await driverService.getDriverMetricsForDateRange(
-        driver.name,
-        startDate,
-        endDate
-      );
-      setCustomMetrics(metrics);
-    } catch (error) {
-      console.error('Failed to load custom range metrics:', error);
-    }
-  };
+  useEffect(() => {
+    if (!driver || !startDate || !endDate || !showCustomRange) return;
+    const controller = new AbortController();
+    driverService.getDriverMetricsForDateRange(driver.name, startDate, endDate, controller.signal)
+      .then(value => { if (!controller.signal.aborted) setCustomMetrics(value); })
+      .catch(error => { if (!controller.signal.aborted) setLoadError(error.message || 'Failed to load range metrics'); });
+    return () => controller.abort();
+  }, [driver, startDate, endDate, showCustomRange]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -376,6 +366,7 @@ export function DriverDetail() {
         )}
       </Card>
 
+      {loadError && <p role="alert" className="text-destructive">{loadError}</p>}
       {/* Order History */}
       <Card>
         <CardHeader>
@@ -384,10 +375,15 @@ export function DriverDetail() {
             Order History
           </CardTitle>
           <CardDescription>
-            Complete order history for {driver.name} ({orders.length} orders total)
+            Order history for {driver.name} ({ordersTotal} orders total)
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <Button variant="outline" disabled={ordersPage === 1 || ordersLoading} onClick={() => setOrdersPage(page => page - 1)}>Previous</Button>
+            <span role="status" className="text-sm text-muted-foreground">{ordersLoading ? 'Loading orders…' : 'Page ' + ordersPage + ' of ' + Math.max(1, Math.ceil(ordersTotal / pageSize))}</span>
+            <Button variant="outline" disabled={ordersPage * pageSize >= ordersTotal || ordersLoading} onClick={() => setOrdersPage(page => page + 1)}>Next</Button>
+          </div>
           {isMobile ? (
             <div className="space-y-3">
               {orders.length > 0 ? (

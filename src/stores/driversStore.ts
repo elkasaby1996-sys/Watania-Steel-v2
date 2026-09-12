@@ -1,3 +1,5 @@
+import { driverService } from '../lib/supabase';
+import { getQuerySession } from '../lib/queryCache';
 import { create } from 'zustand';
 
 // Define types locally to avoid import issues
@@ -30,6 +32,8 @@ interface DriversState {
   error: string | null;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  resetSessionData: () => void;
+  hasLoaded: boolean;
   loadDrivers: () => Promise<void>;
   loadMetrics: () => Promise<void>;
   addDriver: (driver: Omit<Driver, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
@@ -40,51 +44,63 @@ interface DriversState {
   getCurrentCycleDates: () => { start: string; end: string };
 }
 
+let driversRevision = 0;
+let driversRequest: Promise<void> | null = null;
+let metricsRequest: Promise<void> | null = null;
 export const useDriversStore = create<DriversState>((set, get) => ({
   drivers: [],
   metrics: [],
+  hasLoaded: false,
+  resetSessionData: () => { driversRevision++; driversRequest = null; metricsRequest = null;
+    set({ drivers: [], metrics: [], loading: false, error: null, hasLoaded: false }); },
   loading: false,
   error: null,
   searchQuery: '',
   
   setSearchQuery: (query) => set({ searchQuery: query }),
   
-  loadDrivers: async () => {
-    set({ loading: true, error: null });
-    try {
-      // Import dynamically to avoid circular dependencies
-      const { driverService } = await import('../lib/supabase');
-      const drivers = await driverService.getAll();
-      set({ drivers, loading: false });
-    } catch (error) {
-      console.error('Failed to load drivers:', error);
-      set({ 
-        drivers: [], // Set empty array on error
-        error: error instanceof Error ? error.message : 'Failed to load drivers', 
-        loading: false 
-      });
-    }
+  loadDrivers: () => {
+    if (driversRequest) return driversRequest;
+    const session = getQuerySession();
+    const revision = driversRevision;
+    set({ loading: !get().hasLoaded, error: null });
+    const request = (async () => {
+      try {
+        const drivers = await driverService.getAll();
+        if (session === getQuerySession() && revision === driversRevision) set({ drivers, hasLoaded: true });
+      } catch (error) {
+        if (session === getQuerySession() && revision === driversRevision) set({ error: error instanceof Error ? error.message : 'Failed to load drivers' });
+      } finally {
+        if (session === getQuerySession() && revision === driversRevision) { driversRequest = null; set({ loading: false }); }
+      }
+    })();
+    driversRequest = request;
+    return request;
   },
-  
-  loadMetrics: async () => {
-    try {
-      const { driverService } = await import('../lib/supabase');
-      const metrics = await driverService.getMetrics();
-      set({ metrics });
-    } catch (error) {
-      console.error('Failed to load driver metrics:', error);
-      set({ 
-        metrics: [], // Set empty array on error
-        error: error instanceof Error ? error.message : 'Failed to load metrics' 
-      });
-    }
+  loadMetrics: () => {
+    if (metricsRequest) return metricsRequest;
+    const session = getQuerySession();
+    const revision = driversRevision;
+    const request = (async () => {
+      try {
+        await get().loadDrivers();
+        if (session !== getQuerySession() || revision !== driversRevision || get().error) return;
+        const metrics = await driverService.getMetrics(get().drivers);
+        if (session === getQuerySession() && revision === driversRevision) set({ metrics });
+      } catch (error) {
+        if (session === getQuerySession() && revision === driversRevision) set({ error: error instanceof Error ? error.message : 'Failed to load metrics' });
+      } finally { if (session === getQuerySession() && revision === driversRevision) metricsRequest = null; }
+    })();
+    metricsRequest = request;
+    return request;
   },
-  
+
   addDriver: async (driverData) => {
     set({ loading: true, error: null });
     try {
-      const { driverService } = await import('../lib/supabase');
       const newDriver = await driverService.create(driverData);
+      driversRevision++; driversRequest = null; metricsRequest = null;
+      set({ loading: false });
       set(state => ({
         drivers: [newDriver, ...state.drivers],
         loading: false
@@ -103,8 +119,9 @@ export const useDriversStore = create<DriversState>((set, get) => ({
   
   updateDriver: async (id, updates) => {
     try {
-      const { driverService } = await import('../lib/supabase');
       const updatedDriver = await driverService.update(id, updates);
+      driversRevision++; driversRequest = null; metricsRequest = null;
+      set({ loading: false });
       
       // Update the driver in the store
       set(state => ({
@@ -126,8 +143,9 @@ export const useDriversStore = create<DriversState>((set, get) => ({
   
   deleteDriver: async (id) => {
     try {
-      const { driverService } = await import('../lib/supabase');
       await driverService.delete(id);
+      driversRevision++; driversRequest = null; metricsRequest = null;
+      set({ loading: false });
       set(state => ({
         drivers: state.drivers.filter(d => d.id !== id),
         metrics: state.metrics.filter(m => m.driver_id !== id)

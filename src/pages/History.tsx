@@ -31,8 +31,10 @@ import { ROUTES } from '@/routes/routes';
 import { logger } from '@/lib/logger';
 import { useDeviceInfo } from '@/hooks/useDeviceInfo';
 import { normalizeOrderType } from '@/lib/orderTypes';
+import { peekQuery } from '@/lib/queryCache';
+import type { HistoryOrderPage } from '@/lib/supabase';
 
-const HISTORY_PAGE_SIZE = 100;
+const HISTORY_PAGE_SIZE = 50;
 const HISTORY_REFRESH_DEBOUNCE_MS = 300;
 
 type DailyMetric = {
@@ -55,15 +57,17 @@ export function History() {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [companyFilter, setCompanyFilter] = useState('');
+  const [debouncedCompany, setDebouncedCompany] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ key: '', page: 1 });
   const [historyOrders, setHistoryOrders] = useState<HistoryOrder[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const [visiblePageStart, setVisiblePageStart] = useState(0);
   const [visiblePageEnd, setVisiblePageEnd] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -72,33 +76,48 @@ export function History() {
   useEffect(() => {
     const debounceTimer = window.setTimeout(() => {
       setDebouncedSearch(historySearchQuery.trim());
+      setDebouncedCompany(companyFilter.trim());
     }, HISTORY_REFRESH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(debounceTimer);
-  }, [historySearchQuery]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, statusFilter, companyFilter, dateFrom, dateTo]);
+  }, [historySearchQuery, companyFilter]);
 
   const filters: HistoryOrderFilters = useMemo(() => {
     return {
       status: statusFilter === 'all' ? undefined : statusFilter,
-      company: companyFilter.trim() || undefined,
+      company: debouncedCompany || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       search: debouncedSearch || undefined
     };
-  }, [statusFilter, companyFilter, dateFrom, dateTo, debouncedSearch]);
+  }, [statusFilter, debouncedCompany, dateFrom, dateTo, debouncedSearch]);
 
-  const fetchHistoryOrders = useCallback(async () => {
+  const filterKey = JSON.stringify(filters);
+  const page = pagination.key === filterKey ? pagination.page : 1;
+  const setPage = useCallback((value: number | ((previous: number) => number)) => {
+    setPagination(previous => ({ key: filterKey, page: typeof value === 'function'
+      ? value(previous.key === filterKey ? previous.page : 1) : value }));
+  }, [filterKey]);
+  const loadedKeyRef = useRef('');
+
+  const fetchHistoryOrders = useCallback(async (force = false) => {
     const previousController = abortRef.current;
     const controller = new AbortController();
     abortRef.current = controller;
     const requestId = ++requestIdRef.current;
 
     previousController?.abort();
-    setLoading(true);
+    const params = { page, pageSize: HISTORY_PAGE_SIZE, filters };
+    const key = 'history:' + JSON.stringify(params);
+    const cached = peekQuery<HistoryOrderPage>(key);
+    if (cached) {
+      setHistoryOrders(cached.data); setTotalCount(cached.count);
+      setServerTotalPages(cached.totalPages || 1);
+      setVisiblePageStart(cached.pageStart || 0); setVisiblePageEnd(cached.pageEnd || 0);
+      loadedKeyRef.current = key;
+    }
+    setLoading(!cached && loadedKeyRef.current !== key);
+    setRefreshing(true);
     setError(null);
 
     try {
@@ -106,7 +125,8 @@ export function History() {
         page,
         pageSize: HISTORY_PAGE_SIZE,
         filters,
-        signal: controller.signal
+        signal: controller.signal,
+        force
       });
 
       if (controller.signal.aborted || requestId !== requestIdRef.current || result.aborted) {
@@ -118,6 +138,7 @@ export function History() {
       setServerTotalPages(result.totalPages || 1);
       setVisiblePageStart(result.pageStart || 0);
       setVisiblePageEnd(result.pageEnd || 0);
+      loadedKeyRef.current = key;
     } catch (fetchError) {
       if (controller.signal.aborted || requestId !== requestIdRef.current) {
         return;
@@ -125,17 +146,17 @@ export function History() {
 
       const message = fetchError instanceof Error ? fetchError.message : 'Failed to load history orders.';
       setError(message);
-      setHistoryOrders([]);
-      setTotalCount(0);
-      setServerTotalPages(1);
-      setVisiblePageStart(0);
-      setVisiblePageEnd(0);
+      if (loadedKeyRef.current !== key) {
+        setHistoryOrders([]); setTotalCount(0); setServerTotalPages(1);
+        setVisiblePageStart(0); setVisiblePageEnd(0);
+      }
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false);
+        setRefreshing(false);
       }
     }
-  }, [page, filters]);
+  }, [page, filters, user?.id]);
 
   useEffect(() => {
     fetchHistoryOrders();
@@ -143,7 +164,7 @@ export function History() {
 
   useEffect(() => {
     const handleFocus = () => {
-      fetchHistoryOrders();
+      if (document.visibilityState === 'visible') fetchHistoryOrders();
     };
 
     window.addEventListener('focus', handleFocus);
@@ -220,10 +241,10 @@ export function History() {
   const totalPages = useMemo(() => Math.max(1, serverTotalPages), [serverTotalPages]);
 
   useEffect(() => {
-    if (page > totalPages) {
+    if (!loading && loadedKeyRef.current === 'history:' + JSON.stringify({ page, pageSize: HISTORY_PAGE_SIZE, filters }) && page > totalPages) {
       setPage(totalPages);
     }
-  }, [page, totalPages]);
+  }, [page, totalPages, loading, filters, setPage]);
 
   const formatDate = useCallback((dateString: string) => {
     if (!dateString) return 'Invalid Date';
@@ -288,13 +309,14 @@ export function History() {
   }, []);
 
   const refreshHistory = useCallback(() => {
-    fetchHistoryOrders();
+    fetchHistoryOrders(true);
   }, [fetchHistoryOrders]);
 
   const resetFilters = useCallback(() => {
     setHistorySearchQuery('');
     setDebouncedSearch('');
     setCompanyFilter('');
+    setDebouncedCompany('');
     setStatusFilter('all');
     setDateFrom('');
     setDateTo('');
@@ -493,8 +515,8 @@ export function History() {
                 <p className="mt-2 break-words text-xs text-destructive">{error}</p>
               </div>
             </div>
-            <Button onClick={refreshHistory} variant="outline" size="sm" disabled={loading}>
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <Button onClick={refreshHistory} variant="outline" size="sm" disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               Retry
             </Button>
           </div>

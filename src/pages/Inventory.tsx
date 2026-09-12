@@ -297,7 +297,7 @@ function InventorySection({
 // Main Inventory Page
 export function Inventory() {
   const navigate = useNavigate();
-  const { data, loading, loadAllInventory, loadingTable } = useInventoryStore();
+  const { data, loading, loadAllInventory, loadingTable, error } = useInventoryStore();
   const { user } = useAuthStore();
   const { isMobile } = useDeviceInfo();
 
@@ -394,6 +394,7 @@ export function Inventory() {
       </div>
 
       {/* Loading overlay */}
+      {error && <div role="alert" className="flex items-center justify-between gap-3 text-sm text-destructive"><span>{error}</span><Button variant="outline" onClick={() => loadAllInventory()}>Retry</Button></div>}
       {loading && (
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-3">
