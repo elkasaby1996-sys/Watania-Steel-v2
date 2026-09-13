@@ -8,9 +8,10 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuthStore();
+  const { user, loading, initialized } = useAuthStore();
 
-  if (loading) {
+  // Keep the login form mounted during sign-in so pending/error states retain input.
+  if (loading && (!initialized || user)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">

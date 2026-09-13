@@ -182,10 +182,6 @@ th { font-size: 10px; letter-spacing: .06em; }
 
 :root.light .app-sidebar .nav-route-button-active,
 .app-sidebar .nav-route-button-active { color: #f7f6ee; }
-.login-workspace { background-image: repeating-linear-gradient(90deg, transparent, transparent 119px, var(--color-border) 120px); }
-.login-workspace > div { padding: 36px 28px; background: var(--color-background); border-top: 3px solid var(--color-primary); }
-.login-workspace .glass-panel { border: 0; background: transparent; }
-.login-workspace .glass-panel > div { padding-left: 0; padding-right: 0; }
 
 .app-sidebar.w-16 .sidebar-brand-section { flex-direction: column; justify-content: center; gap: 2px; padding: 8px; }
 .app-sidebar.w-16 nav { padding-left: 10px; padding-right: 10px; }

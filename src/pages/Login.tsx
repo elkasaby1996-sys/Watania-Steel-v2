@@ -1,111 +1,74 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { useState, type FormEvent } from 'react';
+import { ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Alert, AlertDescription } from '../components/ui/alert';
-import { Loader2, Package } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import warehouseImage from '../assets/login-steel-warehouse.jpg';
+import brandMark from '../assets/watania-gear-mark.svg';
+import './login.css';
 
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
+  const [showPassword, setShowPassword] = useState(false);
   const { signIn, loading, error, clearError } = useAuthStore();
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignIn = async (event: FormEvent) => {
+    event.preventDefault();
+    if (loading || !email.trim() || !password) return;
     clearError();
-    
-    if (!email || !password) {
-      return;
-    }
-    
-    await signIn(email, password);
+    await signIn(email.trim(), password);
   };
 
   return (
-    <div className="login-workspace min-h-screen overflow-x-hidden bg-glass-shell flex items-center justify-center px-4 py-8 phone-safe-page">
-      <div className="w-full min-w-0 max-w-[calc(100vw-2rem)] sm:max-w-md">
-        {/* Header */}
-        <div className="text-center space-y-4 mb-6 sm:mb-8">
-          <div className="flex flex-col items-center gap-4">
-            <img 
-              src="https://c.animaapp.com/mfuv9ro3jvVXIT/img/chatgpt-image-sep-25-2025-10_05_13-am.png" 
-              alt="Al Watania Steel Qatar"
-              className="h-24 w-24 object-contain sm:h-32 sm:w-32"
-            />
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-3xl font-headline font-bold text-foreground mb-1 break-words leading-tight">
-                Watania Steel
-              </h1>
-            </div>
-          </div>
-          <p className="text-sm sm:text-base text-muted-foreground break-words">
-            Factory operations, in one place.
-          </p>
+    <main className="login-workspace">
+      <img className="login-background" src={warehouseImage} alt="" loading="eager" decoding="async" />
+      <div className="login-photo-shade" aria-hidden="true" />
+      <section className="login-story" aria-label="Watania Steel">
+        <div className="login-brand">
+          <img src={brandMark} alt="" width="44" height="44" />
+          <div><p>Watania Steel</p><span>Factory operations · Qatar</span></div>
         </div>
-
-        {/* Login Form */}
-        <Card className="w-full min-w-0 max-w-full">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
-            <CardDescription className="text-center">
-              Enter your credentials to access the dashboard
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSignIn} className="space-y-4" id="signin-form">
-              <div className="space-y-2">
-                <Label htmlFor="signin-email">Email</Label>
-                <Input
-                  id="signin-email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                />
+        <div className="login-story-copy">
+          <h1>Factory operations,<br />in one place.</h1>
+          <p>From the first order to the final delivery.<br />A clear view of the work ahead.</p>
+        </div>
+        <p className="login-story-footer">Al Watania Steel</p>
+      </section>
+      <section className="login-panel" aria-labelledby="signin-heading">
+        <div className="login-form-content">
+          <div className="login-form-heading">
+            <p className="login-eyebrow">Sign in</p>
+            <h2 id="signin-heading">Welcome back.</h2>
+          </div>
+          <form onSubmit={handleSignIn} id="signin-form" aria-busy={loading}>
+            <div className="login-form-field">
+              <Label htmlFor="signin-email">Work email</Label>
+              <Input id="signin-email" name="email" type="email" autoComplete="username" inputMode="email"
+                autoCapitalize="none" spellCheck={false} placeholder="you@company.com" value={email}
+                onChange={event => { setEmail(event.target.value); if (error) clearError(); }} required disabled={loading} />
+            </div>
+            <div className="login-form-field">
+              <Label htmlFor="signin-password">Password</Label>
+              <div className="login-password-field">
+                <Input id="signin-password" name="password" type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password" placeholder="Enter your password" value={password}
+                  onChange={event => { setPassword(event.target.value); if (error) clearError(); }} required disabled={loading} />
+                <button type="button" className="login-password-toggle" aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-controls="signin-password" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)} disabled={loading}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="signin-password">Password</Label>
-                <Input
-                  id="signin-password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+            </div>
+            {error && <p className="login-error" role="alert">{error}</p>}
+            <Button type="submit" className="login-submit" disabled={loading}>
+              {loading ? <><Loader2 className="animate-spin" aria-hidden="true" /> Signing in…</> : <>Sign in <ArrowRight aria-hidden="true" /></>}
+            </Button>
+          </form>
+          <p className="login-help">Need access or help signing in?<br /><span>Contact your workspace administrator.</span></p>
+        </div>
+      </section>
+    </main>
   );
 }
-
