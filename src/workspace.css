@@ -114,7 +114,6 @@ th { font-size: 10px; letter-spacing: .06em; }
 .nav-route-dot { background: #dba67e; box-shadow: none; width: 4px; height: 4px; }
 .sidebar-brand-section { height: 76px; padding-left: 18px; }
 .sidebar-brand-line { display: none; }
-.brand-symbol { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 38px; background: #dba67e; color: #232824; clip-path: polygon(0 0,100% 0,100% 78%,78% 100%,0 100%); font-weight: 800; font-size: 22px; }
 .sidebar-bottom-panel { border: 0; border-radius: 4px; }
 .app-sidebar .sidebar-bottom-panel .text-primary { color: #dba67e; }
 .workspace-topbar { background: var(--color-background); border-bottom: 1px solid var(--color-border); box-shadow: none; backdrop-filter: none; }
@@ -195,7 +194,6 @@ th { font-size: 10px; letter-spacing: .06em; }
 .login-workspace .glass-panel > div { padding-left: 0; padding-right: 0; }
 
 .app-sidebar.w-16 .sidebar-brand-section { flex-direction: column; justify-content: center; gap: 2px; padding: 8px; }
-.app-sidebar.w-16 .brand-symbol { width: 30px; height: 32px; font-size: 19px; }
 .app-sidebar.w-16 nav { padding-left: 10px; padding-right: 10px; }
 .app-sidebar.w-16 .nav-route-button { gap: 0; }
 

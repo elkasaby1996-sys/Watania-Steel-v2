@@ -95,7 +95,6 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
       <div className={`sidebar-brand-section relative flex h-[82px] shrink-0 items-center justify-between overflow-hidden border-b ${!isMobile && sidebarCollapsed ? 'px-2' : 'px-3'}`}>
         <div className="sidebar-brand-line pointer-events-none absolute inset-x-3 top-3 h-px" />
         <div className={`flex min-w-0 items-center gap-3 ${!isMobile && sidebarCollapsed ? 'w-full justify-center' : 'flex-1'}`}>
-          <div className="brand-symbol" aria-hidden="true">W</div>
           {(isMobile || !sidebarCollapsed) && (
             <div className="min-w-0">
               <p className="truncate text-[15px] font-semibold leading-5 text-gray-50">Watania Steel</p>
@@ -256,4 +255,3 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
     </DialogPrimitive.Root>
   );
 }
-
