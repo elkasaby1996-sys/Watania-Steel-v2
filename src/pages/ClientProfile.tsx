@@ -1,3 +1,4 @@
+import { WorkspaceHeading } from '@/components/WorkspaceHeading';
 // src/pages/ClientProfile.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
@@ -467,19 +468,15 @@ export function ClientProfilePage() {
   }
 
   return (
-    <div className="p-6 space-y-5 sm:space-y-6">
-      {/* Header */}
-      <div className="glass-panel flex flex-col items-stretch gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-        <div className="min-w-0">
-          <div className="text-sm text-slate-400">
-            <Link to={ROUTES.clients} className="hover:underline">
-              ← Back to Clients
-            </Link>
-          </div>
-          <h1 className="break-words text-2xl font-semibold">Client profile and order history</h1>
-          <div className="mt-1 truncate text-xs text-slate-400">Client ID: {clientId}</div>
-        </div>
-
+    <div className="space-y-5 sm:space-y-6">
+      <WorkspaceHeading
+        eyebrow="Client relationships"
+        title="Client profile"
+        description="Client details, order history, and delivery performance."
+        backTo={ROUTES.clients}
+        backLabel="Back to clients"
+      >
+        <span className="max-w-full break-all">Client ID: {clientId}</span>
         <div className="flex w-full flex-wrap items-stretch gap-2 sm:w-auto sm:items-center">
           {isAdmin && (
             <MergeClientsDialog
@@ -513,7 +510,7 @@ export function ClientProfilePage() {
             </button>
           </div>
         </div>
-      </div>
+      </WorkspaceHeading>
 
       {/* Top cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Edit, Truck, Trash2, Eye, CheckCircle, XCircle, ArrowUpRight, PackageOpen } from 'lucide-react';
+import { Edit, Truck, Trash2, Eye, ArrowUpRight, PackageOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/routes/routes';
 import { useDashboardStore } from '@/stores/dashboardStore';
@@ -16,6 +16,12 @@ import { hasPermission } from '@/lib/auth';
 import { orderService } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { useDeviceInfo } from '@/hooks/useDeviceInfo';
+
+function DeliveryNoteBadge({ signed }: { signed: boolean }) {
+  return <Badge className={`queue-status ${signed ? 'queue-status-success' : 'queue-status-progress'}`}>
+    {signed ? 'Signed' : 'Not Signed'}
+  </Badge>;
+}
 
 export function OrderTable() {
   const { getTodayOrders, deleteOrder, isLoadingOrders, ordersError, loadOrders } = useDashboardStore();
@@ -167,9 +173,10 @@ export function OrderTable() {
                     </div>
                     <details className="mobile-order-title"><summary><span>{order.customerName}</span><small>Order description</small></summary><p>{order.customerName}</p></details>
                     <dl className="mobile-order-facts">
-                      <div><dt>Company</dt><dd>{order.company || 'Not specified'}</dd></div>
+                      <div><dt>Client</dt><dd>{order.company || 'Not specified'}</dd></div>
                       <div><dt>Site</dt><dd>{order.site || 'Not specified'}</dd></div>
-                      <div><dt>Scheduled</dt><dd>{order.date} / {order.shift === 'morning' ? 'Morning' : 'Night'}</dd></div>
+                      <div><dt>Schedule</dt><dd>{order.date}</dd></div>
+                      <div><dt>Shift</dt><dd>{order.shift === 'morning' ? 'Morning' : 'Night'}</dd></div>
                       <div><dt>Weight</dt><dd className="mobile-order-weight">{order.tons} <small>tons</small></dd></div>
                     </dl>
                     <div className="min-w-0 text-sm text-muted-foreground">
@@ -285,8 +292,9 @@ export function OrderTable() {
               <TableHeader>
                 <TableRow className="border-border">
                   <TableHead className="text-foreground">Delivery</TableHead>
-                  <TableHead className="text-foreground">Destination</TableHead>
+                  <TableHead className="text-foreground">Client</TableHead>
                   <TableHead className="text-foreground">Schedule</TableHead>
+                  <TableHead className="text-foreground">Shift</TableHead>
                   <TableHead className="text-foreground">Status</TableHead>
                   <TableHead className="text-foreground">Weight</TableHead>
                   <TableHead className="text-foreground">Delivery Note</TableHead>
@@ -298,7 +306,7 @@ export function OrderTable() {
                 {isLoadingOrders ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={`skeleton-${index}`} className="border-border">
-                      {Array.from({ length: 8 }).map((_, cellIndex) => (
+                      {Array.from({ length: 9 }).map((_, cellIndex) => (
                         <TableCell key={cellIndex}>
                           <div className="h-4 w-full animate-pulse rounded bg-muted" />
                         </TableCell>
@@ -310,22 +318,13 @@ export function OrderTable() {
                     <TableRow key={order.id} className="border-border hover:bg-muted/50">
                     <TableCell><strong className="queue-primary-text queue-order-name" title={order.customerName}>{order.customerName}</strong><span className="queue-secondary-text font-mono">{order.id}</span></TableCell>
                     <TableCell><span className="queue-primary-text">{order.company || 'N/A'}</span><span className="queue-secondary-text">{order.site || 'No site specified'}</span></TableCell>
-                    <TableCell><span className="queue-primary-text">{order.date}</span><span className="queue-secondary-text">{order.shift === 'morning' ? 'Morning shift' : 'Night shift'}</span></TableCell>
+                    <TableCell><span className="queue-primary-text whitespace-nowrap">{order.date}</span></TableCell>
+                    <TableCell><span className="queue-primary-text">{order.shift === 'morning' ? 'Morning' : 'Night'}</span></TableCell>
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
                     <TableCell className="queue-weight">{order.tons}<span> t</span></TableCell>
                     <TableCell>
                       <RoleBasedComponent action="edit" fallback={
-                        order.signedDeliveryNote ? (
-                          <Badge className="bg-success text-success-foreground">
-                            <CheckCircle size={12} className="mr-1" />
-                            Signed
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-gray-400 text-white">
-                            <XCircle size={12} className="mr-1" />
-                            Not Signed
-                          </Badge>
-                        )
+                        <DeliveryNoteBadge signed={!!order.signedDeliveryNote} />
                       }>
                         <Button
                           variant="ghost"
@@ -345,17 +344,7 @@ export function OrderTable() {
                           className="p-0 h-auto hover:bg-transparent"
                           title={`Click to mark as ${order.signedDeliveryNote ? 'not signed' : 'signed'}`}
                         >
-                          {order.signedDeliveryNote ? (
-                            <Badge className="bg-success text-success-foreground cursor-pointer hover:bg-success/80 transition-colors">
-                              <CheckCircle size={12} className="mr-1" />
-                              Signed
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-gray-400 text-white cursor-pointer hover:bg-gray-500 transition-colors">
-                              <XCircle size={12} className="mr-1" />
-                              Not Signed
-                            </Badge>
-                          )}
+                          <DeliveryNoteBadge signed={!!order.signedDeliveryNote} />
                         </Button>
                       </RoleBasedComponent>
                     </TableCell>
@@ -462,7 +451,7 @@ export function OrderTable() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8}>
+                  <TableCell colSpan={9}>
                     {emptyState}
                   </TableCell>
                 </TableRow>

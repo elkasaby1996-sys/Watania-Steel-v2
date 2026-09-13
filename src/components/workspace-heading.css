@@ -1,0 +1,14 @@
+.workspace-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding-bottom: 10px; color: var(--color-foreground); }
+.workspace-heading-copy { flex: 1; min-width: 0; }
+.workspace-heading .workspace-heading-back { margin: 0 0 22px -10px; color: var(--color-muted-foreground); font-size: 12px; }
+.workspace-heading h1 { font-size: clamp(32px, 3vw, 46px); font-weight: 500; letter-spacing: -.055em; line-height: 1.2; margin-top: 10px; overflow-wrap: anywhere; text-wrap: balance; }
+.workspace-heading h1 > span { color: var(--color-primary); }
+.workspace-heading-description { max-width: 75ch; font-size: 13px; color: var(--color-muted-foreground); margin-top: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.workspace-heading-aside { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: 50%; min-width: 0; padding-bottom: 4px; color: var(--color-muted-foreground); font-size: 12px; }
+.workspace-heading-aside small { font-size: 11px; }
+@media (max-width: 767px) {
+  .workspace-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .workspace-heading .workspace-heading-back { min-height: 44px; margin-bottom: 16px; }
+  .workspace-heading-description { font-size: 14px; }
+  .workspace-heading-aside { align-items: flex-start; max-width: 100%; width: 100%; }
+}

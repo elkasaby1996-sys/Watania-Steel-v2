@@ -651,13 +651,20 @@ try {
       assert.equal(await cachedRead('test:page', read), 1);
       assert.equal(await cachedRead('test:page', read), 1);
       now += 30_001;
+      assert.equal(peekQuery('test:page'), undefined, 'Expired data is not considered fresh');
+      assert.equal(peekQuery('test:page', { allowStale: true }), 1, 'A returning page can show recent data during refresh');
+      await cachedRead('test:other-page', async () => 'other');
+      assert.equal(peekQuery('test:page', { allowStale: true }), 1, 'Reading another page does not discard retained data');
       assert.equal(await cachedRead('test:page', read), 2);
       const [a, b] = await Promise.all([cachedRead('test:page', read, undefined, { force: true }),
         cachedRead('test:page', read, undefined, { force: true })]);
       assert.equal(a, 3); assert.equal(b, 3);
       resetQuerySession();
       assert.equal(peekQuery('test:page'), undefined);
+      assert.equal(peekQuery('test:page', { allowStale: true }), undefined, 'Identity changes also clear retained data');
       assert.equal(await cachedRead('test:page', read), 4);
+      now += 330_001;
+      assert.equal(peekQuery('test:page', { allowStale: true }), undefined, 'Retention is bounded to five minutes after expiry');
     } finally { Date.now = originalNow; invalidateQueries(); }
   });
 } finally {

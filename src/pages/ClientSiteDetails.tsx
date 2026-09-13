@@ -1,3 +1,4 @@
+import { WorkspaceHeading } from '@/components/WorkspaceHeading';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, MapPin } from 'lucide-react';
@@ -139,23 +140,13 @@ export function ClientSiteDetailsPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => clientId && navigate(routeTo.clientProfile(clientId))}
-          className="text-foreground hover:bg-accent"
-        >
-          <ArrowLeft size={16} />
-          Back to Client
-        </Button>
-        <div className="flex-1">
-          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
-            {siteSummary?.site_name || 'Site Details'}
-          </h1>
-          <p className="text-muted-foreground">Site profile and delivery metrics</p>
-        </div>
-      </div>
+      <WorkspaceHeading
+        eyebrow="Client sites"
+        title={siteSummary?.site_name || 'Site details'}
+        description="Site profile and delivery metrics."
+        backTo={clientId ? routeTo.clientProfile(clientId) : ROUTES.clients}
+        backLabel="Back to client"
+      />
 
       {loading && (
         <Card>

@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test:performance": "node tests/performance.test.mjs",
-    "check": "npm run typecheck && npm run build"
+    "check": "npm run typecheck && npm run build",
+    "test:offcut-report": "node --test tests/offcut-report.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "1.2.1",

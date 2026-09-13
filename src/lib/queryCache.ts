@@ -1,4 +1,4 @@
-const cache = new Map<string, { expiresAt: number; data: unknown }>();
+const cache = new Map<string, { expiresAt: number; retainUntil: number; data: unknown }>();
 type PendingRead = { promise: Promise<unknown>; controller: AbortController; users: number; timer?: ReturnType<typeof setTimeout> };
 const pending = new Map<string, PendingRead>();
 const throwIfAborted = (signal?: AbortSignal) => {
@@ -8,9 +8,9 @@ const throwIfAborted = (signal?: AbortSignal) => {
 };
 
 
-export const peekQuery = <T>(key: string): T | undefined => {
+export const peekQuery = <T>(key: string, options: { allowStale?: boolean } = {}): T | undefined => {
   const entry = cache.get(key);
-  return entry && entry.expiresAt > Date.now() ? entry.data as T : undefined;
+  return entry && (options.allowStale ? entry.retainUntil : entry.expiresAt) > Date.now() ? entry.data as T : undefined;
 };
 
 export const invalidateQueries = (prefix = '') => {
@@ -37,9 +37,10 @@ export const cachedRead = async <T>(key: string, read: (signal: AbortSignal) => 
     entry.promise = Promise.resolve().then(() => read(entry.controller.signal)).then(data => {
       throwIfAborted(entry.controller.signal);
       if (pending.get(key) === entry) {
-        for (const [oldKey, value] of cache) if (value.expiresAt <= Date.now()) cache.delete(oldKey);
+        for (const [oldKey, value] of cache) if (value.retainUntil <= Date.now()) cache.delete(oldKey);
         if (cache.size >= 100) cache.delete(cache.keys().next().value!);
-        cache.set(key, { data, expiresAt: Date.now() + (options.ttlMs ?? 30_000) });
+        const expiresAt = Date.now() + (options.ttlMs ?? 30_000);
+        cache.set(key, { data, expiresAt, retainUntil: expiresAt + 5 * 60_000 });
       }
       return data;
     }).finally(() => {

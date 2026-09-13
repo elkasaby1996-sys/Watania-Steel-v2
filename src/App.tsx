@@ -13,20 +13,20 @@ import { ROUTES } from './routes/routes';
 import { RouteSkeleton } from './components/RouteSkeleton';
 import { useDeviceInfo } from './hooks/useDeviceInfo';
 
-const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
-const History = lazy(() => import('./pages/History').then((module) => ({ default: module.History })));
-const Users = lazy(() => import('./pages/Users').then((module) => ({ default: module.Users })));
-const Drivers = lazy(() => import('./pages/Drivers').then((module) => ({ default: module.Drivers })));
-const DriverDetail = lazy(() => import('./pages/DriverDetail').then((module) => ({ default: module.DriverDetail })));
-const SteelAnalytics = lazy(() => import('./pages/SteelAnalytics').then((module) => ({ default: module.SteelAnalytics })));
-const Clients = lazy(() => import('./pages/Clients').then((module) => ({ default: module.Clients })));
-const ClientProfilePage = lazy(() => import('./pages/ClientProfile').then((module) => ({ default: module.ClientProfilePage })));
-const ClientSiteDetailsPage = lazy(() => import('./pages/ClientSiteDetails').then((module) => ({ default: module.ClientSiteDetailsPage })));
-const Inventory = lazy(() => import('./pages/Inventory').then((module) => ({ default: module.Inventory })));
-const OffcutUsage = lazy(() => import('./pages/OffcutUsage').then((module) => ({ default: module.OffcutUsage })));
-const OffcutExecutivePrintPage = lazy(() =>
-  import('./reports/offcut/OffcutExecutivePrintPage').then((module) => ({ default: module.OffcutExecutivePrintPage }))
-);
+import { routeModules, preloadRoute } from './routes/routeModules';
+
+const Dashboard = lazy(routeModules[ROUTES.dashboard]);
+const History = lazy(routeModules[ROUTES.history]);
+const Users = lazy(routeModules[ROUTES.users]);
+const Drivers = lazy(routeModules[ROUTES.drivers]);
+const DriverDetail = lazy(routeModules[ROUTES.driverDetail]);
+const SteelAnalytics = lazy(routeModules[ROUTES.steelAnalytics]);
+const Clients = lazy(routeModules[ROUTES.clients]);
+const ClientProfilePage = lazy(routeModules[ROUTES.clientProfile]);
+const ClientSiteDetailsPage = lazy(routeModules[ROUTES.clientSite]);
+const Inventory = lazy(routeModules[ROUTES.inventory]);
+const OffcutUsage = lazy(routeModules[ROUTES.offcutUsage]);
+const OffcutExecutivePrintPage = lazy(routeModules[ROUTES.offcutExecutiveReport]);
 
 function AppShell() {
   const userId = useAuthStore(state => state.user?.id);
@@ -37,6 +37,30 @@ function AppShell() {
   const isReportRoute = location.pathname.startsWith(ROUTES.offcutExecutiveReport);
 
   useEffect(() => {
+    if (!userId || isReportRoute) return;
+    let cancelled = false;
+    // Warm code only, one page at a time after initial rendering. Data is still
+    // fetched by the destination page with its normal permissions and filters.
+    const pages = [ROUTES.dashboard, ROUTES.history, ROUTES.clients, ROUTES.drivers,
+      ROUTES.inventory, ROUTES.offcutUsage, ROUTES.steelAnalytics];
+    let timer: ReturnType<typeof setTimeout>;
+    const next = async () => {
+      const path = pages.shift();
+      if (cancelled || !path) return;
+      if (document.visibilityState !== 'visible') { pages.unshift(path); }
+      else await preloadRoute(path);
+      if (!cancelled) timer = setTimeout(next, 1000);
+    };
+    timer = setTimeout(next, 1500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [userId, isReportRoute]);
+
+  const preloadLink = (event: React.SyntheticEvent) => {
+    const link = (event.target as Element).closest<HTMLAnchorElement>('a[href]');
+    if (link && link.origin === window.location.origin) void preloadRoute(link.pathname);
+  };
+
+  useEffect(() => {
     if (isMobile) {
       setMobileSidebarOpen(false);
       window.scrollTo({ top: 0, behavior: 'instant' });
@@ -45,7 +69,7 @@ function AppShell() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-glass-shell text-foreground">
+      <div className="min-h-screen bg-glass-shell text-foreground" onPointerOver={preloadLink} onFocusCapture={preloadLink} onTouchStart={preloadLink}>
         <ImageAssets />
         <a className="skip-link" href="#workspace-content">Skip to workspace</a>
         {!isReportRoute && (
@@ -105,6 +129,7 @@ function App() {
 
   useEffect(() => {
     // The store coalesces initialization, including StrictMode and hot reload.
+    void preloadRoute(window.location.pathname);
     void initialize();
   }, [initialize]);
 

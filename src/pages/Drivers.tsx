@@ -1,9 +1,8 @@
+import { WorkspaceHeading } from '@/components/WorkspaceHeading';
 import React, { useEffect } from 'react';
-import { ArrowLeft, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { useNavigate } from 'react-router-dom';
 import { useDriversStore } from '../stores/driversStore';
 import { AddDriverDialog } from '../components/AddDriverDialog';
 import { DriversTable } from '../components/DriversTable';
@@ -13,7 +12,6 @@ import { RoleBasedComponent } from '../components/RoleBasedComponent';
 import { ROUTES } from '@/routes/routes';
 
 export function Drivers() {
-  const navigate = useNavigate();
   const driversStore = useDriversStore();
 
   // Safe access to store data and functions
@@ -38,31 +36,14 @@ export function Drivers() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      {/* Header */}
-      <div className="glass-panel flex flex-col items-stretch gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:p-5">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.dashboard)}
-          className="w-full justify-start text-foreground hover:bg-accent sm:w-auto"
-        >
-          <ArrowLeft size={16} />
-          Back to Dashboard
-        </Button>
-        <div className="min-w-0 flex-1">
-          <h1 className="break-words text-3xl font-headline font-bold text-foreground">
-            Drivers Management
-          </h1>
-          <p className="break-words text-muted-foreground">
-            Manage drivers and track their performance metrics
-          </p>
-        </div>
-        <div className="w-full sm:w-auto">
-          <RoleBasedComponent action="create">
-            <AddDriverDialog />
-          </RoleBasedComponent>
-        </div>
-      </div>
+      <WorkspaceHeading
+        eyebrow="Fleet operations"
+        title="Drivers management"
+        description="Manage drivers and track their performance metrics."
+        backTo={ROUTES.dashboard}
+      >
+        <RoleBasedComponent action="create"><AddDriverDialog /></RoleBasedComponent>
+      </WorkspaceHeading>
 
       {/* Database Setup Alert */}
       {showSetupAlert && <DatabaseSchemaAlert />}

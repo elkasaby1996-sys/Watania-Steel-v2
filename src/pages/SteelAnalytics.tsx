@@ -1,6 +1,6 @@
+import { WorkspaceHeading } from '@/components/WorkspaceHeading';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft,
   BarChart3,
   TrendingUp,
   RotateCcw,
@@ -25,7 +25,6 @@ import {
   ResponsiveContainer,
 
 } from 'recharts';
-import { useNavigate } from 'react-router-dom';
 import { formatNumber } from '@/lib/utils';
 import {
   fetchAnalyticsSummary,
@@ -67,7 +66,6 @@ const subtractDays = (dateString: string, days: number) => {
 
 export function SteelAnalytics() {
   const userId = useAuthStore(state => state.user?.id);
-  const navigate = useNavigate();
   const [selectedRangeDays, setSelectedRangeDays] = useState<(typeof RANGE_OPTIONS)[number]>(30);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
@@ -172,20 +170,17 @@ export function SteelAnalytics() {
 
   return (
     <div className="steel-analytics" aria-busy={loading}>
-      <header className="analytics-heading">
-        <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.dashboard)} className="analytics-back">
-            <ArrowLeft size={14} /> Back to dashboard
-          </Button>
-          <p className="eyebrow"><span className="heading-marker" />Delivery intelligence</p>
-          <h1>Steel analytics<span>.</span></h1>
-          <p className="analytics-subtitle">A closer look at delivered steel, daily output, and diameter mix.</p>
-        </div>
+      <WorkspaceHeading
+        eyebrow="Delivery intelligence"
+        title="Steel analytics"
+        description="A closer look at delivered steel, daily output, and diameter mix."
+        backTo={ROUTES.dashboard}
+      >
         <div className="analytics-update">
           <span><span className="analytics-status-dot" />Delivered steel only</span>
           {lastUpdated && <small>Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>}
         </div>
-      </header>
+      </WorkspaceHeading>
 
       <section className="analytics-controls" aria-label="Analytics filters">
         <Tabs value={filterMode} onValueChange={(value) => setFilterMode(value as FilterMode)}>

@@ -6,6 +6,7 @@ import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
 import { getRoleDisplayName } from '../lib/auth';
 import { useLocation } from 'react-router-dom';
+import { UniversalSearch } from './UniversalSearch';
 
 interface TopBarProps {
   isMobile?: boolean;
@@ -71,7 +72,8 @@ export function TopBar({ isMobile = false, menuOpen = false, onMenuClick }: TopB
           <div className="workspace-breadcrumb"><span>{isMobile ? 'Watania' : 'Factory workspace'}</span><span aria-hidden="true">/</span><strong>{pageLabel}</strong></div>
         </div>
 
-        <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-4'}`}>
+        <UniversalSearch isMobile={isMobile} />
+        <div className={`flex min-w-0 items-center ${isMobile ? 'gap-1' : 'flex-1 justify-end gap-4'}`}>
           <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}>
             {!isMobile && user?.profile?.role && (
               <Badge className="workspace-role" variant={getRoleBadgeVariant(user.profile.role) as any}>

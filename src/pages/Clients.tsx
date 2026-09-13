@@ -1,5 +1,6 @@
+import { WorkspaceHeading } from '@/components/WorkspaceHeading';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Search, Building2, AlertCircle } from 'lucide-react';
+import { Search, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,11 +13,13 @@ import { formatNumber } from '@/lib/utils';
 import { fetchClientsSummary, type ClientSummary } from '@/lib/clientsApi';
 import { ROUTES, routeTo } from '@/routes/routes';
 import { useDeviceInfo } from '@/hooks/useDeviceInfo';
+import { peekQuery } from '@/lib/queryCache';
 
 export function Clients() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -27,7 +30,10 @@ export function Clients() {
   const requestIdRef = useRef(0);
   const fetchClients = useCallback(async (searchText?: string, signal?: AbortSignal) => {
     const requestId = ++requestIdRef.current;
-    setLoading(true);
+    const cached = peekQuery<ClientSummary[]>('clients:get_clients_summary:' + JSON.stringify({search_text: searchText ?? null}), { allowStale: true });
+    if (cached) setClients(cached);
+    setLoading(!cached);
+    setRefreshing(true);
     setError(null);
     try {
       const data = await fetchClientsSummary(searchText, signal);
@@ -46,7 +52,7 @@ export function Clients() {
         variant: 'destructive'
       });
     } finally {
-      if (!signal?.aborted && requestId === requestIdRef.current) setLoading(false);
+      if (!signal?.aborted && requestId === requestIdRef.current) { setLoading(false); setRefreshing(false); }
     }
   }, [toast]);
 
@@ -75,27 +81,15 @@ export function Clients() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      {/* Header */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.dashboard)}
-          className="text-foreground hover:bg-accent"
-        >
-          <ArrowLeft size={16} />
-          Back to Dashboard
-        </Button>
-        <div className="flex-1">
-          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
-            Clients Database
-          </h1>
-          <p className="text-muted-foreground">
-            Manage and analyze client relationships across all orders
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">Last updated: {lastUpdatedLabel}</p>
-        </div>
-      </div>
+      {refreshing && !loading && <p role="status" className="text-xs text-muted-foreground">Updating clients… Showing the last loaded data.</p>}
+      <WorkspaceHeading
+        eyebrow="Client relationships"
+        title="Clients database"
+        description="Manage and analyze client relationships across all orders."
+        backTo={ROUTES.dashboard}
+      >
+        <span>Updated {lastUpdatedLabel}</span>
+      </WorkspaceHeading>
 
       {error && (
         <Card className="border-destructive">

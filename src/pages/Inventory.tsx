@@ -1,5 +1,6 @@
+import { WorkspaceHeading } from '@/components/WorkspaceHeading';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Edit2, Package } from 'lucide-react';
+import { Edit2, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -10,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useNavigate } from 'react-router-dom';
 import { useInventoryStore, InventoryTableName } from '../stores/inventoryStore';
 import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
@@ -296,7 +296,6 @@ function InventorySection({
 
 // Main Inventory Page
 export function Inventory() {
-  const navigate = useNavigate();
   const { data, loading, loadAllInventory, loadingTable, error } = useInventoryStore();
   const { user } = useAuthStore();
   const { isMobile } = useDeviceInfo();
@@ -369,29 +368,14 @@ export function Inventory() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      {/* Header */}
-      <div className="glass-panel flex flex-col items-stretch gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:p-5">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.dashboard)}
-          className="w-full justify-start text-foreground hover:bg-accent sm:w-auto"
-        >
-          <ArrowLeft size={16} />
-          Back to Dashboard
-        </Button>
-        <div className="min-w-0 flex-1">
-          <h1 className="break-words text-3xl font-headline font-bold text-foreground">
-            Inventory Management
-          </h1>
-          <p className="break-words text-muted-foreground">
-            View and manage steel inventory across all categories
-          </p>
-          <p className="mt-1 break-words text-sm text-muted-foreground">
-            Last updated: {lastUpdatedLabel}
-          </p>
-        </div>
-      </div>
+      <WorkspaceHeading
+        eyebrow="Material inventory"
+        title="Inventory management"
+        description="View and manage steel inventory across all categories."
+        backTo={ROUTES.dashboard}
+      >
+        <span>Updated {lastUpdatedLabel}</span>
+      </WorkspaceHeading>
 
       {/* Loading overlay */}
       {error && <div role="alert" className="flex items-center justify-between gap-3 text-sm text-destructive"><span>{error}</span><Button variant="outline" onClick={() => loadAllInventory()}>Retry</Button></div>}

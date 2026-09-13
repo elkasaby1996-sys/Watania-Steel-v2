@@ -1,5 +1,6 @@
+import { WorkspaceHeading } from '@/components/WorkspaceHeading';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { ArrowLeft, Calendar, Filter, Trophy, Plus, Edit, Trash2, FileDown, Hash, Scale, Calculator } from 'lucide-react';
+import { Calendar, Filter, Trophy, Plus, Edit, Trash2, FileDown, Hash, Scale, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ import {
 } from '@/reports/offcut/buildExecutiveOffcutReportData';
 import { ROUTES } from '@/routes/routes';
 import { useDeviceInfo } from '@/hooks/useDeviceInfo';
+import { peekQuery } from '@/lib/queryCache';
 
 type ViewMode = 'daily' | 'monthly' | 'range';
 const EXEC_REPORT_SESSION_KEY = 'offcutExecutiveReport';
@@ -94,6 +96,8 @@ export function OffcutUsage() {
   // Data state - filtered dataset stored in state for later calculations
   const [filteredEntries, setFilteredEntries] = useState<OffcutUsageEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [openingExecutiveReport, setOpeningExecutiveReport] = useState<boolean>(false);
   const canExportExecutive =
     user?.profile?.role === 'admin';
@@ -153,7 +157,12 @@ export function OffcutUsage() {
     const controller = new AbortController();
     offcutAbortRef.current = controller;
     const signal = controller.signal;
-    setLoading(true);
+    const range = getDateRange();
+    const cached = peekQuery<OffcutUsageEntry[]>('offcut:' + range.start + ':' + range.end, { allowStale: true });
+    setFilteredEntries(cached ?? []);
+    setLoading(!cached);
+    setRefreshing(true);
+    setLoadError(false);
     try {
       let data: OffcutUsageEntry[] = [];
 
@@ -176,13 +185,14 @@ export function OffcutUsage() {
     } catch (error) {
       if (signal.aborted) return;
       console.error('Failed to fetch offcut usage data:', error);
+      setLoadError(true);
       toast({
         title: 'Error',
         description: 'Failed to load offcut usage data. Please try again.',
         variant: 'destructive'
       });
     } finally {
-      if (!signal.aborted) setLoading(false);
+      if (!signal.aborted) { setLoading(false); setRefreshing(false); }
     }
   };
 
@@ -221,32 +231,21 @@ export function OffcutUsage() {
     const selectFields =
       'date,tons,order_type,company,breakdown_8mm,breakdown_10mm,breakdown_12mm,breakdown_14mm,breakdown_16mm,breakdown_18mm,breakdown_20mm,breakdown_25mm,breakdown_32mm';
 
-    const [ordersResponse, historyResponse] = await Promise.all([
-      supabase
-        .from('orders')
-        .select(selectFields)
-        .gte('date', dateRange.start)
-        .lte('date', dateRange.end)
-        .eq('order_type', 'cut-and-bend'),
-      supabase
-        .from('history_orders')
-        .select(selectFields)
-        .gte('date', dateRange.start)
-        .lte('date', dateRange.end)
-        .eq('order_type', 'cut-and-bend')
-    ]);
-
-    if (ordersResponse.error) {
-      throw ordersResponse.error;
-    }
-    if (historyResponse.error) {
-      throw historyResponse.error;
-    }
-
-    return [
-      ...(ordersResponse.data || []),
-      ...(historyResponse.data || [])
-    ] as ProductionRow[];
+    const fetchTable = async (table: 'orders' | 'history_orders') => {
+      const rows: ProductionRow[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase.from(table).select(selectFields)
+          .gte('date', dateRange.start).lte('date', dateRange.end)
+          .eq('order_type', 'cut-and-bend')
+          .order('date', { ascending: true }).order('id', { ascending: true })
+          .range(offset, offset + 999);
+        if (error) throw error;
+        rows.push(...(data || []) as ProductionRow[]);
+        if ((data?.length || 0) < 1000) return rows;
+      }
+    };
+    const [orders, history] = await Promise.all([fetchTable('orders'), fetchTable('history_orders')]);
+    return [...orders, ...history];
   };
 
   const handleExportExecutivePdf = async () => {
@@ -260,27 +259,17 @@ export function OffcutUsage() {
     setOpeningExecutiveReport(true);
     try {
       const dateRange = getDateRange();
-      const ytdStart = `${new Date(dateRange.end).getFullYear()}-01-01`;
-      let ytdRows = filteredEntries;
-      if (dateRange.start > ytdStart) {
-        try {
-          ytdRows = await offcutUsageService.getByDateRange(ytdStart, dateRange.end);
-        } catch (error) {
-          console.error('Failed to fetch YTD offcut usage:', error);
-          ytdRows = filteredEntries;
-        }
-      }
-
-      let productionRows: ProductionRow[] = [];
-      try {
-        productionRows = await fetchProductionRows(dateRange);
-      } catch (error) {
-        console.error('Failed to fetch production data:', error);
-        toast({
-          title: 'Production data unavailable',
-          description: 'The report will note production data as unavailable.',
-        });
-      }
+      const ytdStart = dateRange.end.slice(0, 4) + '-01-01';
+      let ytdRows: OffcutUsageEntry[] | undefined;
+      let productionRows: ProductionRow[] | undefined;
+      await Promise.all([
+        offcutUsageService.getByDateRange(ytdStart, dateRange.end)
+          .then(rows => { ytdRows = rows; })
+          .catch(error => console.error('Failed to fetch YTD offcut usage:', error)),
+        fetchProductionRows(dateRange)
+          .then(rows => { productionRows = rows; })
+          .catch(error => console.error('Failed to fetch production data:', error)),
+      ]);
 
       const reportData = buildExecutiveOffcutReportData({
         startDate: dateRange.start,
@@ -297,11 +286,7 @@ export function OffcutUsage() {
       localStorage.setItem(`${EXEC_REPORT_LOCAL_PREFIX}${reportId}`, reportJson);
       localStorage.setItem(EXEC_REPORT_LATEST_KEY, reportId);
 
-      const reportUrl = `${window.location.origin}${ROUTES.offcutExecutiveReport}?rid=${encodeURIComponent(reportId)}`;
-      const reportWindow = window.open(reportUrl, '_blank', 'noopener,noreferrer');
-      if (!reportWindow) {
-        navigate(`${ROUTES.offcutExecutiveReport}?rid=${encodeURIComponent(reportId)}`);
-      }
+      navigate(`${ROUTES.offcutExecutiveReport}?rid=${encodeURIComponent(reportId)}`);
     } catch (error) {
       console.error('Failed to generate executive report:', error);
       toast({
@@ -369,25 +354,12 @@ export function OffcutUsage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      {/* Header */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.dashboard)}
-          className="text-foreground hover:bg-accent"
-        >
-          <ArrowLeft size={16} />
-          Back to Dashboard
-        </Button>
-        <div className="flex-1">
-          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-headline font-bold text-foreground`}>
-            Offcut Usage
-          </h1>
-          <p className="text-muted-foreground">
-            Track and analyze offcut steel usage across operations
-          </p>
-        </div>
+      <WorkspaceHeading
+        eyebrow="Material intelligence"
+        title="Offcut usage"
+        description="Track and analyze offcut steel usage across operations."
+        backTo={ROUTES.dashboard}
+      >
         <Button
           onClick={() => setAddModalOpen(true)}
           className={`bg-primary text-primary-foreground hover:bg-primary/90 shadow-md ${isMobile ? 'h-10 px-3 text-sm' : ''}`}
@@ -395,7 +367,7 @@ export function OffcutUsage() {
           <Plus size={20} className="mr-2" />
           Add Entries
         </Button>
-      </div>
+      </WorkspaceHeading>
 
       {/* Filter Controls */}
       <Card>
@@ -424,7 +396,7 @@ export function OffcutUsage() {
               >
                 <Button
                   onClick={handleExportExecutivePdf}
-                  disabled={filteredEntries.length === 0 || openingExecutiveReport}
+                  disabled={loading || refreshing || loadError || filteredEntries.length === 0 || openingExecutiveReport}
                   className="bg-slate-900 text-white hover:bg-slate-800"
                 >
                   <FileDown size={18} className="mr-2" />
@@ -521,6 +493,8 @@ export function OffcutUsage() {
       </Card>
 
       {/* Loading State */}
+      {refreshing && !loading && <p role="status" className="text-xs text-muted-foreground">Updating offcut usage… Showing the last loaded data.</p>}
+      {loadError && <p role="alert" className="text-sm text-destructive">Couldn’t refresh offcut usage. <button className="underline" onClick={fetchData}>Retry</button></p>}
       {loading && (
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-3">

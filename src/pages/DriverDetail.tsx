@@ -1,3 +1,4 @@
+import { WorkspaceHeading } from '@/components/WorkspaceHeading';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Package, CheckCircle, Clock, Weight, Phone, User } from 'lucide-react';
@@ -192,32 +193,18 @@ export function DriverDetail() {
   }
 
   return (
-    <div className={`${isMobile ? '' : 'p-6'} space-y-5 sm:space-y-6`}>
-      {/* Header */}
-      <div className="glass-panel flex flex-col items-stretch gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:p-5">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.drivers)}
-          className="w-full justify-start text-foreground hover:bg-accent sm:w-auto"
-        >
-          <ArrowLeft size={16} />
-          Back to Drivers
-        </Button>
-        <div className="min-w-0 flex-1">
-          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} break-words font-headline font-bold text-foreground`}>
-            {driver.name}
-          </h1>
-          <p className="break-words text-muted-foreground">
-            Driver performance and order history
-          </p>
-        </div>
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <Badge className={driver.is_active ? 'bg-success text-success-foreground' : 'bg-gray-400 text-white'}>
-            {driver.is_active ? 'Active' : 'Inactive'}
-          </Badge>
-        </div>
-      </div>
+    <div className="space-y-5 sm:space-y-6">
+      <WorkspaceHeading
+        eyebrow="Fleet operations"
+        title={driver.name}
+        description="Driver performance and order history."
+        backTo={ROUTES.drivers}
+        backLabel="Back to drivers"
+      >
+        <Badge className={driver.is_active ? 'bg-success text-success-foreground' : 'bg-gray-400 text-white'}>
+          {driver.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      </WorkspaceHeading>
 
       {/* Driver Info Card */}
       <Card>

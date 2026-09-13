@@ -21,6 +21,7 @@ import { useAuthStore } from '../stores/authStore';
 import { getRoleDisplayName, hasPermission } from '../lib/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '@/routes/routes';
+import { preloadRoute } from '@/routes/routeModules';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -151,6 +152,9 @@ export function Sidebar({ isMobile = false, mobileOpen = false, onMobileClose }:
           return (
             <Button
               key={index}
+              onPointerEnter={() => { void preloadRoute(item.path); }}
+              onFocus={() => { void preloadRoute(item.path); }}
+              onTouchStart={() => { void preloadRoute(item.path); }}
               variant="ghost"
               aria-label={item.label} aria-current={item.active ? "page" : undefined} onClick={() => handleNavigation(item.path)}
               className={cn(

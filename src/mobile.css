@@ -22,10 +22,6 @@
   .phone-safe-page .page-header-title { font-size: 28px; }
   .phone-safe-page .eyebrow { font-size: 11px; letter-spacing: .1em; }
   .dashboard-workspace { gap: 20px; }
-  .operations-heading { gap: 14px; padding-bottom: 0; }
-  .operations-heading h1 { margin-top: 10px; font-size: 32px; }
-  .operations-heading h1 > span { display: inline; }
-  .operations-description { margin-top: 8px; font-size: 14px; line-height: 1.6; }
   .operations-date { font-size: 12px; }
   .operations-heading-actions { grid-template-columns: 1fr; gap: 8px; }
   .operations-heading-actions > button { width: 100%; font-size: 14px; }

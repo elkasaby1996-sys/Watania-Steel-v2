@@ -1,3 +1,4 @@
+import { WorkspaceHeading } from '@/components/WorkspaceHeading';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertTriangle,
-  ArrowLeft,
   Calendar,
   CheckCircle,
   ChevronDown,
@@ -22,7 +22,6 @@ import {
 import { OrderDetailsDialog } from '../components/OrderDetailsDialog';
 import { useAuthStore } from '../stores/authStore';
 import { hasPermission } from '../lib/auth';
-import { useNavigate } from 'react-router-dom';
 import { type HistoryOrder, historyService, type HistoryOrderFilters } from '../lib/supabase';
 import { useToast } from '../hooks/use-toast';
 import { RoleBasedComponent } from '../components/RoleBasedComponent';
@@ -46,7 +45,6 @@ type DailyMetric = {
 export function History() {
   const { user } = useAuthStore();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const { isMobile } = useDeviceInfo();
 
   const [historySearchQuery, setHistorySearchQuery] = useState('');
@@ -109,7 +107,7 @@ export function History() {
     previousController?.abort();
     const params = { page, pageSize: HISTORY_PAGE_SIZE, filters };
     const key = 'history:' + JSON.stringify(params);
-    const cached = peekQuery<HistoryOrderPage>(key);
+    const cached = peekQuery<HistoryOrderPage>(key, { allowStale: true });
     if (cached) {
       setHistoryOrders(cached.data); setTotalCount(cached.count);
       setServerTotalPages(cached.totalPages || 1);
@@ -370,34 +368,15 @@ export function History() {
 
   return (
     <div className="history-workspace space-y-4 sm:space-y-5">
-      <section className="rounded-lg border border-border bg-card px-4 py-4 shadow-card sm:px-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0 space-y-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(ROUTES.dashboard)}
-              className="h-8 w-fit px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-            >
-              <ArrowLeft size={15} />
-              Dashboard
-            </Button>
-            <div>
-              <h1 className="break-words font-headline text-2xl font-semibold text-foreground sm:text-3xl">
-                Delivery Archive
-              </h1>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                Delivered orders by date, tonnage, driver, and signed delivery note.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:justify-end">
-            <span>{totalCount.toLocaleString()} delivered orders</span>
-            <span className="hidden text-border sm:inline">|</span>
-            <span>{resultSummary}</span>
-          </div>
-        </div>
-      </section>
+      <WorkspaceHeading
+        eyebrow="Delivery history"
+        title="Delivery archive"
+        description="Delivered orders by date, tonnage, driver, and signed delivery note."
+        backTo={ROUTES.dashboard}
+      >
+        <span>{totalCount.toLocaleString()} delivered orders</span>
+        <small>{resultSummary}</small>
+      </WorkspaceHeading>
 
       <section className="rounded-lg border border-border bg-card px-4 py-4 shadow-card sm:px-5">
         <div className="grid gap-3 xl:grid-cols-[minmax(260px,1.55fr)_minmax(180px,0.9fr)_minmax(160px,0.7fr)_minmax(320px,1.25fr)_minmax(210px,auto)] xl:items-end">

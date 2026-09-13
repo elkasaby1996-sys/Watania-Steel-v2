@@ -24,6 +24,7 @@ interface OrderDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   readOnly?: boolean;
   onHistoryUpdated?: () => void | Promise<void>;
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 interface OrderFormData {
@@ -57,7 +58,8 @@ export function OrderDetailsDialog({
   open,
   onOpenChange,
   readOnly = false,
-  onHistoryUpdated
+  onHistoryUpdated,
+  onCloseAutoFocus
 }: OrderDetailsDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -468,7 +470,7 @@ export function OrderDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] bg-background text-foreground max-h-[90vh] overflow-y-auto" aria-describedby="order-details-description">
+      <DialogContent className="sm:max-w-[700px] bg-background text-foreground max-h-[90vh] overflow-y-auto" aria-describedby="order-details-description" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-foreground">Order Details - {
